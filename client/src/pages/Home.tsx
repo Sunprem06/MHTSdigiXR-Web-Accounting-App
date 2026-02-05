@@ -137,8 +137,8 @@ export default function Home() {
     <div className="overflow-hidden">
       {/* Hero Section - World Class */}
       <section className="relative min-h-[90vh] flex items-center overflow-hidden">
-        {/* Left side - White background with content */}
-        <div className="w-full lg:w-1/2 py-20 lg:py-32 px-4 md:px-6 lg:px-12 xl:px-20 bg-white dark:bg-slate-950 relative z-10">
+        {/* Left side - Transparent to show watermark */}
+        <div className="w-full lg:w-1/2 py-20 lg:py-32 px-4 md:px-6 lg:px-12 xl:px-20 relative z-10">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -282,8 +282,8 @@ export default function Home() {
           </svg>
         </div>
 
-        {/* Mobile gradient background */}
-        <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-white via-white to-sky-100/50 dark:from-slate-950 dark:via-slate-950 dark:to-sky-900/30 -z-10" />
+        {/* Mobile gradient background - semi-transparent to show watermark */}
+        <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-white/80 via-white/70 to-sky-100/50 dark:from-slate-950/80 dark:via-slate-950/70 dark:to-sky-900/30 -z-10" />
       </section>
 
       {/* Stats Counter Section */}

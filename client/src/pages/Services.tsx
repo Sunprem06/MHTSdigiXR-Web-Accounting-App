@@ -1,6 +1,96 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Server, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Server, CheckCircle2, GraduationCap, Clock, IndianRupee, Users } from "lucide-react";
+import { SiReact, SiNextdotjs, SiNodedotjs, SiWordpress, SiShopify, SiPython, SiMongodb, SiAmazon } from "react-icons/si";
+
+const WHY_CHOOSE_US = [
+  {
+    icon: GraduationCap,
+    title: "Experienced Team",
+    desc: "10+ years of combined expertise in digital marketing and web development."
+  },
+  {
+    icon: BarChart3,
+    title: "Result-Driven Approach",
+    desc: "We focus on measurable outcomes that directly impact your business growth."
+  },
+  {
+    icon: Clock,
+    title: "24/7 Support",
+    desc: "Round-the-clock customer support to address your concerns anytime."
+  },
+  {
+    icon: IndianRupee,
+    title: "Transparent Pricing",
+    desc: "No hidden costs. Clear, upfront pricing for all our services."
+  }
+];
+
+const TECH_STACK = [
+  { icon: SiReact, name: "React", category: "FRONTEND" },
+  { icon: SiNextdotjs, name: "Next.js", category: "FRAMEWORK" },
+  { icon: SiNodedotjs, name: "Node.js", category: "BACKEND" },
+  { icon: SiWordpress, name: "WordPress", category: "CMS" },
+  { icon: SiShopify, name: "Shopify", category: "E-COMMERCE" },
+  { icon: SiPython, name: "Python", category: "BACKEND" },
+  { icon: SiMongodb, name: "MongoDB", category: "DATABASE" },
+  { icon: SiAmazon, name: "AWS", category: "CLOUD" }
+];
+
+const PRICING_PLANS = [
+  {
+    name: "Starter",
+    price: "15,000",
+    period: "one-time",
+    description: "Perfect for small businesses getting started online",
+    features: [
+      "Basic website (5 pages)",
+      "Mobile responsive",
+      "Basic SEO setup",
+      "Contact form",
+      "1 month support",
+      "Social media integration"
+    ],
+    cta: "GET STARTED",
+    popular: false
+  },
+  {
+    name: "Growth",
+    price: "35,000",
+    period: "one-time",
+    description: "Comprehensive solution for growing businesses",
+    features: [
+      "Custom website (10 pages)",
+      "Advanced SEO",
+      "Blog integration",
+      "E-commerce (basic)",
+      "3 months support",
+      "Google Analytics",
+      "Content management",
+      "Email marketing setup"
+    ],
+    cta: "MOST POPULAR",
+    popular: true
+  },
+  {
+    name: "Enterprise",
+    price: "Custom",
+    period: "quote",
+    description: "Tailored solutions for large-scale projects",
+    features: [
+      "Unlimited pages",
+      "Custom features",
+      "Advanced e-commerce",
+      "API integrations",
+      "Dedicated support",
+      "Performance optimization",
+      "Security hardening",
+      "Monthly maintenance"
+    ],
+    cta: "CONTACT SALES",
+    popular: false
+  }
+];
 
 const SERVICES_LIST = [
   {
@@ -150,12 +240,141 @@ export default function Services() {
           ))}
         </div>
 
+        {/* Why Choose Us Section */}
+        <section className="mt-24 mb-20">
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl py-16 px-8">
+            <div className="text-center mb-12">
+              <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm tracking-wider mb-3">WHY CHOOSE US</p>
+              <h2 className="text-3xl md:text-5xl font-bold dark:text-white">
+                Your Success is <span className="text-emerald-500 italic">Our Mission</span>
+              </h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {WHY_CHOOSE_US.map((item, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm hover:shadow-lg transition-shadow text-center"
+                >
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center mx-auto mb-6">
+                    <item.icon className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-3 dark:text-white">{item.title}</h3>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{item.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Technology Stack Section */}
+        <section className="mb-24">
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl py-16 px-8">
+            <div className="text-center mb-12">
+              <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm tracking-wider mb-3">TECHNOLOGY STACK</p>
+              <h2 className="text-3xl md:text-5xl font-bold dark:text-white">
+                Powered by <span className="text-emerald-500 italic">Modern Tech</span>
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto mt-4">
+                We leverage cutting-edge technologies to build scalable, secure, and high-performance solutions.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {TECH_STACK.map((tech, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.05 }}
+                  whileHover={{ y: -5 }}
+                  className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm hover:shadow-lg transition-all text-center cursor-pointer"
+                >
+                  <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto mb-4">
+                    <tech.icon className="w-8 h-8 text-slate-700 dark:text-slate-300" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">{tech.name}</h3>
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">{tech.category}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing Section */}
+        <section className="mb-20">
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl py-16 px-8">
+            <div className="text-center mb-12">
+              <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm tracking-wider mb-3">PRICING PLANS</p>
+              <h2 className="text-3xl md:text-5xl font-bold dark:text-white">
+                Transparent <span className="text-emerald-500 italic">Pricing</span>
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto mt-4">
+                Choose the plan that fits your needs. All plans include our quality guarantee.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {PRICING_PLANS.map((plan, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className={`relative bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg ${plan.popular ? 'ring-2 ring-emerald-500 scale-105' : ''}`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs font-bold px-4 py-1 rounded-full">
+                      RECOMMENDED
+                    </div>
+                  )}
+                  
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{plan.name}</h3>
+                  <div className="flex items-baseline gap-1 mb-2">
+                    {plan.price !== "Custom" && <span className="text-2xl font-bold text-slate-900 dark:text-white">₹</span>}
+                    <span className="text-4xl font-bold text-slate-900 dark:text-white">{plan.price}</span>
+                    <span className="text-slate-500 dark:text-slate-400 text-sm ml-1">{plan.period}</span>
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">{plan.description}</p>
+                  
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, j) => (
+                      <li key={j} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  <Link 
+                    href="/contact" 
+                    className={`block w-full py-3 rounded-xl text-center font-bold transition-all ${
+                      plan.popular 
+                        ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
+                        : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'
+                    }`}
+                    data-testid={`button-pricing-${plan.name.toLowerCase()}`}
+                  >
+                    {plan.cta}
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* CTA Section */}
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-20 text-center"
+          className="text-center"
         >
           <div className="bg-gradient-to-br from-emerald-50 to-sky-50 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Need a Custom Solution?</h2>

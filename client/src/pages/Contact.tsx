@@ -26,15 +26,20 @@ export default function Contact() {
 
   return (
     <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
-      <section className="bg-slate-900 dark:bg-black text-white py-20 mb-16 relative overflow-hidden">
+      <section className="bg-slate-900 dark:bg-black py-20 mb-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 to-sky-900/30" />
         <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
         <div className="container mx-auto px-4 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">Contact Us</h1>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 text-sm font-semibold mb-6">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Get in Touch
+            </div>
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white">Contact Us</h1>
             <p className="text-xl text-slate-300 max-w-2xl mx-auto">
               Have a project in mind? Let's discuss how we can help you grow.
             </p>

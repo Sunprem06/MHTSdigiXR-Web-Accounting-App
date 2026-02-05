@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Check, Quote, Users, Target, Lightbulb, Award, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
+import teamMemberImage from "@/assets/images/team-member.png";
 
 const TEAM_VALUES = [
   { icon: Target, title: "Result-Driven", desc: "Every strategy we craft is aimed at delivering measurable outcomes for your business." },
@@ -84,9 +85,9 @@ export default function About() {
               </div>
               <div className="lg:col-span-2">
                 <img 
-                  src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&q=80" 
-                  alt="Leadership Team" 
-                  className="rounded-2xl shadow-2xl mx-auto w-full max-w-xs"
+                  src={teamMemberImage}
+                  alt="MHTSdigiX Team Representative" 
+                  className="rounded-2xl shadow-2xl mx-auto w-full max-w-xs object-cover"
                 />
                 <div className="text-center mt-6">
                   <p className="text-white font-bold text-lg">The MHTSdigiX Team</p>
