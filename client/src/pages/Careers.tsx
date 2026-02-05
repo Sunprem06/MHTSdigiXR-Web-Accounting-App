@@ -21,26 +21,30 @@ interface JobPosition {
 
 const JOB_POSITIONS: JobPosition[] = [
   {
-    id: "frontend-dev",
-    title: "Frontend Developer",
+    id: "fullstack-dev",
+    title: "Full Stack Developer",
     department: "Engineering",
     location: "Chennai, India",
     type: "Full-time",
-    experience: "2-4 years",
-    description: "We're looking for a talented Frontend Developer to build beautiful, responsive web applications using React and modern JavaScript frameworks.",
+    experience: "3-5 years",
+    description: "We're looking for a talented Full Stack Developer with expertise in both frontend and backend technologies to build complete, end-to-end web applications.",
     requirements: [
-      "2+ years of experience with React.js",
-      "Strong proficiency in HTML5, CSS3, and JavaScript/TypeScript",
-      "Experience with state management (Redux, Zustand, or similar)",
-      "Familiarity with REST APIs and GraphQL",
-      "Understanding of responsive design and cross-browser compatibility",
-      "Good communication and teamwork skills"
+      "3+ years of experience in full stack development",
+      "Strong proficiency in React.js, Next.js, and TypeScript",
+      "Experience with Node.js, Express, and RESTful APIs",
+      "Knowledge of databases (PostgreSQL, MongoDB, MySQL)",
+      "Understanding of cloud services (AWS, GCP, or Azure)",
+      "Experience with Git, Docker, and CI/CD pipelines",
+      "Familiarity with Agile development methodologies",
+      "Strong problem-solving and communication skills"
     ],
     responsibilities: [
-      "Develop and maintain high-quality web applications",
-      "Collaborate with designers to implement pixel-perfect UI",
-      "Write clean, reusable, and well-documented code",
-      "Optimize applications for maximum speed and scalability",
+      "Design and develop complete web applications (frontend + backend)",
+      "Build responsive, user-friendly interfaces with React",
+      "Develop robust APIs and server-side applications",
+      "Optimize applications for performance and scalability",
+      "Collaborate with designers and product managers",
+      "Write clean, maintainable, and well-documented code",
       "Participate in code reviews and mentor junior developers"
     ]
   },
@@ -90,30 +94,6 @@ const JOB_POSITIONS: JobPosition[] = [
       "Analyze campaign performance and prepare reports",
       "Optimize campaigns for better ROI",
       "Stay updated with latest digital marketing trends"
-    ]
-  },
-  {
-    id: "backend-dev",
-    title: "Backend Developer",
-    department: "Engineering",
-    location: "Chennai, India",
-    type: "Full-time",
-    experience: "3-5 years",
-    description: "Looking for an experienced Backend Developer to build robust, scalable server-side applications and APIs.",
-    requirements: [
-      "3+ years of experience with Node.js or Python",
-      "Strong knowledge of databases (PostgreSQL, MongoDB)",
-      "Experience with RESTful API design and development",
-      "Understanding of cloud services (AWS, GCP, Azure)",
-      "Familiarity with Docker and containerization",
-      "Experience with microservices architecture is a plus"
-    ],
-    responsibilities: [
-      "Design and develop scalable backend systems",
-      "Build and maintain RESTful APIs",
-      "Optimize database queries and performance",
-      "Implement security best practices",
-      "Collaborate with frontend team for API integration"
     ]
   },
   {
