@@ -23,6 +23,7 @@ import Home from "@/pages/Home";
 import Services from "@/pages/Services";
 import ServiceDetail from "@/pages/ServiceDetail";
 import FAQ from "@/pages/FAQ";
+import Careers from "@/pages/Careers";
 import Workflow from "@/pages/Workflow";
 import CaseStudies from "@/pages/CaseStudies";
 import Blog from "@/pages/Blog";
@@ -52,6 +53,7 @@ function Router() {
             <Route path="/services" component={Services} />
             <Route path="/services/:slug" component={ServiceDetail} />
             <Route path="/faq" component={FAQ} />
+            <Route path="/careers" component={Careers} />
             <Route path="/workflow" component={Workflow} />
             <Route path="/case-studies" component={CaseStudies} />
             <Route path="/blog" component={Blog} />
