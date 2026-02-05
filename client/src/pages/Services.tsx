@@ -9,7 +9,8 @@ const SERVICES_LIST = [
     title: "Web Development",
     desc: "From corporate websites to complex web applications, we build robust, scalable, and secure web solutions.",
     features: ["Custom CMS", "E-commerce Solutions", "Progressive Web Apps"],
-    color: "from-blue-500 to-blue-600"
+    color: "from-blue-500 to-blue-600",
+    image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&q=80"
   },
   {
     slug: "mobile-app",
@@ -17,7 +18,8 @@ const SERVICES_LIST = [
     title: "Mobile App Development",
     desc: "Native and cross-platform mobile applications that provide seamless user experiences on iOS and Android.",
     features: ["iOS & Android", "React Native / Flutter", "App Store Optimization"],
-    color: "from-purple-500 to-purple-600"
+    color: "from-purple-500 to-purple-600",
+    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&q=80"
   },
   {
     slug: "digital-marketing",
@@ -25,7 +27,8 @@ const SERVICES_LIST = [
     title: "Digital Marketing",
     desc: "Data-driven marketing strategies to increase brand visibility, drive traffic, and boost conversions.",
     features: ["Social Media Marketing", "PPC Campaigns", "Content Strategy"],
-    color: "from-orange-500 to-orange-600"
+    color: "from-orange-500 to-orange-600",
+    image: "https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=600&q=80"
   },
   {
     slug: "ui-ux",
@@ -33,7 +36,8 @@ const SERVICES_LIST = [
     title: "UI/UX Design",
     desc: "Creating intuitive and engaging user interfaces that delight users and solve complex problems.",
     features: ["User Research", "Wireframing", "Interactive Prototyping"],
-    color: "from-pink-500 to-pink-600"
+    color: "from-pink-500 to-pink-600",
+    image: "https://images.unsplash.com/photo-1586717791821-3f44a5638d0f?w=600&q=80"
   },
   {
     slug: "seo",
@@ -41,7 +45,8 @@ const SERVICES_LIST = [
     title: "SEO Optimization",
     desc: "Improve your search engine rankings and drive organic traffic with our proven SEO strategies.",
     features: ["On-page SEO", "Technical Audits", "Link Building"],
-    color: "from-green-500 to-green-600"
+    color: "from-green-500 to-green-600",
+    image: "https://images.unsplash.com/photo-1432888622747-4eb9a8efeb07?w=600&q=80"
   },
   {
     slug: "branding",
@@ -49,7 +54,8 @@ const SERVICES_LIST = [
     title: "Branding & Graphics",
     desc: "Build a memorable brand identity with professional logo design and visual assets.",
     features: ["Logo Design", "Brand Guidelines", "Marketing Collateral"],
-    color: "from-red-500 to-red-600"
+    color: "from-red-500 to-red-600",
+    image: "https://images.unsplash.com/photo-1626785774573-4b7993125486?w=600&q=80"
   },
   {
     slug: "hosting",
@@ -57,7 +63,8 @@ const SERVICES_LIST = [
     title: "Domain & Hosting",
     desc: "Secure and reliable hosting solutions to keep your website running 24/7.",
     features: ["SSL Certificates", "Cloud Hosting", "Domain Management"],
-    color: "from-cyan-500 to-cyan-600"
+    color: "from-cyan-500 to-cyan-600",
+    image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&q=80"
   },
   {
     slug: "video-animation",
@@ -65,7 +72,8 @@ const SERVICES_LIST = [
     title: "Video & Animation",
     desc: "Captivate your audience with high-quality video content and motion graphics.",
     features: ["Explainer Videos", "Social Media Shorts", "3D Animation"],
-    color: "from-yellow-500 to-yellow-600"
+    color: "from-yellow-500 to-yellow-600",
+    image: "https://images.unsplash.com/photo-1574717024453-354056b9f6bc?w=600&q=80"
   }
 ];
 
@@ -106,25 +114,35 @@ export default function Services() {
               transition={{ delay: index * 0.05 }}
               whileHover={{ y: -8 }}
             >
-              <Link href={`/services/${service.slug}`}>
-                <div className="h-full bg-white dark:bg-slate-800 rounded-2xl p-8 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-700 transition-all duration-300 cursor-pointer group">
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${service.color} flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
-                    <service.icon className="w-8 h-8" />
+              <Link href={`/services/${service.slug}`} data-testid={`link-service-${service.slug}`}>
+                <div className="h-full bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-700 transition-all duration-300 cursor-pointer group" data-testid={`card-service-${service.slug}`}>
+                  <div className="relative h-48 overflow-hidden">
+                    <img 
+                      src={service.image} 
+                      alt={service.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className={`absolute top-4 left-4 w-12 h-12 rounded-xl bg-gradient-to-br ${service.color} flex items-center justify-center text-white shadow-lg`}>
+                      <service.icon className="w-6 h-6" />
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-bold mb-4 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors dark:text-white">{service.title}</h3>
-                  <p className="text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                    {service.desc}
-                  </p>
-                  <ul className="space-y-2 mb-8">
-                    {service.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 font-medium">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="flex items-center text-emerald-600 dark:text-emerald-400 font-bold group-hover:translate-x-2 transition-transform">
-                    Learn more <ArrowRight className="w-4 h-4 ml-2" />
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold mb-3 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors dark:text-white">{service.title}</h3>
+                    <p className="text-slate-500 dark:text-slate-400 mb-4 leading-relaxed text-sm">
+                      {service.desc}
+                    </p>
+                    <ul className="space-y-2 mb-6">
+                      {service.features.map((feature, i) => (
+                        <li key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 font-medium">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex items-center text-emerald-600 dark:text-emerald-400 font-bold group-hover:translate-x-2 transition-transform" data-testid={`text-learn-more-${service.slug}`}>
+                      Learn more <ArrowRight className="w-4 h-4 ml-2" />
+                    </div>
                   </div>
                 </div>
               </Link>
