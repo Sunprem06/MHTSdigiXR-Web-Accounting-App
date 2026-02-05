@@ -136,7 +136,7 @@ export default function Home() {
   return (
     <div className="overflow-hidden">
       {/* Hero Section - Single White Background with Dark Tech Illustration */}
-      <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-white dark:bg-slate-950">
+      <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-white/80 dark:bg-slate-950/80">
         <div className="container mx-auto px-4 md:px-6 lg:px-12 py-20 lg:py-32 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left side - Text content */}
@@ -186,20 +186,20 @@ export default function Home() {
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Link 
                     href="/contact" 
-                    className="group px-6 py-3 rounded-md bg-sky-500 hover:bg-sky-600 text-white font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2" 
+                    className="group px-8 py-3.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2" 
                     data-testid="button-get-started"
                   >
-                    Get Started Today
+                    Start Your Project
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Link 
                     href="/services" 
-                    className="px-6 py-3 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all" 
+                    className="px-8 py-3.5 rounded-full bg-transparent text-emerald-600 dark:text-emerald-400 border-2 border-emerald-500 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all" 
                     data-testid="link-view-services"
                   >
-                    Our Services
+                    View Our Work
                   </Link>
                 </motion.div>
               </div>
@@ -657,14 +657,14 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Link href="/contact" className="inline-block px-10 py-5 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30" data-testid="button-start-project">
+                <Link href="/contact" className="inline-block px-10 py-5 rounded-full bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30" data-testid="button-start-project">
                   Start Your Project
                 </Link>
               </motion.div>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <a href="https://wa.me/917358105995" target="_blank" className="inline-block px-10 py-5 rounded-xl bg-white/10 backdrop-blur-sm text-white border border-white/20 font-bold hover:bg-white/20 transition-all" data-testid="link-whatsapp">
-                  Chat on WhatsApp
-                </a>
+                <Link href="/case-studies" className="inline-block px-10 py-5 rounded-full bg-transparent text-white border-2 border-white/50 font-bold hover:bg-white/10 transition-all" data-testid="link-view-work">
+                  View Our Work
+                </Link>
               </motion.div>
             </div>
           </motion.div>

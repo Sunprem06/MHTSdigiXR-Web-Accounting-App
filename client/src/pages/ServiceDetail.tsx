@@ -76,8 +76,8 @@ export default function ServiceDetail() {
               </ul>
             </div>
 
-            <Link href="/contact" className="inline-block w-full text-center py-4 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all shadow-lg hover:shadow-emerald-500/25">
-              Request a Quote
+            <Link href="/contact" className="inline-block w-full text-center py-4 rounded-full bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-all shadow-lg hover:shadow-emerald-500/25">
+              Start Your Project
             </Link>
           </motion.div>
 
