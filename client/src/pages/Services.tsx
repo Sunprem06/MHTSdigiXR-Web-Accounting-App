@@ -127,7 +127,7 @@ const SERVICES_LIST = [
     desc: "Creating intuitive and engaging user interfaces that delight users and solve complex problems.",
     features: ["User Research", "Wireframing", "Interactive Prototyping"],
     color: "from-pink-500 to-pink-600",
-    image: "https://images.unsplash.com/photo-1586717791821-3f44a5638d0f?w=600&q=80"
+    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600&q=80"
   },
   {
     slug: "seo",
@@ -145,7 +145,7 @@ const SERVICES_LIST = [
     desc: "Build a memorable brand identity with professional logo design and visual assets.",
     features: ["Logo Design", "Brand Guidelines", "Marketing Collateral"],
     color: "from-red-500 to-red-600",
-    image: "https://images.unsplash.com/photo-1626785774573-4b7993125486?w=600&q=80"
+    image: "https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=600&q=80"
   },
   {
     slug: "hosting",
@@ -163,7 +163,7 @@ const SERVICES_LIST = [
     desc: "Captivate your audience with high-quality video content and motion graphics.",
     features: ["Explainer Videos", "Social Media Shorts", "3D Animation"],
     color: "from-yellow-500 to-yellow-600",
-    image: "https://images.unsplash.com/photo-1574717024453-354056b9f6bc?w=600&q=80"
+    image: "https://images.unsplash.com/photo-1536240478700-b869070f9279?w=600&q=80"
   }
 ];
 

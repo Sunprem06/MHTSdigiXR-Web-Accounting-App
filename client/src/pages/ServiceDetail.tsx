@@ -104,7 +104,7 @@ const SERVICES_DATA: Record<string, {
     title: "UI/UX Design",
     desc: "Creating intuitive and engaging user interfaces that delight users and solve problems.",
     longDesc: "Great design is invisible - it just works. Our UI/UX team creates interfaces that are beautiful, functional, and user-focused. We combine research, creativity, and usability testing to deliver designs that convert.",
-    image: "https://images.unsplash.com/photo-1586717791821-3f44a5638d0f?w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=1200&q=80",
     features: [
       "User Research & Personas",
       "Wireframing & Information Architecture",
@@ -162,7 +162,7 @@ const SERVICES_DATA: Record<string, {
     title: "Branding & Graphics",
     desc: "Build a memorable brand identity with professional logo design and visual assets.",
     longDesc: "Your brand is more than just a logo - it's the entire experience customers have with your business. We create cohesive brand identities that resonate with your target audience and set you apart from competitors.",
-    image: "https://images.unsplash.com/photo-1626785774573-4b7993125486?w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=1200&q=80",
     features: [
       "Logo Design & Variations",
       "Brand Identity Guidelines",
@@ -220,7 +220,7 @@ const SERVICES_DATA: Record<string, {
     title: "Video & Animation",
     desc: "Captivate your audience with high-quality video content and motion graphics.",
     longDesc: "Video is the most engaging content format. We create compelling explainer videos, social media content, and animations that tell your story, explain complex concepts, and drive action from your audience.",
-    image: "https://images.unsplash.com/photo-1574717024453-354056b9f6bc?w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1536240478700-b869070f9279?w=1200&q=80",
     features: [
       "Explainer Videos (2D & 3D)",
       "Social Media Video Content",
