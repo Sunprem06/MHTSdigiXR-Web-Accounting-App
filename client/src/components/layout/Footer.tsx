@@ -17,7 +17,10 @@ export function Footer() {
                 alt="MHTSdigiX Logo" 
                 className="w-10 h-10 rounded-lg object-cover"
               />
-              <span className="font-display font-bold text-xl text-white">MHTSdigiX</span>
+              <div className="flex flex-col">
+                <span className="font-display font-extrabold text-lg text-white">MHTSdigiX</span>
+                <span className="text-[10px] font-medium text-slate-400 tracking-wide">Maanagaram Hi Tech Solutions</span>
+              </div>
             </div>
             <p className="text-slate-400 mb-6 leading-relaxed">
               Empowering businesses with cutting-edge digital solutions. From web development to AI integration, we are your partner in growth.

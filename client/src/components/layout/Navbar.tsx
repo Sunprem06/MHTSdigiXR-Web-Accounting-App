@@ -58,11 +58,11 @@ export function Navbar() {
               className="w-12 h-12 rounded-xl shadow-lg group-hover:scale-105 transition-transform object-cover"
             />
             <div className="flex flex-col">
-              <span className={`font-display font-bold text-lg leading-tight ${scrolled ? 'text-slate-900 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
-                Maanagaram
-              </span>
-              <span className="text-xs font-medium text-emerald-600 tracking-wider">
+              <span className={`font-display font-extrabold text-lg leading-tight ${scrolled ? 'text-slate-900 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
                 MHTSdigiX
+              </span>
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 tracking-wide">
+                Maanagaram Hi Tech Solutions
               </span>
             </div>
           </Link>
