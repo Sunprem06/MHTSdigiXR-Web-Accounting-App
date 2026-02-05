@@ -86,3 +86,10 @@ Located in `server/replit_integrations/`, these provide:
 - DM Sans (body text)
 - Outfit (display headings)
 - Loaded via Google Fonts in `client/index.html`
+
+## Notes for Future Development
+
+### Payment Gateway
+- Stripe integration was proposed but dismissed by user. If needed in future:
+  - User can set up Stripe via Replit's integration system
+  - Alternatively, user can provide STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY as secrets
