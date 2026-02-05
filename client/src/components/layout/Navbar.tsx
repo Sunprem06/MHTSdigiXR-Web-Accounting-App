@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Menu, X, Phone, Globe, Sun, Moon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import logoImage from "@assets/MHTS_DigiX-Logo_300x300_1770302687256.jpg";
 
 const links = [
   { href: "/", label: "Home" },
@@ -51,11 +52,13 @@ export function Navbar() {
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:scale-105 transition-transform">
-              M
-            </div>
+            <img 
+              src={logoImage} 
+              alt="MHTSdigiX Logo" 
+              className="w-12 h-12 rounded-xl shadow-lg group-hover:scale-105 transition-transform object-cover"
+            />
             <div className="flex flex-col">
-              <span className={`font-display font-bold text-lg leading-tight ${scrolled ? 'text-slate-900' : 'text-slate-900'}`}>
+              <span className={`font-display font-bold text-lg leading-tight ${scrolled ? 'text-slate-900 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
                 Maanagaram
               </span>
               <span className="text-xs font-medium text-emerald-600 tracking-wider">

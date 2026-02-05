@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from "lucide-react";
+import logoImage from "@assets/MHTS_DigiX-Logo_300x300_1770302687256.jpg";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -11,9 +12,11 @@ export function Footer() {
           {/* Company Info */}
           <div>
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center text-white font-bold text-lg">
-                M
-              </div>
+              <img 
+                src={logoImage} 
+                alt="MHTSdigiX Logo" 
+                className="w-10 h-10 rounded-lg object-cover"
+              />
               <span className="font-display font-bold text-xl text-white">MHTSdigiX</span>
             </div>
             <p className="text-slate-400 mb-6 leading-relaxed">
