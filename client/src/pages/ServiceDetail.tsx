@@ -286,7 +286,7 @@ export default function ServiceDetail() {
               {service.longDesc}
             </p>
             
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-bold hover:bg-sky-600 transition-all shadow-lg hover:shadow-sky-500/25" data-testid="button-start-project">
                 Start Your Project
               </Link>
@@ -306,7 +306,7 @@ export default function ServiceDetail() {
               alt={service.title} 
               className="rounded-3xl shadow-2xl w-full object-cover aspect-[4/3]"
             />
-            <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-black/10" />
+            <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-black/10 dark:ring-white/10" />
           </motion.div>
         </div>
 
@@ -436,7 +436,7 @@ export default function ServiceDetail() {
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
               Let's discuss how our {service.title.toLowerCase()} services can help grow your business. Get a free consultation today.
             </p>
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-4">
               <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg" data-testid="button-contact-us">
                 Get Free Quote
               </Link>
