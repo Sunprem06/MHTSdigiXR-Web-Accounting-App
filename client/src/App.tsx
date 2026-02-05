@@ -28,7 +28,7 @@ function Router() {
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center center',
           backgroundSize: '40%',
-          opacity: 0.08,
+          opacity: 0.1,
         }}
       />
       <div className="relative z-10 flex flex-col min-h-screen">
