@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Server, CheckCircle2, GraduationCap, Clock, IndianRupee, Users } from "lucide-react";
+import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Server, CheckCircle2, GraduationCap, Clock, IndianRupee, Users, HelpCircle } from "lucide-react";
 import { SiReact, SiNextdotjs, SiNodedotjs, SiWordpress, SiShopify, SiPython, SiMongodb, SiAmazon } from "react-icons/si";
 
 const WHY_CHOOSE_US = [
@@ -368,6 +368,32 @@ export default function Services() {
             </div>
           </div>
         </section>
+
+        {/* FAQ Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mb-20"
+        >
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-12 text-center">
+            <div className="w-20 h-20 rounded-full bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center mx-auto mb-6">
+              <HelpCircle className="w-10 h-10 text-sky-500" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Have Questions?</h2>
+            <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
+              Find answers to common questions about our services, pricing, timelines, and processes in our comprehensive FAQ section.
+            </p>
+            <Link 
+              href="/faq" 
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg shadow-sky-500/30" 
+              data-testid="button-services-faq"
+            >
+              <HelpCircle className="w-5 h-5" />
+              View FAQ & Common Questions
+            </Link>
+          </div>
+        </motion.section>
 
         {/* CTA Section */}
         <motion.section 
