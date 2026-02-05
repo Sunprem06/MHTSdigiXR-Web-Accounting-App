@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MHTSdigiX Deployment Guide for Hostinger</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            color: #333;
+        }
+        h1 { color: #0ea5e9; border-bottom: 3px solid #0ea5e9; padding-bottom: 10px; }
+        h2 { color: #0284c7; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        h3 { color: #0369a1; }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        pre code { background: transparent; color: inherit; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th { background: #0ea5e9; color: white; }
+        tr:nth-child(even) { background: #f8fafc; }
+        .important {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .step-box {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .step-number {
+            background: #0ea5e9;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        ul, ol { padding-left: 25px; }
+        li { margin: 8px 0; }
+        .logo { text-align: center; margin-bottom: 30px; }
+        .logo h1 { font-size: 28px; margin: 0; }
+        .logo p { color: #64748b; margin: 5px 0; }
+        hr { border: none; border-top: 2px solid #e2e8f0; margin: 30px 0; }
+        @media print {
+            body { padding: 20px; }
+            pre { white-space: pre-wrap; word-wrap: break-word; }
+            .step-box { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="logo">
+    <h1>MHTSdigiX Deployment Guide</h1>
+    <p>Complete Instructions for Hostinger with maanagaram.com</p>
+    <p><strong>Document Version:</strong> 1.0 | <strong>Last Updated:</strong> February 2026</p>
+</div>
+
+<hr>
+
+<div class="important">
+    <strong>IMPORTANT: Hosting Type Required</strong><br><br>
+    Your MHTSdigiX website is a <strong>full-stack Node.js application</strong> with:
+    <ul>
+        <li>React frontend</li>
+        <li>Express.js backend</li>
+        <li>PostgreSQL database</li>
+        <li>OpenAI API integration (Meena chatbot)</li>
+    </ul>
+    <strong>You need Hostinger VPS Hosting</strong> (not shared hosting) because shared hosting doesn't support Node.js backends.
+</div>
+
+<h2>Step 1: Purchase Hostinger VPS Hosting</h2>
+<div class="step-box">
+    <ol>
+        <li>Go to <strong>hostinger.com/vps-hosting</strong></li>
+        <li>Choose a plan (recommended: <strong>KVM 2</strong> or higher)
+            <ul>
+                <li>Minimum: 2 GB RAM, 2 CPU cores</li>
+                <li>Recommended: 4 GB RAM, 2 CPU cores</li>
+            </ul>
+        </li>
+        <li>Select <strong>Ubuntu 22.04</strong> as Operating System</li>
+        <li>Complete purchase</li>
+    </ol>
+</div>
+
+<h2>Step 2: Connect Your Domain (maanagaram.com)</h2>
+<div class="step-box">
+    <h3>If domain is registered on Hostinger:</h3>
+    <ol>
+        <li>Log in to Hostinger hPanel</li>
+        <li>Go to <strong>Domains</strong> → <strong>maanagaram.com</strong></li>
+        <li>Click <strong>DNS / Nameservers</strong></li>
+        <li>Add A Record:
+            <ul>
+                <li>Type: <code>A</code></li>
+                <li>Name: <code>@</code></li>
+                <li>Points to: <code>[Your VPS IP Address]</code></li>
+                <li>TTL: <code>14400</code></li>
+            </ul>
+        </li>
+        <li>Add another A Record for www:
+            <ul>
+                <li>Type: <code>A</code></li>
+                <li>Name: <code>www</code></li>
+                <li>Points to: <code>[Your VPS IP Address]</code></li>
+            </ul>
+        </li>
+    </ol>
+</div>
+
+<h2>Step 3: Access Your VPS</h2>
+<div class="step-box">
+    <ol>
+        <li>In Hostinger hPanel, go to <strong>VPS</strong> section</li>
+        <li>Note your VPS details: IP Address and Root password</li>
+        <li>Connect via SSH (use Terminal or PuTTY):</li>
+    </ol>
+    <pre><code>ssh root@YOUR_VPS_IP</code></pre>
+    <p>Enter root password when prompted.</p>
+</div>
+
+<h2>Step 4: Setup VPS Server Environment</h2>
+<div class="step-box">
+    <h3>4.1 Update System</h3>
+    <pre><code>apt update && apt upgrade -y</code></pre>
+    
+    <h3>4.2 Install Node.js 20</h3>
+    <pre><code>curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+apt install -y nodejs</code></pre>
+    
+    <h3>4.3 Verify Installation</h3>
+    <pre><code>node --version   # Should show v20.x.x
+npm --version    # Should show 10.x.x</code></pre>
+    
+    <h3>4.4 Install PM2 (Process Manager)</h3>
+    <pre><code>npm install -g pm2</code></pre>
+    
+    <h3>4.5 Install Nginx (Web Server)</h3>
+    <pre><code>apt install nginx -y
+systemctl start nginx
+systemctl enable nginx</code></pre>
+    
+    <h3>4.6 Install PostgreSQL</h3>
+    <pre><code>apt install postgresql postgresql-contrib -y
+systemctl start postgresql
+systemctl enable postgresql</code></pre>
+</div>
+
+<h2>Step 5: Setup PostgreSQL Database</h2>
+<div class="step-box">
+    <h3>5.1 Create Database and User</h3>
+    <pre><code>sudo -u postgres psql</code></pre>
+    
+    <p>In PostgreSQL prompt, run:</p>
+    <pre><code>CREATE DATABASE mhtsdigix;
+CREATE USER mhtsuser WITH ENCRYPTED PASSWORD 'YOUR_SECURE_PASSWORD';
+GRANT ALL PRIVILEGES ON DATABASE mhtsdigix TO mhtsuser;
+\c mhtsdigix
+GRANT ALL ON SCHEMA public TO mhtsuser;
+\q</code></pre>
+    
+    <h3>5.2 Note Your Database URL</h3>
+    <pre><code>DATABASE_URL=postgresql://mhtsuser:YOUR_SECURE_PASSWORD@localhost:5432/mhtsdigix</code></pre>
+</div>
+
+<h2>Step 6: Build Your Application (On Replit)</h2>
+<div class="step-box">
+    <p>Before deploying, build your application on Replit:</p>
+    <pre><code>npm run build</code></pre>
+    
+    <p><strong>Files to Download after build:</strong></p>
+    <ul>
+        <li><code>dist/</code> folder (built application)</li>
+        <li><code>package.json</code></li>
+        <li><code>package-lock.json</code></li>
+        <li><code>drizzle.config.ts</code></li>
+        <li><code>shared/</code> folder</li>
+        <li><code>server/</code> folder</li>
+    </ul>
+</div>
+
+<h2>Step 7: Upload Files to VPS</h2>
+<div class="step-box">
+    <h3>7.1 Create Application Directory</h3>
+    <pre><code>mkdir -p /var/www/mhtsdigix
+cd /var/www/mhtsdigix</code></pre>
+    
+    <h3>7.2 Upload Files</h3>
+    <p>Use SFTP client (FileZilla, WinSCP) to upload all files to <code>/var/www/mhtsdigix/</code></p>
+    
+    <h3>7.3 Install Dependencies on VPS</h3>
+    <pre><code>cd /var/www/mhtsdigix
+npm install --production</code></pre>
+</div>
+
+<h2>Step 8: Configure Environment Variables</h2>
+<div class="step-box">
+    <h3>8.1 Create Environment File</h3>
+    <pre><code>nano /var/www/mhtsdigix/.env</code></pre>
+    
+    <h3>8.2 Add These Variables</h3>
+    <pre><code># Database
+DATABASE_URL=postgresql://mhtsuser:YOUR_SECURE_PASSWORD@localhost:5432/mhtsdigix
+
+# Session
+SESSION_SECRET=your-super-secret-session-key-minimum-32-characters
+
+# OpenAI API (for Meena chatbot)
+OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# Server
+NODE_ENV=production
+PORT=5000</code></pre>
+    
+    <h3>8.3 Get OpenAI API Key</h3>
+    <ol>
+        <li>Go to <strong>platform.openai.com</strong></li>
+        <li>Sign up or log in</li>
+        <li>Go to <strong>API Keys</strong> section</li>
+        <li>Click <strong>Create new secret key</strong></li>
+        <li>Copy the key and paste in .env file</li>
+    </ol>
+</div>
+
+<h2>Step 9: Run Database Migrations</h2>
+<div class="step-box">
+    <pre><code>cd /var/www/mhtsdigix
+npm run db:push</code></pre>
+</div>
+
+<h2>Step 10: Start Application with PM2</h2>
+<div class="step-box">
+    <h3>10.1 Start the Application</h3>
+    <pre><code>cd /var/www/mhtsdigix
+pm2 start dist/index.js --name mhtsdigix</code></pre>
+    
+    <h3>10.2 Save PM2 Configuration</h3>
+    <pre><code>pm2 save
+pm2 startup</code></pre>
+    
+    <h3>10.3 Verify Application Running</h3>
+    <pre><code>pm2 status
+pm2 logs mhtsdigix</code></pre>
+</div>
+
+<h2>Step 11: Configure Nginx Reverse Proxy</h2>
+<div class="step-box">
+    <h3>11.1 Create Nginx Configuration</h3>
+    <pre><code>nano /etc/nginx/sites-available/maanagaram.com</code></pre>
+    
+    <h3>11.2 Add This Configuration</h3>
+    <pre><code>server {
+    listen 80;
+    server_name maanagaram.com www.maanagaram.com;
+
+    location / {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}</code></pre>
+    
+    <h3>11.3 Enable the Site</h3>
+    <pre><code>ln -s /etc/nginx/sites-available/maanagaram.com /etc/nginx/sites-enabled/
+nginx -t
+systemctl restart nginx</code></pre>
+</div>
+
+<h2>Step 12: Install SSL Certificate (HTTPS)</h2>
+<div class="step-box">
+    <h3>12.1 Install Certbot</h3>
+    <pre><code>apt install certbot python3-certbot-nginx -y</code></pre>
+    
+    <h3>12.2 Get SSL Certificate</h3>
+    <pre><code>certbot --nginx -d maanagaram.com -d www.maanagaram.com</code></pre>
+    
+    <p>Follow prompts: Enter email, agree to terms, choose redirect option (Yes).</p>
+    
+    <h3>12.3 Auto-Renewal Test</h3>
+    <pre><code>certbot renew --dry-run</code></pre>
+</div>
+
+<h2>Step 13: Configure Firewall</h2>
+<div class="step-box">
+    <pre><code>ufw allow OpenSSH
+ufw allow 'Nginx Full'
+ufw enable
+ufw status</code></pre>
+</div>
+
+<h2>Step 14: Verify Deployment</h2>
+<div class="step-box">
+    <p>Open browser and visit:</p>
+    <ul>
+        <li><strong>https://maanagaram.com</strong></li>
+        <li><strong>https://www.maanagaram.com</strong></li>
+    </ul>
+    
+    <p><strong>Test Checklist:</strong></p>
+    <ul>
+        <li>Homepage loads correctly</li>
+        <li>All pages navigate properly</li>
+        <li>Contact form works</li>
+        <li>Meena chatbot responds</li>
+        <li>All service pages display</li>
+        <li>FAQ section works</li>
+        <li>Careers page shows jobs</li>
+    </ul>
+</div>
+
+<hr>
+
+<h2>Troubleshooting Commands</h2>
+<table>
+    <tr>
+        <th>Issue</th>
+        <th>Command</th>
+    </tr>
+    <tr>
+        <td>Check app status</td>
+        <td><code>pm2 status</code></td>
+    </tr>
+    <tr>
+        <td>View app logs</td>
+        <td><code>pm2 logs mhtsdigix --lines 100</code></td>
+    </tr>
+    <tr>
+        <td>Check Nginx status</td>
+        <td><code>systemctl status nginx</code></td>
+    </tr>
+    <tr>
+        <td>View Nginx errors</td>
+        <td><code>tail -f /var/log/nginx/error.log</code></td>
+    </tr>
+    <tr>
+        <td>Check PostgreSQL</td>
+        <td><code>systemctl status postgresql</code></td>
+    </tr>
+    <tr>
+        <td>Restart app</td>
+        <td><code>pm2 restart mhtsdigix</code></td>
+    </tr>
+    <tr>
+        <td>Restart Nginx</td>
+        <td><code>systemctl restart nginx</code></td>
+    </tr>
+</table>
+
+<hr>
+
+<h2>Cost Summary</h2>
+<table>
+    <tr>
+        <th>Item</th>
+        <th>Monthly Cost</th>
+    </tr>
+    <tr>
+        <td>Hostinger VPS (KVM 2)</td>
+        <td>~$8-12</td>
+    </tr>
+    <tr>
+        <td>Domain (maanagaram.com)</td>
+        <td>~$10/year</td>
+    </tr>
+    <tr>
+        <td>OpenAI API</td>
+        <td>Pay per use (~$5-20)</td>
+    </tr>
+    <tr>
+        <td>SSL Certificate</td>
+        <td>FREE (Let's Encrypt)</td>
+    </tr>
+</table>
+
+<hr>
+
+<h2>Support Contacts</h2>
+<ul>
+    <li><strong>Hostinger Support:</strong> support.hostinger.com</li>
+    <li><strong>OpenAI Support:</strong> help.openai.com</li>
+    <li><strong>Let's Encrypt:</strong> letsencrypt.org/docs</li>
+</ul>
+
+<hr>
+
+<p style="text-align: center; color: #64748b;">
+    <strong>MHTSdigiX</strong> - Maanagaram Hi Tech Solutions<br>
+    Document prepared for maanagaram.com deployment
+</p>
+
+</body>
+</html>
