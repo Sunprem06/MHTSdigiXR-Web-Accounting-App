@@ -135,155 +135,162 @@ export default function Home() {
 
   return (
     <div className="overflow-hidden">
-      {/* Hero Section - World Class */}
-      <section className="relative min-h-[90vh] flex items-center overflow-hidden">
-        {/* Left side - Transparent to show watermark */}
-        <div className="w-full lg:w-1/2 py-20 lg:py-32 px-4 md:px-6 lg:px-12 xl:px-20 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
-            className="max-w-xl"
-          >
-            <motion.p 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="text-sky-500 dark:text-sky-400 text-sm font-semibold tracking-wider mb-6 uppercase"
+      {/* Hero Section - Single White Background with Dark Tech Illustration */}
+      <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-white dark:bg-slate-950">
+        <div className="container mx-auto px-4 md:px-6 lg:px-12 py-20 lg:py-32 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left side - Text content */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6 }}
+              className="max-w-xl"
             >
-              Establish Your Brand Awareness With Us
-            </motion.p>
-            
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold leading-[1.1] mb-6">
-              <span className="text-slate-900 dark:text-white">Think Big. Create</span>
-              <br />
-              <span className="text-slate-900 dark:text-white">Unique. </span>
-              <motion.span 
-                className="text-emerald-500"
-                initial={{ opacity: 0, y: 20 }}
+              <motion.p 
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0.2 }}
+                className="text-sky-500 dark:text-sky-400 text-sm font-semibold tracking-wider mb-6 uppercase"
               >
-                Bring The
-              </motion.span>
-              <br />
-              <motion.span 
-                className="text-emerald-500"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
+                Establish Your Brand Awareness With Us
+              </motion.p>
+              
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold leading-[1.1] mb-6">
+                <span className="text-slate-900 dark:text-white">Think Big. Create</span>
+                <br />
+                <span className="text-slate-900 dark:text-white">Unique. </span>
+                <motion.span 
+                  className="text-emerald-500"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  Bring The
+                </motion.span>
+                <br />
+                <motion.span 
+                  className="text-emerald-500"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  Change.
+                </motion.span>
+              </h1>
+              
+              <p className="text-base md:text-lg text-slate-600 dark:text-slate-400 mb-8 leading-relaxed">
+                We are a team of enthusiastic and creative developers and designers who deliver best in class websites and designs for B2B and B2C businesses.
+              </p>
+              
+              <div className="flex flex-wrap gap-4">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link 
+                    href="/contact" 
+                    className="group px-6 py-3 rounded-md bg-sky-500 hover:bg-sky-600 text-white font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2" 
+                    data-testid="button-get-started"
+                  >
+                    Get Started Today
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link 
+                    href="/services" 
+                    className="px-6 py-3 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all" 
+                    data-testid="link-view-services"
+                  >
+                    Our Services
+                  </Link>
+                </motion.div>
+              </div>
+            </motion.div>
+
+            {/* Right side - Dark Gradient Tech Illustration */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+              className="relative h-[400px] lg:h-[500px] rounded-3xl overflow-hidden shadow-2xl"
+            >
+              {/* Dark gradient background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950" />
+              
+              {/* Accent gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-sky-600/30 via-transparent to-emerald-500/20" />
+              
+              {/* Grid pattern overlay */}
+              <div className="absolute inset-0 opacity-10" style={{
+                backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+                backgroundSize: '40px 40px'
+              }} />
+
+              {/* Floating tech elements */}
+              <motion.div
+                animate={{ y: [0, -15, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-12 left-12 w-16 h-16 bg-sky-500/90 rounded-2xl shadow-xl flex items-center justify-center backdrop-blur-sm"
               >
-                Change.
-              </motion.span>
-            </h1>
-            
-            <p className="text-base md:text-lg text-slate-600 dark:text-slate-400 mb-8 leading-relaxed">
-              We are a team of enthusiastic and creative developers and designers who deliver best in class websites and designs for B2B and B2C businesses.
-            </p>
-            
-            <div className="flex flex-wrap gap-4">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link 
-                  href="/contact" 
-                  className="group px-6 py-3 rounded-md bg-sky-500 hover:bg-sky-600 text-white font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2" 
-                  data-testid="button-get-started"
-                >
-                  Get Started Today
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                <Smartphone className="w-8 h-8 text-white" />
               </motion.div>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link 
-                  href="/services" 
-                  className="px-6 py-3 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all" 
-                  data-testid="link-view-services"
-                >
-                  Our Services
-                </Link>
+
+              <motion.div
+                animate={{ y: [0, 15, 0] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                className="absolute top-20 right-16 w-14 h-14 bg-emerald-500/90 rounded-full shadow-xl flex items-center justify-center"
+              >
+                <Globe className="w-7 h-7 text-white" />
               </motion.div>
-            </div>
-          </motion.div>
+
+              <motion.div
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                className="absolute bottom-24 left-20 w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl shadow-xl flex items-center justify-center border border-white/20"
+              >
+                <Monitor className="w-10 h-10 text-emerald-400" />
+              </motion.div>
+
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="absolute bottom-32 right-24 w-12 h-12"
+              >
+                <div className="w-full h-full bg-sky-400/80 rounded-lg shadow-lg flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+              </motion.div>
+
+              <motion.div
+                animate={{ y: [0, 10, 0] }}
+                transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
+                className="absolute top-1/2 right-12 w-14 h-14 bg-emerald-400/80 rounded-xl shadow-xl flex items-center justify-center"
+              >
+                <Code className="w-7 h-7 text-white" />
+              </motion.div>
+
+              {/* Center large icon */}
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-gradient-to-br from-sky-500 to-emerald-500 rounded-3xl shadow-2xl flex items-center justify-center"
+              >
+                <Search className="w-14 h-14 text-white" />
+              </motion.div>
+
+              {/* Network dots and lines */}
+              <svg className="absolute inset-0 w-full h-full opacity-40" viewBox="0 0 400 400">
+                <circle cx="80" cy="80" r="2" fill="#0EA5E9" />
+                <circle cx="320" cy="60" r="2" fill="#10B981" />
+                <circle cx="200" cy="200" r="3" fill="#0EA5E9" />
+                <circle cx="60" cy="320" r="2" fill="#10B981" />
+                <circle cx="340" cy="300" r="2" fill="#0EA5E9" />
+                <line x1="80" y1="80" x2="200" y2="200" stroke="#0EA5E9" strokeWidth="0.5" opacity="0.5" />
+                <line x1="320" y1="60" x2="200" y2="200" stroke="#10B981" strokeWidth="0.5" opacity="0.5" />
+                <line x1="60" y1="320" x2="200" y2="200" stroke="#10B981" strokeWidth="0.5" opacity="0.5" />
+                <line x1="340" y1="300" x2="200" y2="200" stroke="#0EA5E9" strokeWidth="0.5" opacity="0.5" />
+              </svg>
+            </motion.div>
+          </div>
         </div>
-
-        {/* Right side - Gradient background with tech illustration */}
-        <div className="hidden lg:block absolute top-0 right-0 w-1/2 h-full">
-          <div className="absolute inset-0 bg-gradient-to-br from-sky-100 via-sky-200 to-emerald-400 dark:from-sky-900 dark:via-sky-800 dark:to-emerald-700" />
-          
-          {/* Tech illustration elements */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="absolute inset-0 flex items-center justify-center"
-          >
-            <img 
-              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80" 
-              alt="Digital technology"
-              className="w-full h-full object-cover opacity-30 mix-blend-overlay"
-            />
-          </motion.div>
-
-          {/* Floating elements */}
-          <motion.div
-            animate={{ y: [0, -15, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-1/4 left-1/4 w-20 h-20 bg-white/80 dark:bg-white/60 rounded-2xl shadow-xl flex items-center justify-center"
-          >
-            <Smartphone className="w-10 h-10 text-sky-500" />
-          </motion.div>
-
-          <motion.div
-            animate={{ y: [0, 15, 0] }}
-            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-            className="absolute top-1/3 right-1/4 w-16 h-16 bg-sky-400/80 dark:bg-sky-500/60 rounded-full shadow-xl flex items-center justify-center"
-          >
-            <Globe className="w-8 h-8 text-white" />
-          </motion.div>
-
-          <motion.div
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute bottom-1/4 left-1/3 w-24 h-24 bg-white/90 dark:bg-white/70 rounded-2xl shadow-xl flex items-center justify-center"
-          >
-            <Monitor className="w-12 h-12 text-emerald-500" />
-          </motion.div>
-
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute bottom-1/3 right-1/3 w-14 h-14"
-          >
-            <div className="w-full h-full bg-emerald-400/60 dark:bg-emerald-500/50 rounded-lg shadow-lg flex items-center justify-center">
-              <BarChart3 className="w-7 h-7 text-white" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
-            className="absolute top-1/2 right-1/5 w-12 h-12 bg-sky-300/80 dark:bg-sky-400/60 rounded-xl shadow-xl flex items-center justify-center"
-          >
-            <Code className="w-6 h-6 text-white" />
-          </motion.div>
-
-          {/* Network dots and lines */}
-          <svg className="absolute inset-0 w-full h-full opacity-30 dark:opacity-20" viewBox="0 0 400 400">
-            <circle cx="100" cy="100" r="3" fill="white" />
-            <circle cx="200" cy="150" r="3" fill="white" />
-            <circle cx="300" cy="100" r="3" fill="white" />
-            <circle cx="150" cy="250" r="3" fill="white" />
-            <circle cx="250" cy="300" r="3" fill="white" />
-            <circle cx="350" cy="250" r="3" fill="white" />
-            <line x1="100" y1="100" x2="200" y2="150" stroke="white" strokeWidth="1" />
-            <line x1="200" y1="150" x2="300" y2="100" stroke="white" strokeWidth="1" />
-            <line x1="150" y1="250" x2="200" y2="150" stroke="white" strokeWidth="1" />
-            <line x1="250" y1="300" x2="350" y2="250" stroke="white" strokeWidth="1" />
-            <line x1="250" y1="300" x2="150" y2="250" stroke="white" strokeWidth="1" />
-          </svg>
-        </div>
-
-        {/* Mobile gradient background - semi-transparent to show watermark */}
-        <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-white/80 via-white/70 to-sky-100/50 dark:from-slate-950/80 dark:via-slate-950/70 dark:to-sky-900/30 -z-10" />
       </section>
 
       {/* Stats Counter Section */}
