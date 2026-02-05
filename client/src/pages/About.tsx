@@ -161,7 +161,7 @@ export default function About() {
             <p className="text-slate-500 dark:text-slate-400 max-w-xl mx-auto mb-8">
               Let's discuss how we can help transform your business with our digital solutions.
             </p>
-            <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition-all shadow-lg" data-testid="button-contact-us">
+            <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg" data-testid="button-contact-us">
               Start Your Project <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

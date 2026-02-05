@@ -182,11 +182,11 @@ export default function Home() {
                 We are a team of enthusiastic and creative developers and designers who deliver best in class websites and designs for B2B and B2C businesses.
               </p>
               
-              <div className="flex flex-wrap gap-4">
+              <div className="flex items-center gap-4">
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Link 
                     href="/contact" 
-                    className="group px-8 py-3.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2" 
+                    className="group px-8 py-3.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white font-semibold transition-all shadow-lg hover:shadow-xl inline-flex items-center gap-2" 
                     data-testid="button-get-started"
                   >
                     Start Your Project
@@ -196,7 +196,7 @@ export default function Home() {
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Link 
                     href="/services" 
-                    className="px-8 py-3.5 rounded-full bg-transparent text-emerald-600 dark:text-emerald-400 border-2 border-emerald-500 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all" 
+                    className="px-8 py-3.5 rounded-full bg-transparent text-sky-600 dark:text-sky-400 border-2 border-sky-500 font-semibold hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-all inline-block" 
                     data-testid="link-view-services"
                   >
                     View Our Work
@@ -657,7 +657,7 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Link href="/contact" className="inline-block px-10 py-5 rounded-full bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30" data-testid="button-start-project">
+                <Link href="/contact" className="inline-block px-10 py-5 rounded-full bg-sky-500 text-white font-bold hover:bg-sky-600 transition-all shadow-lg shadow-sky-500/30" data-testid="button-start-project">
                   Start Your Project
                 </Link>
               </motion.div>

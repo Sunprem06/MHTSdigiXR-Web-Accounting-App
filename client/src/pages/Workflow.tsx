@@ -122,7 +122,7 @@ export default function Workflow() {
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
               Let's work together to bring your ideas to life. Contact us today to get started.
             </p>
-            <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition-all shadow-lg" data-testid="button-start-project">
+            <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg" data-testid="button-start-project">
               Start Your Project <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

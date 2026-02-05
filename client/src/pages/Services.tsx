@@ -356,8 +356,8 @@ export default function Services() {
                     href="/contact" 
                     className={`block w-full py-3 rounded-full text-center font-bold transition-all ${
                       plan.popular 
-                        ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
-                        : 'bg-transparent text-emerald-600 dark:text-emerald-400 border-2 border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                        ? 'bg-sky-500 text-white hover:bg-sky-600' 
+                        : 'bg-transparent text-sky-600 dark:text-sky-400 border-2 border-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/20'
                     }`}
                     data-testid={`button-pricing-${plan.name.toLowerCase()}`}
                   >
@@ -381,7 +381,7 @@ export default function Services() {
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
               Every business is unique. Let's discuss how we can create a tailored solution that perfectly fits your needs.
             </p>
-            <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition-all shadow-lg" data-testid="button-custom-solution">
+            <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg" data-testid="button-custom-solution">
               Start Your Project <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
