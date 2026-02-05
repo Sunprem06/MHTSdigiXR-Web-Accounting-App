@@ -163,7 +163,7 @@ const SERVICES_LIST = [
     desc: "Captivate your audience with high-quality video content and motion graphics.",
     features: ["Explainer Videos", "Social Media Shorts", "3D Animation"],
     color: "from-yellow-500 to-yellow-600",
-    image: "https://images.unsplash.com/photo-1536240478700-b869070f9279?w=600&q=80"
+    image: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&q=80"
   }
 ];
 

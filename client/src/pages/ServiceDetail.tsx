@@ -220,7 +220,7 @@ const SERVICES_DATA: Record<string, {
     title: "Video & Animation",
     desc: "Captivate your audience with high-quality video content and motion graphics.",
     longDesc: "Video is the most engaging content format. We create compelling explainer videos, social media content, and animations that tell your story, explain complex concepts, and drive action from your audience.",
-    image: "https://images.unsplash.com/photo-1536240478700-b869070f9279?w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=1200&q=80",
     features: [
       "Explainer Videos (2D & 3D)",
       "Social Media Video Content",
