@@ -4,6 +4,13 @@
 
 This is a full-stack digital agency website for Maanagaram Hi Tech Solutions, a company providing end-to-end digital services including web development, mobile apps, SEO, branding, and AI integrations. The application features a React frontend with a modern design system, Express backend with PostgreSQL database, and integrated AI chat capabilities via Replit AI Integrations.
 
+## Recent Changes (Feb 2026)
+
+- **Enhanced Home Page**: Added animated stats counter (3+ years, 150+ projects, 50+ clients, 98% satisfaction), client logos carousel, testimonials section with auto-rotating carousel, and "What are my options" section inspired by top agencies
+- **AI Chatbot Integration**: Connected floating chat widget to OpenAI with streaming responses, contextual system prompt with company info and services
+- **Enhanced About Page**: Added leadership message section, core values cards, improved vision/mission design
+- **Competitive Analysis**: Website enhanced based on research of Social Eagle and 2025 digital marketing trends
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
