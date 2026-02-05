@@ -6,10 +6,15 @@ This is a full-stack digital agency website for Maanagaram Hi Tech Solutions, a 
 
 ## Recent Changes (Feb 2026)
 
-- **Enhanced Home Page**: Added animated stats counter (3+ years, 150+ projects, 50+ clients, 98% satisfaction), client logos carousel, testimonials section with auto-rotating carousel, and "What are my options" section inspired by top agencies
-- **AI Chatbot Integration**: Connected floating chat widget to OpenAI with streaming responses, contextual system prompt with company info and services
-- **Enhanced About Page**: Added leadership message section, core values cards, improved vision/mission design
-- **Competitive Analysis**: Website enhanced based on research of Social Eagle and 2025 digital marketing trends
+- **World-Class Agency Features**: Researched top agencies (WPP, Ogilvy, AKQA) and 2025 design trends
+- **Awards & Recognition Section**: Added trophy icons and award cards on Home page (like Cannes Lions)
+- **How We Work Section**: Visual 4-step process timeline (Discovery, Strategy, Execution, Delivery)
+- **Dark Mode Support**: Full dark mode with toggle in Navbar (desktop + mobile), localStorage persistence
+- **Enhanced Hero Section**: Bolder typography, animated CTAs, trust badges, floating award card
+- **Enhanced Services Page**: Colorful gradient icons, improved hover effects, CTA section
+- **Enhanced Home Page**: Stats counter, client logos carousel, testimonials, "What are my options" section
+- **AI Chatbot Integration**: Connected floating chat widget to OpenAI with streaming responses
+- **Enhanced About Page**: Leadership message section, core values cards, vision/mission design
 
 ## User Preferences
 

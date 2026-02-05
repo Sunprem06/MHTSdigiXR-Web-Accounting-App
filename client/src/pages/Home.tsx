@@ -1,6 +1,6 @@
 import { motion, useInView } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Star, Users, Award, TrendingUp, Quote } from "lucide-react";
+import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Star, Users, Award, TrendingUp, Quote, Trophy, Target, Lightbulb, CheckCircle2, Zap, Shield, Clock } from "lucide-react";
 import { useServices } from "@/hooks/use-services";
 import { useRef, useEffect, useState } from "react";
 
@@ -60,7 +60,39 @@ const CLIENT_LOGOS = [
   { name: "FinanceHub", initial: "FH" },
 ];
 
-// Animated counter component
+const AWARDS = [
+  { title: "Best Digital Agency", year: "2025", org: "Digital Excellence Awards" },
+  { title: "Top Web Development", year: "2024", org: "Tech Innovation India" },
+  { title: "Best UI/UX Design", year: "2024", org: "Design Masters" },
+];
+
+const PROCESS_STEPS = [
+  { 
+    step: "01", 
+    title: "Discovery", 
+    desc: "We analyze your business, audience, and goals to create a strategic roadmap.",
+    icon: Target
+  },
+  { 
+    step: "02", 
+    title: "Strategy", 
+    desc: "We develop a customized plan with clear milestones and measurable outcomes.",
+    icon: Lightbulb
+  },
+  { 
+    step: "03", 
+    title: "Execution", 
+    desc: "Our expert team brings your vision to life with cutting-edge technology.",
+    icon: Zap
+  },
+  { 
+    step: "04", 
+    title: "Delivery", 
+    desc: "We launch, optimize, and provide ongoing support for continued success.",
+    icon: CheckCircle2
+  },
+];
+
 function AnimatedCounter({ value, suffix }: { value: number; suffix: string }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
@@ -103,36 +135,72 @@ export default function Home() {
 
   return (
     <div className="overflow-hidden">
-      {/* Hero Section */}
+      {/* Hero Section - World Class */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-brand opacity-30 -z-10" />
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-emerald-100/40 to-transparent -z-10" />
+        <div className="absolute inset-0 bg-gradient-brand opacity-30 dark:opacity-50 -z-10" />
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-emerald-100/40 dark:from-emerald-900/20 to-transparent -z-10" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-sky-300/30 dark:bg-sky-500/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-emerald-300/30 dark:bg-emerald-500/10 rounded-full blur-3xl" />
         
-        <div className="container mx-auto px-4 md:px-6">
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-800 text-sm font-semibold mb-6">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-sm font-semibold mb-6"
+              >
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Transforming Ideas into Digital Reality
-              </div>
-              <h1 className="text-5xl lg:text-7xl font-display font-bold leading-[1.1] mb-6 text-slate-900">
-                Want More <br />
-                <span className="text-gradient">Customers Online?</span>
+                Award-Winning Digital Agency
+              </motion.div>
+              <h1 className="text-5xl lg:text-7xl font-display font-bold leading-[1.05] mb-6 text-slate-900 dark:text-white">
+                Transform Your
+                <br />
+                <motion.span 
+                  className="text-gradient inline-block"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  Digital Future
+                </motion.span>
               </h1>
-              <p className="text-lg text-slate-600 mb-8 max-w-lg leading-relaxed">
-                Build a brand that is data-driven, performance-based, and customer-led. We deliver 10X growth in every aspect of your digital venture.
+              <p className="text-lg md:text-xl text-slate-600 dark:text-slate-300 mb-8 max-w-lg leading-relaxed">
+                Data-driven strategies. Performance-based results. We deliver 10X growth for ambitious brands ready to dominate online.
               </p>
-              <div className="flex flex-wrap gap-4">
-                <Link href="/contact" className="px-8 py-4 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 flex items-center gap-2" data-testid="button-get-started">
-                  Get Started <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link href="/services" className="px-8 py-4 rounded-xl bg-white text-slate-900 border border-slate-200 font-semibold hover:bg-slate-50 transition-all" data-testid="link-view-services">
-                  View Services
-                </Link>
+              <div className="flex flex-wrap gap-4 mb-8">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link href="/contact" className="group px-8 py-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-lg hover:shadow-xl flex items-center gap-2" data-testid="button-get-started">
+                    Start Your Project 
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link href="/services" className="px-8 py-4 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all" data-testid="link-view-services">
+                    Explore Services
+                  </Link>
+                </motion.div>
+              </div>
+              
+              {/* Trust badges */}
+              <div className="flex flex-wrap gap-6 items-center text-sm text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-emerald-500" />
+                  <span>100% Secure</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-sky-500" />
+                  <span>24/7 Support</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-500" />
+                  <span>5-Star Rated</span>
+                </div>
               </div>
             </motion.div>
 
@@ -142,22 +210,34 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="relative"
             >
-              <div className="relative z-10 rounded-3xl overflow-hidden shadow-2xl border-4 border-white/50">
+              <div className="relative z-10 rounded-3xl overflow-hidden shadow-2xl border-4 border-white/50 dark:border-slate-700/50">
                 <img 
                   src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80" 
                   alt="Team collaboration" 
                   className="w-full h-auto object-cover"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
+                <div className="absolute bottom-6 left-6 right-6">
+                  <div className="flex items-center gap-3 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center">
+                      <Trophy className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-white">Top Digital Agency 2025</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Excellence in Innovation</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-sky-200 rounded-full blur-3xl opacity-50" />
-              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-200 rounded-full blur-3xl opacity-50" />
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-sky-200 dark:bg-sky-900 rounded-full blur-3xl opacity-50" />
+              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-200 dark:bg-emerald-900 rounded-full blur-3xl opacity-50" />
             </motion.div>
           </div>
         </div>
       </section>
 
       {/* Stats Counter Section */}
-      <section className="py-16 bg-slate-900 relative overflow-hidden">
+      <section className="py-16 bg-slate-900 dark:bg-slate-950 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/20 to-sky-900/20" />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -184,9 +264,9 @@ export default function Home() {
       </section>
 
       {/* Client Logos Carousel */}
-      <section className="py-12 bg-white border-b border-slate-100">
+      <section className="py-12 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
         <div className="container mx-auto px-4 md:px-6">
-          <p className="text-center text-slate-500 text-sm font-medium mb-8">TRUSTED BY LEADING BRANDS</p>
+          <p className="text-center text-slate-500 dark:text-slate-400 text-sm font-medium mb-8">TRUSTED BY LEADING BRANDS WORLDWIDE</p>
           <div className="overflow-hidden relative">
             <motion.div 
               className="flex gap-12 items-center"
@@ -195,10 +275,10 @@ export default function Home() {
             >
               {[...CLIENT_LOGOS, ...CLIENT_LOGOS].map((logo, i) => (
                 <div key={i} className="flex items-center gap-3 shrink-0">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center text-white font-bold text-lg">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                     {logo.initial}
                   </div>
-                  <span className="text-slate-700 font-semibold text-lg whitespace-nowrap">{logo.name}</span>
+                  <span className="text-slate-700 dark:text-slate-300 font-semibold text-lg whitespace-nowrap">{logo.name}</span>
                 </div>
               ))}
             </motion.div>
@@ -206,12 +286,96 @@ export default function Home() {
         </div>
       </section>
 
-      {/* What Are My Options Section - Like Social Eagle */}
-      <section className="py-20 bg-white">
+      {/* Awards & Recognition - World Class Feature */}
+      <section className="py-20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-black dark:via-slate-900 dark:to-black relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&q=80')] opacity-5 bg-cover bg-center" />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
+          <div className="text-center mb-16">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+            >
+              <Trophy className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Awards & Recognition</h2>
+              <p className="text-slate-400 max-w-2xl mx-auto">
+                Our commitment to excellence has earned us recognition from industry leaders worldwide.
+              </p>
+            </motion.div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {AWARDS.map((award, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                whileHover={{ y: -5, scale: 1.02 }}
+                className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/10 transition-all"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-yellow-500/20">
+                  <Trophy className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">{award.title}</h3>
+                <p className="text-emerald-400 font-semibold mb-1">{award.year}</p>
+                <p className="text-slate-400 text-sm">{award.org}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Process Section - World Class Feature */}
+      <section className="py-24 bg-white dark:bg-slate-900">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">What are my options?</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-3xl md:text-5xl font-bold mb-4 dark:text-white">How We Work</h2>
+              <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
+                Our proven 4-step process ensures quality results and a seamless experience for every client.
+              </p>
+            </motion.div>
+          </div>
+
+          <div className="grid md:grid-cols-4 gap-8 relative">
+            {/* Connection line */}
+            <div className="hidden md:block absolute top-20 left-[12%] right-[12%] h-0.5 bg-gradient-to-r from-emerald-500 via-sky-500 to-violet-500" />
+            
+            {PROCESS_STEPS.map((step, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="relative text-center"
+              >
+                <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center mx-auto mb-6 shadow-xl">
+                  <step.icon className="w-8 h-8 text-white" />
+                </div>
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white dark:bg-slate-800 border-4 border-emerald-500 text-xs font-bold flex items-center justify-center text-emerald-600">
+                  {step.step.replace('0', '')}
+                </div>
+                <h3 className="text-xl font-bold mb-3 dark:text-white">{step.title}</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{step.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* What Are My Options Section */}
+      <section className="py-20 bg-slate-50 dark:bg-slate-800">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 dark:text-white">What are my options?</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
               At MHTSdigiX, we become an extended digital arm for your brand. Choose how you want to work with us.
             </p>
           </div>
@@ -246,12 +410,13 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="group relative rounded-3xl overflow-hidden bg-slate-900"
+                whileHover={{ y: -10 }}
+                className="group relative rounded-3xl overflow-hidden bg-slate-900 shadow-xl"
               >
                 <img 
                   src={option.image} 
                   alt={option.title}
-                  className="w-full h-64 object-cover opacity-40 group-hover:opacity-30 transition-opacity"
+                  className="w-full h-64 object-cover opacity-40 group-hover:opacity-30 group-hover:scale-105 transition-all duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
@@ -260,7 +425,7 @@ export default function Home() {
                     {option.title}
                   </h3>
                   <p className="text-slate-300 text-sm mb-4">{option.desc}</p>
-                  <Link href="/contact" className="inline-flex items-center gap-2 text-white font-semibold hover:gap-3 transition-all">
+                  <Link href="/contact" className="inline-flex items-center gap-2 text-white font-semibold hover:gap-3 transition-all group-hover:text-emerald-400">
                     Get Started <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
@@ -271,11 +436,11 @@ export default function Home() {
       </section>
 
       {/* Services Grid */}
-      <section className="py-20 bg-slate-50">
+      <section className="py-20 bg-white dark:bg-slate-900">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Our Services</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 dark:text-white">Our Services</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
               Comprehensive digital solutions tailored to your business needs. We deliver excellence in every pixel and line of code.
             </p>
           </div>
@@ -289,13 +454,13 @@ export default function Home() {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.05 }}
                   whileHover={{ y: -5 }}
-                  className="group h-full p-8 rounded-2xl bg-white border border-slate-100 hover:border-emerald-200 hover:shadow-lg transition-all cursor-pointer"
+                  className="group h-full p-8 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-700 hover:shadow-lg transition-all cursor-pointer"
                 >
                   <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform text-white shadow-lg">
                     <feature.icon className="w-7 h-7" />
                   </div>
-                  <h3 className="text-xl font-bold mb-3 group-hover:text-emerald-700 transition-colors">{feature.title}</h3>
-                  <p className="text-slate-500 text-sm leading-relaxed">{feature.desc}</p>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors dark:text-white">{feature.title}</h3>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{feature.desc}</p>
                 </motion.div>
               </Link>
             ))}
@@ -304,11 +469,11 @@ export default function Home() {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-slate-50 dark:bg-slate-800">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">What Our Clients Say</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 dark:text-white">What Our Clients Say</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
               Delivering top-notch service is great, but hearing how our work makes a difference is what truly matters.
             </p>
           </div>
@@ -319,11 +484,11 @@ export default function Home() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="relative bg-gradient-to-br from-emerald-50 to-sky-50 rounded-3xl p-8 md:p-12"
+              className="relative bg-gradient-to-br from-emerald-50 to-sky-50 dark:from-slate-700 dark:to-slate-700 rounded-3xl p-8 md:p-12 shadow-xl"
             >
-              <Quote className="absolute top-6 left-6 w-12 h-12 text-emerald-200" />
+              <Quote className="absolute top-6 left-6 w-12 h-12 text-emerald-200 dark:text-emerald-800" />
               <div className="relative z-10">
-                <p className="text-xl md:text-2xl text-slate-700 mb-8 leading-relaxed italic">
+                <p className="text-xl md:text-2xl text-slate-700 dark:text-slate-200 mb-8 leading-relaxed italic">
                   "{TESTIMONIALS[currentTestimonial].content}"
                 </p>
                 <div className="flex items-center gap-4">
@@ -333,8 +498,8 @@ export default function Home() {
                     className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-lg"
                   />
                   <div>
-                    <div className="font-bold text-slate-900">{TESTIMONIALS[currentTestimonial].name}</div>
-                    <div className="text-slate-500 text-sm">{TESTIMONIALS[currentTestimonial].role}</div>
+                    <div className="font-bold text-slate-900 dark:text-white">{TESTIMONIALS[currentTestimonial].name}</div>
+                    <div className="text-slate-500 dark:text-slate-400 text-sm">{TESTIMONIALS[currentTestimonial].role}</div>
                   </div>
                 </div>
               </div>
@@ -348,7 +513,7 @@ export default function Home() {
                   className={`w-3 h-3 rounded-full transition-all ${
                     i === currentTestimonial 
                       ? 'bg-emerald-500 w-8' 
-                      : 'bg-slate-300 hover:bg-slate-400'
+                      : 'bg-slate-300 dark:bg-slate-600 hover:bg-slate-400'
                   }`}
                   data-testid={`button-testimonial-${i}`}
                 />
@@ -359,17 +524,24 @@ export default function Home() {
       </section>
 
       {/* About Snippet */}
-      <section className="py-20 bg-slate-50 border-y border-slate-200">
+      <section className="py-20 bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="order-2 lg:order-1 relative">
               <div className="grid grid-cols-2 gap-4">
-                <img 
+                <motion.img 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
                   src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&q=80" 
                   alt="Office meeting" 
                   className="rounded-2xl shadow-lg mt-8"
                 />
-                <img 
+                <motion.img 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.1 }}
                   src="https://images.unsplash.com/photo-1531482615713-2afd69097998?w=500&q=80" 
                   alt="Strategy planning" 
                   className="rounded-2xl shadow-lg"
@@ -377,8 +549,8 @@ export default function Home() {
               </div>
             </div>
             <div className="order-1 lg:order-2">
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">Why Choose <br /><span className="text-gradient">MHTSdigiX?</span></h2>
-              <p className="text-slate-600 mb-6 text-lg">
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 dark:text-white">Why Choose <br /><span className="text-gradient">MHTSdigiX?</span></h2>
+              <p className="text-slate-600 dark:text-slate-300 mb-6 text-lg">
                 We are more than just a tech company; we are your growth partners. Our young and dynamic team is obsessed with quality and innovation.
               </p>
               <ul className="space-y-4 mb-8">
@@ -389,15 +561,22 @@ export default function Home() {
                   "Dedicated support team 24/7",
                   "Cutting-edge technology stack"
                 ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 font-medium text-slate-700">
-                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                      <ArrowRight className="w-3 h-3" />
+                  <motion.li 
+                    key={i} 
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    className="flex items-center gap-3 font-medium text-slate-700 dark:text-slate-300"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                      <CheckCircle2 className="w-4 h-4" />
                     </div>
                     {item}
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
-              <Link href="/about" className="text-emerald-600 font-bold hover:text-emerald-700 inline-flex items-center gap-2" data-testid="link-about-us">
+              <Link href="/about" className="text-emerald-600 dark:text-emerald-400 font-bold hover:text-emerald-700 inline-flex items-center gap-2" data-testid="link-about-us">
                 Learn more about us <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -406,25 +585,30 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-slate-900 relative overflow-hidden">
+      <section className="py-24 bg-slate-900 dark:bg-black relative overflow-hidden">
         <div className="absolute top-0 right-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&q=80')] opacity-10 bg-cover bg-center" />
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 to-sky-900/30" />
         <div className="container mx-auto px-4 relative z-10 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">Ready to Scale Your Business?</h2>
+            <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">Ready to Dominate Online?</h2>
             <p className="text-slate-300 text-lg max-w-2xl mx-auto mb-10">
-              Join hundreds of satisfied clients who have transformed their digital presence with MHTSdigiX.
+              Join 50+ brands who have transformed their digital presence with MHTSdigiX. Let's build something extraordinary together.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/contact" className="px-8 py-4 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-all shadow-lg hover:shadow-emerald-500/25" data-testid="button-start-project">
-                Start Your Project
-              </Link>
-              <a href="https://wa.me/917358105995" target="_blank" className="px-8 py-4 rounded-xl bg-white/10 backdrop-blur-sm text-white border border-white/20 font-bold hover:bg-white/20 transition-all" data-testid="link-whatsapp">
-                Chat on WhatsApp
-              </a>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Link href="/contact" className="inline-block px-10 py-5 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30" data-testid="button-start-project">
+                  Start Your Project
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <a href="https://wa.me/917358105995" target="_blank" className="inline-block px-10 py-5 rounded-xl bg-white/10 backdrop-blur-sm text-white border border-white/20 font-bold hover:bg-white/20 transition-all" data-testid="link-whatsapp">
+                  Chat on WhatsApp
+                </a>
+              </motion.div>
             </div>
           </motion.div>
         </div>

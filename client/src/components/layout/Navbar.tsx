@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, X, Phone, Globe } from "lucide-react";
+import { Menu, X, Phone, Globe, Sun, Moon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const links = [
@@ -16,6 +16,7 @@ const links = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const [location] = useLocation();
 
   useEffect(() => {
@@ -23,6 +24,21 @@ export function Navbar() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const shouldBeDark = savedTheme === "dark" || (!savedTheme && prefersDark);
+    setIsDark(shouldBeDark);
+    document.documentElement.classList.toggle("dark", shouldBeDark);
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newMode = !isDark;
+    setIsDark(newMode);
+    document.documentElement.classList.toggle("dark", newMode);
+    localStorage.setItem("theme", newMode ? "dark" : "light");
+  };
 
   return (
     <nav
@@ -63,9 +79,16 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <button
+              onClick={toggleDarkMode}
+              data-testid="button-theme-toggle"
+              className="p-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
             <a
               href="tel:+914447740195"
-              className="px-5 py-2.5 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-all shadow-md hover:shadow-xl flex items-center gap-2"
+              className="px-5 py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-md hover:shadow-xl flex items-center gap-2"
             >
               <Phone className="w-4 h-4" />
               <span>Call Now</span>
@@ -99,20 +122,28 @@ export function Navbar() {
                   onClick={() => setIsOpen(false)}
                   className={`text-lg font-medium p-2 rounded-lg ${
                     location === link.href
-                      ? "bg-emerald-50 text-emerald-600"
-                      : "text-slate-600"
+                      ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                      : "text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   {link.label}
                 </Link>
               ))}
-              <hr className="border-slate-100" />
+              <hr className="border-slate-100 dark:border-slate-800" />
               <div className="flex flex-col gap-3 p-2">
-                <div className="flex items-center gap-3 text-sm text-slate-500">
+                <button
+                  onClick={toggleDarkMode}
+                  data-testid="button-theme-toggle-mobile"
+                  className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300 font-medium"
+                >
+                  {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
+                </button>
+                <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
                   <Globe className="w-4 h-4" />
                   <span>Ayyapakam, Chennai</span>
                 </div>
-                <div className="flex items-center gap-3 text-sm text-slate-500">
+                <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
                   <Phone className="w-4 h-4" />
                   <span>+91 44 4774 0195</span>
                 </div>

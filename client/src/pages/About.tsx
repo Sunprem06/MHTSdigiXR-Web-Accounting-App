@@ -11,7 +11,7 @@ const TEAM_VALUES = [
 
 export default function About() {
   return (
-    <div className="pt-24 pb-20">
+    <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
       <div className="container mx-auto px-4 md:px-6">
         {/* Header */}
         <div className="grid lg:grid-cols-2 gap-16 items-center mb-24">
@@ -19,24 +19,24 @@ export default function About() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-800 text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-sm font-semibold mb-6">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               About MHTSdigiX
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-slate-900">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-slate-900 dark:text-white">
               Your Extended <span className="text-gradient">Digital Team</span>
             </h1>
-            <p className="text-lg text-slate-600 mb-6 leading-relaxed">
+            <p className="text-lg text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
               Maanagaram Hi Tech Solutions (MHTSdigiX) was founded in December 2022 with a vision to empower businesses through digital transformation. We genuinely feel like an extended marketing and technology arm for every brand we associate with.
             </p>
-            <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+            <p className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
               Based in Chennai, India, we serve clients globally, providing bespoke solutions that drive growth and efficiency. Our approach combines technical expertise with creative innovation to solve complex business challenges.
             </p>
             
             <div className="grid grid-cols-2 gap-4">
               {["Expert Team", "Global Reach", "24/7 Support", "Agile Methodology"].map((item) => (
-                <div key={item} className="flex items-center gap-2 font-semibold text-slate-800">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <div key={item} className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200">
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                     <Check className="w-4 h-4" />
                   </div>
                   {item}
@@ -55,16 +55,16 @@ export default function About() {
               alt="Our Team" 
               className="rounded-3xl shadow-2xl"
             />
-            <div className="absolute -bottom-6 -right-6 bg-white p-8 rounded-2xl shadow-xl border border-slate-100 max-w-xs">
-              <p className="text-4xl font-bold text-emerald-600 mb-1">150+</p>
-              <p className="text-slate-600 font-medium">Projects Successfully Delivered</p>
+            <div className="absolute -bottom-6 -right-6 bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 max-w-xs">
+              <p className="text-4xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">150+</p>
+              <p className="text-slate-600 dark:text-slate-300 font-medium">Projects Successfully Delivered</p>
             </div>
           </motion.div>
         </div>
 
         {/* Message from Leadership */}
         <section className="mb-24">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 md:p-12 relative overflow-hidden">
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-black dark:to-slate-900 rounded-3xl p-8 md:p-12 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
             
@@ -103,7 +103,7 @@ export default function About() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="bg-slate-900 text-white p-10 rounded-3xl"
+            className="bg-slate-900 dark:bg-black text-white p-10 rounded-3xl"
           >
             <h2 className="text-2xl font-bold mb-4">Our Vision</h2>
             <p className="text-slate-300 leading-relaxed">
@@ -127,8 +127,8 @@ export default function About() {
         {/* Core Values */}
         <section className="mb-24">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">What Drives Us</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 dark:text-white">What Drives Us</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
               Our core values shape everything we do - from how we work with clients to how we build our solutions.
             </p>
           </div>
@@ -141,13 +141,13 @@ export default function About() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="bg-white border border-slate-100 p-8 rounded-2xl hover:shadow-lg transition-shadow"
+                className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-8 rounded-2xl hover:shadow-lg transition-shadow"
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center mb-6 text-white">
                   <value.icon className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-bold mb-3">{value.title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{value.desc}</p>
+                <h3 className="text-xl font-bold mb-3 dark:text-white">{value.title}</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{value.desc}</p>
               </motion.div>
             ))}
           </div>
@@ -155,12 +155,12 @@ export default function About() {
 
         {/* CTA */}
         <section className="text-center">
-          <div className="bg-slate-50 rounded-3xl p-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Work Together?</h2>
-            <p className="text-slate-500 max-w-xl mx-auto mb-8">
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl p-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Ready to Work Together?</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-xl mx-auto mb-8">
               Let's discuss how we can help transform your business with our digital solutions.
             </p>
-            <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all shadow-lg" data-testid="button-contact-us">
+            <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-lg" data-testid="button-contact-us">
               Get in Touch <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
