@@ -39,7 +39,7 @@ const FAQ_CATEGORIES: FAQCategory[] = [
       },
       {
         question: "How can I get a quote for my project?",
-        answer: "Getting a quote is easy! You can fill out our contact form, chat with Meena (our AI assistant), call us at +91 4447740195, or WhatsApp us at +91 7358105995. We typically respond within 2-4 hours and provide detailed proposals within 24-48 hours."
+        answer: "Getting a quote is easy! You can fill out our contact form, chat with Kayal (our AI assistant), call us at +91 4447740195, or WhatsApp us at +91 7358105995. We typically respond within 2-4 hours and provide detailed proposals within 24-48 hours."
       }
     ]
   },
@@ -345,9 +345,9 @@ export default function FAQ() {
     <div className="pt-24 pb-20">
       {/* Hero Section */}
       <section className="relative bg-slate-900 dark:bg-black py-20 mb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-emerald-900/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-sky-900/30" />
         <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <motion.div
@@ -460,11 +460,11 @@ export default function FAQ() {
           viewport={{ once: true }}
           className="mt-20 text-center"
         >
-          <div className="bg-gradient-to-br from-sky-50 to-emerald-50 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
+          <div className="bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
             <MessageSquare className="w-16 h-16 text-sky-500 mx-auto mb-6" />
             <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Still Have Questions?</h2>
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
-              Can't find what you're looking for? Our team is here to help. Chat with Meena, our AI assistant, or reach out to us directly.
+              Can't find what you're looking for? Our team is here to help. Chat with Kayal, our AI assistant, or reach out to us directly.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link 

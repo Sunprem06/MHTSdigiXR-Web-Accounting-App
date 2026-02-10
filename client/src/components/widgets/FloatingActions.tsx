@@ -6,8 +6,8 @@ import { useMutation } from "@tanstack/react-query";
 // WhatsApp Number
 const WHATSAPP_NUMBER = "917358105995";
 
-// System prompt for Meena - the AI assistant
-const SYSTEM_CONTEXT = `You are Meena, the friendly and knowledgeable AI assistant for MHTSdigiX (Maanagaram Hi Tech Solutions), a premier digital agency in Chennai, India.
+// System prompt for Kayal - the AI assistant
+const SYSTEM_CONTEXT = `You are Kayal, the friendly and knowledgeable AI assistant for MHTSdigiX (Maanagaram Hi Tech Solutions), a premier digital agency in Chennai, India.
 
 You are an expert in:
 - SERVICE SUPPORT: Helping customers understand our services, features, and capabilities
@@ -42,7 +42,7 @@ Your personality:
 - Speak in a helpful, conversational tone
 - Use simple language that non-technical customers can understand
 - Be enthusiastic about helping businesses grow digitally
-- Always introduce yourself as "Meena" when greeting
+- Always introduce yourself as "Kayal" when greeting
 - Provide specific pricing when asked
 - Encourage customers to book a free consultation or contact us on WhatsApp for personalized quotes
 
@@ -51,7 +51,7 @@ Always guide customers towards the right service for their needs and encourage t
 export function FloatingActions() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([
-    { role: 'assistant', content: 'Hi there! I\'m Meena, your digital solutions expert at MHTSdigiX. How can I help you today? Whether you need help with web development, mobile apps, digital marketing, or any technical questions - I\'m here to assist!' }
+    { role: 'assistant', content: 'Hi there! I\'m Kayal, your digital solutions expert at MHTSdigiX. How can I help you today? Whether you need help with web development, mobile apps, digital marketing, or any technical questions - I\'m here to assist!' }
   ]);
   const [input, setInput] = useState("");
   const [streamingResponse, setStreamingResponse] = useState("");
@@ -149,68 +149,68 @@ export function FloatingActions() {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="bg-white rounded-2xl shadow-2xl w-80 md:w-96 overflow-hidden border border-slate-200 mb-2"
+            className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-80 md:w-96 overflow-hidden border border-slate-200 dark:border-slate-700 mb-2"
           >
-            <div className="bg-gradient-to-r from-emerald-600 to-sky-500 p-4 flex justify-between items-center text-white">
+            <div className="bg-gradient-to-r from-sky-500 to-sky-600 p-4 flex justify-between items-center text-white">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="font-semibold">Meena - Your Digital Expert</span>
+                <span className="font-semibold">Kayal - Your Digital Expert</span>
               </div>
               <button onClick={() => setIsChatOpen(false)} className="hover:bg-white/20 p-1 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="h-80 overflow-y-auto p-4 bg-slate-50 flex flex-col gap-3">
+            <div className="h-80 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 flex flex-col gap-3">
               {messages.map((msg, i) => (
                 <div
                   key={i}
                   className={`p-3 rounded-2xl text-sm max-w-[85%] ${
                     msg.role === 'user'
                       ? 'bg-sky-500 text-white self-end rounded-tr-sm'
-                      : 'bg-white border border-slate-200 text-slate-700 self-start rounded-tl-sm shadow-sm'
+                      : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 self-start rounded-tl-sm shadow-sm'
                   }`}
                 >
                   {msg.content}
                 </div>
               ))}
               {streamingResponse && (
-                <div className="p-3 rounded-2xl text-sm max-w-[85%] bg-white border border-slate-200 text-slate-700 self-start rounded-tl-sm shadow-sm">
+                <div className="p-3 rounded-2xl text-sm max-w-[85%] bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 self-start rounded-tl-sm shadow-sm">
                   {streamingResponse}
-                  <span className="inline-block w-2 h-4 bg-emerald-500 animate-pulse ml-1" />
+                  <span className="inline-block w-2 h-4 bg-sky-500 animate-pulse ml-1" />
                 </div>
               )}
               {sendMessage.isPending && !streamingResponse && (
-                <div className="self-start bg-white p-3 rounded-2xl rounded-tl-sm border border-slate-200 shadow-sm">
+                <div className="self-start bg-white dark:bg-slate-700 p-3 rounded-2xl rounded-tl-sm border border-slate-200 dark:border-slate-600 shadow-sm">
                   <div className="flex gap-1 items-center">
-                    <Sparkles className="w-3 h-3 text-emerald-500 animate-pulse" />
-                    <span className="text-xs text-slate-400">AI is thinking...</span>
+                    <Sparkles className="w-3 h-3 text-sky-500 animate-pulse" />
+                    <span className="text-xs text-slate-400 dark:text-slate-300">AI is thinking...</span>
                   </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-3 bg-white border-t border-slate-100 flex gap-2">
+            <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700 flex gap-2">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder="Type your message..."
-                className="flex-1 bg-slate-100 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-sky-500 focus:outline-none"
               />
               <button
                 onClick={handleSend}
                 disabled={sendMessage.isPending || !input.trim()}
                 data-testid="button-send-chat"
-                className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                className="p-2 bg-sky-500 text-white rounded-xl hover:bg-sky-600 transition-colors disabled:opacity-50"
               >
                 <Send className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="bg-slate-50 p-2 text-center text-xs text-slate-400 border-t border-slate-100">
-              Need human help? <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" className="text-emerald-600 font-medium hover:underline">Chat on WhatsApp</a>
+            <div className="bg-slate-50 dark:bg-slate-800 p-2 text-center text-xs text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700">
+              Need human help? <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" className="text-sky-600 dark:text-sky-400 font-medium hover:underline">Chat on WhatsApp</a>
             </div>
           </motion.div>
         )}
@@ -223,7 +223,7 @@ export function FloatingActions() {
           whileTap={{ scale: 0.9 }}
           onClick={() => setIsChatOpen(!isChatOpen)}
           data-testid="button-chat-toggle"
-          className="w-14 h-14 rounded-full bg-white shadow-lg border border-emerald-100 text-emerald-600 flex items-center justify-center hover:shadow-xl transition-all"
+          className="w-14 h-14 rounded-full bg-white dark:bg-slate-800 shadow-lg border border-sky-100 dark:border-slate-700 text-sky-600 dark:text-sky-400 flex items-center justify-center hover:shadow-xl transition-all"
         >
           {isChatOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
         </motion.button>

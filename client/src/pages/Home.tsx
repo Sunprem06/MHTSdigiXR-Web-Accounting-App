@@ -160,7 +160,7 @@ export default function Home() {
                 <br />
                 <span className="text-slate-900 dark:text-white">Unique. </span>
                 <motion.span 
-                  className="text-emerald-500"
+                  className="text-sky-500"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
@@ -169,7 +169,7 @@ export default function Home() {
                 </motion.span>
                 <br />
                 <motion.span 
-                  className="text-emerald-500"
+                  className="text-sky-500"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
@@ -216,7 +216,7 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950" />
               
               {/* Accent gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-sky-600/30 via-transparent to-emerald-500/20" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-sky-600/30 via-transparent to-sky-500/20" />
               
               {/* Grid pattern overlay */}
               <div className="absolute inset-0 opacity-10" style={{
@@ -236,7 +236,7 @@ export default function Home() {
               <motion.div
                 animate={{ y: [0, 15, 0] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                className="absolute top-20 right-16 w-14 h-14 bg-emerald-500/90 rounded-full shadow-xl flex items-center justify-center"
+                className="absolute top-20 right-16 w-14 h-14 bg-sky-500/90 rounded-full shadow-xl flex items-center justify-center"
               >
                 <Globe className="w-7 h-7 text-white" />
               </motion.div>
@@ -246,7 +246,7 @@ export default function Home() {
                 transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                 className="absolute bottom-24 left-20 w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl shadow-xl flex items-center justify-center border border-white/20"
               >
-                <Monitor className="w-10 h-10 text-emerald-400" />
+                <Monitor className="w-10 h-10 text-sky-400" />
               </motion.div>
 
               <motion.div
@@ -262,7 +262,7 @@ export default function Home() {
               <motion.div
                 animate={{ y: [0, 10, 0] }}
                 transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
-                className="absolute top-1/2 right-12 w-14 h-14 bg-emerald-400/80 rounded-xl shadow-xl flex items-center justify-center"
+                className="absolute top-1/2 right-12 w-14 h-14 bg-sky-400/80 rounded-xl shadow-xl flex items-center justify-center"
               >
                 <Code className="w-7 h-7 text-white" />
               </motion.div>
@@ -271,7 +271,7 @@ export default function Home() {
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-gradient-to-br from-sky-500 to-emerald-500 rounded-3xl shadow-2xl flex items-center justify-center"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-gradient-to-br from-sky-500 to-sky-500 rounded-3xl shadow-2xl flex items-center justify-center"
               >
                 <Search className="w-14 h-14 text-white" />
               </motion.div>
@@ -295,7 +295,7 @@ export default function Home() {
 
       {/* Stats Counter Section */}
       <section className="py-16 bg-slate-900 dark:bg-slate-950 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/20 to-sky-900/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/20 to-sky-900/20" />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {STATS.map((stat, i) => (
@@ -307,7 +307,7 @@ export default function Home() {
                 transition={{ delay: i * 0.1 }}
                 className="text-center"
               >
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 mb-4">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-sky-500/20 text-sky-400 mb-4">
                   <stat.icon className="w-7 h-7" />
                 </div>
                 <div className="text-4xl md:text-5xl font-bold text-white mb-2">
@@ -332,7 +332,7 @@ export default function Home() {
             >
               {[...CLIENT_LOGOS, ...CLIENT_LOGOS].map((logo, i) => (
                 <div key={i} className="flex items-center gap-3 shrink-0">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-sky-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                     {logo.initial}
                   </div>
                   <span className="text-slate-700 dark:text-slate-300 font-semibold text-lg whitespace-nowrap">{logo.name}</span>
@@ -376,7 +376,7 @@ export default function Home() {
                   <Trophy className="w-8 h-8 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">{award.title}</h3>
-                <p className="text-emerald-400 font-semibold mb-1">{award.year}</p>
+                <p className="text-sky-400 font-semibold mb-1">{award.year}</p>
                 <p className="text-slate-400 text-sm">{award.org}</p>
               </motion.div>
             ))}
@@ -402,7 +402,7 @@ export default function Home() {
 
           <div className="grid md:grid-cols-4 gap-8 relative">
             {/* Connection line */}
-            <div className="hidden md:block absolute top-20 left-[12%] right-[12%] h-0.5 bg-gradient-to-r from-emerald-500 via-sky-500 to-violet-500" />
+            <div className="hidden md:block absolute top-20 left-[12%] right-[12%] h-0.5 bg-gradient-to-r from-sky-500 via-sky-500 to-violet-500" />
             
             {PROCESS_STEPS.map((step, i) => (
               <motion.div
@@ -413,10 +413,10 @@ export default function Home() {
                 transition={{ delay: i * 0.1 }}
                 className="relative text-center"
               >
-                <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center mx-auto mb-6 shadow-xl">
+                <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-br from-sky-500 to-sky-500 flex items-center justify-center mx-auto mb-6 shadow-xl">
                   <step.icon className="w-8 h-8 text-white" />
                 </div>
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white dark:bg-slate-800 border-4 border-emerald-500 text-xs font-bold flex items-center justify-center text-emerald-600">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white dark:bg-slate-800 border-4 border-sky-500 text-xs font-bold flex items-center justify-center text-sky-600">
                   {step.step.replace('0', '')}
                 </div>
                 <h3 className="text-xl font-bold mb-3 dark:text-white">{step.title}</h3>
@@ -482,7 +482,7 @@ export default function Home() {
                     {option.title}
                   </h3>
                   <p className="text-slate-300 text-sm mb-4">{option.desc}</p>
-                  <Link href="/contact" className="inline-flex items-center gap-2 text-white font-semibold hover:gap-3 transition-all group-hover:text-emerald-400">
+                  <Link href="/contact" className="inline-flex items-center gap-2 text-white font-semibold hover:gap-3 transition-all group-hover:text-sky-400">
                     Get Started <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
@@ -511,12 +511,12 @@ export default function Home() {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.05 }}
                   whileHover={{ y: -5 }}
-                  className="group h-full p-8 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-700 hover:shadow-lg transition-all cursor-pointer"
+                  className="group h-full p-8 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-sky-200 dark:hover:border-sky-700 hover:shadow-lg transition-all cursor-pointer"
                 >
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform text-white shadow-lg">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-sky-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform text-white shadow-lg">
                     <feature.icon className="w-7 h-7" />
                   </div>
-                  <h3 className="text-xl font-bold mb-3 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors dark:text-white">{feature.title}</h3>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors dark:text-white">{feature.title}</h3>
                   <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{feature.desc}</p>
                 </motion.div>
               </Link>
@@ -541,9 +541,9 @@ export default function Home() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="relative bg-gradient-to-br from-emerald-50 to-sky-50 dark:from-slate-700 dark:to-slate-700 rounded-3xl p-8 md:p-12 shadow-xl"
+              className="relative bg-gradient-to-br from-sky-50 to-sky-50 dark:from-slate-700 dark:to-slate-700 rounded-3xl p-8 md:p-12 shadow-xl"
             >
-              <Quote className="absolute top-6 left-6 w-12 h-12 text-emerald-200 dark:text-emerald-800" />
+              <Quote className="absolute top-6 left-6 w-12 h-12 text-sky-200 dark:text-sky-800" />
               <div className="relative z-10">
                 <p className="text-xl md:text-2xl text-slate-700 dark:text-slate-200 mb-8 leading-relaxed italic">
                   "{TESTIMONIALS[currentTestimonial].content}"
@@ -569,7 +569,7 @@ export default function Home() {
                   onClick={() => setCurrentTestimonial(i)}
                   className={`w-3 h-3 rounded-full transition-all ${
                     i === currentTestimonial 
-                      ? 'bg-emerald-500 w-8' 
+                      ? 'bg-sky-500 w-8' 
                       : 'bg-slate-300 dark:bg-slate-600 hover:bg-slate-400'
                   }`}
                   data-testid={`button-testimonial-${i}`}
@@ -626,14 +626,14 @@ export default function Home() {
                     transition={{ delay: i * 0.1 }}
                     className="flex items-center gap-3 font-medium text-slate-700 dark:text-slate-300"
                   >
-                    <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
                       <CheckCircle2 className="w-4 h-4" />
                     </div>
                     {item}
                   </motion.li>
                 ))}
               </ul>
-              <Link href="/about" className="text-emerald-600 dark:text-emerald-400 font-bold hover:text-emerald-700 inline-flex items-center gap-2" data-testid="link-about-us">
+              <Link href="/about" className="text-sky-600 dark:text-sky-400 font-bold hover:text-sky-700 inline-flex items-center gap-2" data-testid="link-about-us">
                 Learn more about us <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -644,7 +644,7 @@ export default function Home() {
       {/* CTA Section */}
       <section className="py-24 bg-slate-900 dark:bg-black relative overflow-hidden">
         <div className="absolute top-0 right-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&q=80')] opacity-10 bg-cover bg-center" />
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 to-sky-900/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-sky-900/30" />
         <div className="container mx-auto px-4 relative z-10 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

@@ -6,15 +6,19 @@ This is a full-stack digital agency website for Maanagaram Hi Tech Solutions, a 
 
 ## Recent Changes (Feb 2026)
 
-- **World-Class Agency Features**: Researched top agencies (WPP, Ogilvy, AKQA) and 2025 design trends
-- **Awards & Recognition Section**: Added trophy icons and award cards on Home page (like Cannes Lions)
-- **How We Work Section**: Visual 4-step process timeline (Discovery, Strategy, Execution, Delivery)
+- **Sky Blue Color Scheme**: Replaced all emerald/teal accent colors with sky blue across entire site
+- **AI Chatbot "Kayal"**: Renamed from "Meena" to "Kayal" - expert in service/sales/marketing/technical/customer support
+- **Light Mode Default**: Website defaults to light mode (not system preference), full dark mode toggle support
 - **Dark Mode Support**: Full dark mode with toggle in Navbar (desktop + mobile), localStorage persistence
-- **Enhanced Hero Section**: Bolder typography, animated CTAs, trust badges, floating award card
+- **Chat Widget Dark Mode**: Complete dark mode support for Kayal chat widget (backgrounds, borders, text colors)
+- **Sky Blue Buttons**: All buttons use sky blue color with rounded-full styling
+- **Logo Watermark**: 25% opacity in light mode, 10% opacity in dark mode
+- **Contact Form**: Sky blue focus rings, sky blue submit button with rounded-full
+- **World-Class Agency Features**: Researched top agencies (WPP, Ogilvy, AKQA) and 2025 design trends
+- **Awards & Recognition Section**: Added trophy icons and award cards on Home page
 - **Enhanced Services Page**: Colorful gradient icons, improved hover effects, CTA section
-- **Enhanced Home Page**: Stats counter, client logos carousel, testimonials, "What are my options" section
-- **AI Chatbot Integration**: Connected floating chat widget to OpenAI with streaming responses
-- **Enhanced About Page**: Leadership message section, core values cards, vision/mission design
+- **Enhanced Home Page**: Stats counter, client logos carousel, testimonials
+- **Deployment Ready**: Complete Hostinger VPS deployment guide with OpenAI API integration
 
 ## User Preferences
 

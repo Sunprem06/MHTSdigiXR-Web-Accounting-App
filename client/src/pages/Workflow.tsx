@@ -52,8 +52,8 @@ export default function Workflow() {
     <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
       {/* Hero Section */}
       <section className="relative bg-slate-900 dark:bg-black py-20 mb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 to-sky-900/30" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-sky-900/30" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
         
         <div className="container mx-auto px-4 text-center relative z-10">
@@ -61,8 +61,8 @@ export default function Workflow() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 text-sm font-semibold mb-6">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-500/20 text-sky-300 text-sm font-semibold mb-6">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
               Transparent Process
             </div>
             <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white">Our Workflow</h1>
@@ -117,7 +117,7 @@ export default function Workflow() {
           viewport={{ once: true }}
           className="mt-20 text-center"
         >
-          <div className="bg-gradient-to-br from-emerald-50 to-sky-50 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
+          <div className="bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Ready to Start Your Project?</h2>
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
               Let's work together to bring your ideas to life. Contact us today to get started.

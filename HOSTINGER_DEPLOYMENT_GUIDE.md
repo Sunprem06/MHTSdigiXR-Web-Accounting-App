@@ -195,7 +195,7 @@ DATABASE_URL=postgresql://mhtsuser:YOUR_SECURE_PASSWORD@localhost:5432/mhtsdigix
 # Session
 SESSION_SECRET=your-super-secret-session-key-minimum-32-characters
 
-# OpenAI API (for Meena chatbot)
+# OpenAI API (for Kayal chatbot)
 OPENAI_API_KEY=sk-your-openai-api-key-here
 
 # Server
@@ -341,7 +341,7 @@ Open browser and visit:
 - [ ] Homepage loads correctly
 - [ ] All pages navigate properly
 - [ ] Contact form works
-- [ ] Meena chatbot responds
+- [ ] Kayal chatbot responds
 - [ ] All service pages display
 - [ ] FAQ section works
 - [ ] Careers page shows jobs

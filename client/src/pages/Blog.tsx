@@ -67,13 +67,13 @@ export default function Blog() {
                     <User className="w-3 h-3" /> {post.author}
                   </div>
                 </div>
-                <h3 className="text-xl font-bold mb-3 group-hover:text-emerald-600 transition-colors line-clamp-2">
+                <h3 className="text-xl font-bold mb-3 group-hover:text-sky-600 transition-colors line-clamp-2">
                   {post.title}
                 </h3>
                 <p className="text-slate-600 text-sm mb-4 line-clamp-3">
                   {post.excerpt}
                 </p>
-                <button className="text-emerald-600 font-bold text-sm hover:underline">
+                <button className="text-sky-600 font-bold text-sm hover:underline">
                   Read Article
                 </button>
               </div>

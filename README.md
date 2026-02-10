@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A professional digital agency website for **Maanagaram Hi Tech Solutions** (Brand: **MHTSdigiX**). Built with React, TypeScript, Express, and PostgreSQL. Features sky blue color scheme, AI chatbot named "Meena", comprehensive service showcase, FAQ section, and Careers page.
+A professional digital agency website for **Maanagaram Hi Tech Solutions** (Brand: **MHTSdigiX**). Built with React, TypeScript, Express, and PostgreSQL. Features sky blue color scheme, AI chatbot named "Kayal", comprehensive service showcase, FAQ section, and Careers page.
 
 **Last Updated:** February 2026
 
@@ -366,10 +366,10 @@ The chatbot uses OpenAI through Replit AI Integrations.
 
 #### Chatbot Personality (in `server/routes.ts`)
 ```typescript
-const systemPrompt = `You are Meena, a friendly AI assistant for MHTSdigiX...`;
+const systemPrompt = `You are Kayal, a friendly AI assistant for MHTSdigiX...`;
 ```
 
-**To customize Meena's personality:**
+**To customize Kayal's personality:**
 1. Edit the system prompt in `server/routes.ts`
 2. Add company-specific knowledge
 3. Define response style and tone

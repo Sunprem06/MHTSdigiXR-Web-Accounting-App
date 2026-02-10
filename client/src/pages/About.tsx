@@ -20,8 +20,8 @@ export default function About() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-sm font-semibold mb-6">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 text-sm font-semibold mb-6">
+              <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
               About MHTSdigiX
             </div>
             <h1 className="text-4xl md:text-6xl font-bold mb-6 text-slate-900 dark:text-white">
@@ -37,7 +37,7 @@ export default function About() {
             <div className="grid grid-cols-2 gap-4">
               {["Expert Team", "Global Reach", "24/7 Support", "Agile Methodology"].map((item) => (
                 <div key={item} className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <div className="w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center text-sky-600 dark:text-sky-400">
                     <Check className="w-4 h-4" />
                   </div>
                   {item}
@@ -57,7 +57,7 @@ export default function About() {
               className="rounded-3xl shadow-2xl"
             />
             <div className="absolute -bottom-6 -right-6 bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 max-w-xs">
-              <p className="text-4xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">150+</p>
+              <p className="text-4xl font-bold text-sky-600 dark:text-sky-400 mb-1">150+</p>
               <p className="text-slate-600 dark:text-slate-300 font-medium">Projects Successfully Delivered</p>
             </div>
           </motion.div>
@@ -66,12 +66,12 @@ export default function About() {
         {/* Message from Leadership */}
         <section className="mb-24">
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-black dark:to-slate-900 rounded-3xl p-8 md:p-12 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
             
             <div className="relative z-10 grid lg:grid-cols-5 gap-10 items-center">
               <div className="lg:col-span-3">
-                <Quote className="w-12 h-12 text-emerald-500 mb-6" />
+                <Quote className="w-12 h-12 text-sky-500 mb-6" />
                 <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">Message from Our Team</h2>
                 <p className="text-slate-300 text-lg leading-relaxed mb-6">
                   Most businesses struggle because they don't concentrate on Marketing. If there is no lead flow, there is no cash flow. Creating multiple sources for lead generation is the key to sustainable growth.
@@ -79,7 +79,7 @@ export default function About() {
                 <p className="text-slate-300 text-lg leading-relaxed mb-6">
                   We help you define your audience, refine your message, and identify platforms to leverage the maximum potential of the Digital Ecosystem. Only 3% of the audience are looking for a solution - the rest of the market needs education.
                 </p>
-                <p className="text-emerald-400 font-semibold text-xl italic">
+                <p className="text-sky-400 font-semibold text-xl italic">
                   "Marketing + Data = New Fuel. We take you to escape velocity."
                 </p>
               </div>
@@ -116,7 +116,7 @@ export default function About() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-emerald-500 to-sky-500 text-white p-10 rounded-3xl"
+            className="bg-gradient-to-br from-sky-500 to-sky-500 text-white p-10 rounded-3xl"
           >
             <h2 className="text-2xl font-bold mb-4">Our Mission</h2>
             <p className="text-white/90 leading-relaxed">
@@ -144,7 +144,7 @@ export default function About() {
                 transition={{ delay: i * 0.1 }}
                 className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-8 rounded-2xl hover:shadow-lg transition-shadow"
               >
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center mb-6 text-white">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-sky-500 flex items-center justify-center mb-6 text-white">
                   <value.icon className="w-7 h-7" />
                 </div>
                 <h3 className="text-xl font-bold mb-3 dark:text-white">{value.title}</h3>

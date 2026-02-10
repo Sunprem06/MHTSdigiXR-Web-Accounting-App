@@ -28,8 +28,7 @@ export function Navbar() {
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const shouldBeDark = savedTheme === "dark" || (!savedTheme && prefersDark);
+    const shouldBeDark = savedTheme === "dark";
     setIsDark(shouldBeDark);
     document.documentElement.classList.toggle("dark", shouldBeDark);
   }, []);
@@ -73,9 +72,9 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-sm font-medium transition-colors hover:text-emerald-600 ${
+                className={`text-sm font-medium transition-colors hover:text-sky-600 ${
                   location === link.href
-                    ? "text-emerald-600 font-semibold"
+                    ? "text-sky-600 font-semibold"
                     : "text-slate-600 dark:text-slate-300"
                 }`}
               >
@@ -101,7 +100,7 @@ export function Navbar() {
           {/* Mobile Toggle */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="lg:hidden p-2 text-slate-600"
+            className="lg:hidden p-2 text-slate-600 dark:text-slate-300"
           >
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -125,7 +124,7 @@ export function Navbar() {
                   onClick={() => setIsOpen(false)}
                   className={`text-lg font-medium p-2 rounded-lg ${
                     location === link.href
-                      ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                      ? "bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400"
                       : "text-slate-600 dark:text-slate-300"
                   }`}
                 >

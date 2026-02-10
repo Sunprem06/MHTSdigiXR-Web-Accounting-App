@@ -224,7 +224,7 @@ function JobCard({ job, isExpanded, onToggle }: { job: JobPosition; isExpanded: 
               <ul className="space-y-2">
                 {job.responsibilities.map((resp, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
-                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <CheckCircle className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
                     {resp}
                   </li>
                 ))}
@@ -258,9 +258,9 @@ export default function Careers() {
     <div className="pt-24 pb-20">
       {/* Hero Section */}
       <section className="relative bg-slate-900 dark:bg-black py-20 mb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-emerald-900/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-sky-900/30" />
         <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <motion.div
@@ -407,7 +407,7 @@ export default function Careers() {
           viewport={{ once: true }}
           className="text-center"
         >
-          <div className="bg-gradient-to-br from-sky-50 to-emerald-50 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
+          <div className="bg-gradient-to-br from-sky-50 to-sky-50 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Don't See Your Role?</h2>
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
               We're always looking for talented people. Send us your resume and we'll keep you in mind for future opportunities.

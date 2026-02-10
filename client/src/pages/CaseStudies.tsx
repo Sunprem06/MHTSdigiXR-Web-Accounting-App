@@ -72,12 +72,12 @@ export default function CaseStudies() {
                 </div>
               </div>
               <div className="p-8">
-                <h3 className="text-2xl font-bold mb-2 group-hover:text-emerald-600 transition-colors">{project.title}</h3>
+                <h3 className="text-2xl font-bold mb-2 group-hover:text-sky-600 transition-colors">{project.title}</h3>
                 <p className="text-slate-500 mb-6">Client: {project.client}</p>
                 
                 <div className="flex flex-wrap gap-2 mb-6">
                   {project.results.map((result, i) => (
-                    <span key={i} className="px-3 py-1 bg-emerald-50 text-emerald-700 text-sm font-medium rounded-lg">
+                    <span key={i} className="px-3 py-1 bg-sky-50 text-sky-700 text-sm font-medium rounded-lg">
                       {result}
                     </span>
                   ))}

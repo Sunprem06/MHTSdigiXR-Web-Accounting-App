@@ -35,13 +35,12 @@ function Router() {
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-slate-950 relative">
       <div 
-        className="fixed inset-0 z-0 pointer-events-none"
+        className="fixed inset-0 z-0 pointer-events-none opacity-25 dark:opacity-10"
         style={{
           backgroundImage: `url(${logoImage})`,
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center center',
           backgroundSize: '40%',
-          opacity: 0.25,
         }}
       />
       <div className="relative z-10 flex flex-col min-h-screen">

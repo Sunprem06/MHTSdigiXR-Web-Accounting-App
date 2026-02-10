@@ -26,7 +26,7 @@ export function Footer() {
               Empowering businesses with cutting-edge digital solutions. From web development to AI integration, we are your partner in growth.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="w-10 h-10 rounded-full bg-slate-800 dark:bg-slate-900 flex items-center justify-center hover:bg-emerald-600 transition-colors" data-testid="link-linkedin">
+              <a href="#" className="w-10 h-10 rounded-full bg-slate-800 dark:bg-slate-900 flex items-center justify-center hover:bg-sky-600 transition-colors" data-testid="link-linkedin">
                 <Linkedin className="w-5 h-5" />
               </a>
               <a href="#" className="w-10 h-10 rounded-full bg-slate-800 dark:bg-slate-900 flex items-center justify-center hover:bg-sky-500 transition-colors" data-testid="link-twitter">
@@ -45,13 +45,13 @@ export function Footer() {
           <div>
             <h3 className="text-white font-bold text-lg mb-6">Quick Links</h3>
             <ul className="space-y-3">
-              <li><Link href="/about" className="hover:text-emerald-400 transition-colors">About Us</Link></li>
-              <li><Link href="/services" className="hover:text-emerald-400 transition-colors">Our Services</Link></li>
-              <li><Link href="/workflow" className="hover:text-emerald-400 transition-colors">Workflow</Link></li>
-              <li><Link href="/case-studies" className="hover:text-emerald-400 transition-colors">Case Studies</Link></li>
-              <li><Link href="/careers" className="hover:text-emerald-400 transition-colors">Careers</Link></li>
-              <li><Link href="/faq" className="hover:text-emerald-400 transition-colors">FAQ</Link></li>
-              <li><Link href="/contact" className="hover:text-emerald-400 transition-colors">Contact</Link></li>
+              <li><Link href="/about" className="hover:text-sky-400 transition-colors">About Us</Link></li>
+              <li><Link href="/services" className="hover:text-sky-400 transition-colors">Our Services</Link></li>
+              <li><Link href="/workflow" className="hover:text-sky-400 transition-colors">Workflow</Link></li>
+              <li><Link href="/case-studies" className="hover:text-sky-400 transition-colors">Case Studies</Link></li>
+              <li><Link href="/careers" className="hover:text-sky-400 transition-colors">Careers</Link></li>
+              <li><Link href="/faq" className="hover:text-sky-400 transition-colors">FAQ</Link></li>
+              <li><Link href="/contact" className="hover:text-sky-400 transition-colors">Contact</Link></li>
             </ul>
           </div>
 
@@ -59,11 +59,11 @@ export function Footer() {
           <div>
             <h3 className="text-white font-bold text-lg mb-6">Services</h3>
             <ul className="space-y-3">
-              <li><Link href="/services/web-development" className="hover:text-emerald-400 transition-colors">Web Development</Link></li>
-              <li><Link href="/services/mobile-app" className="hover:text-emerald-400 transition-colors">Mobile Apps</Link></li>
-              <li><Link href="/services/digital-marketing" className="hover:text-emerald-400 transition-colors">Digital Marketing</Link></li>
-              <li><Link href="/services/seo" className="hover:text-emerald-400 transition-colors">SEO Optimization</Link></li>
-              <li><Link href="/services/ui-ux" className="hover:text-emerald-400 transition-colors">UI/UX Design</Link></li>
+              <li><Link href="/services/web-development" className="hover:text-sky-400 transition-colors">Web Development</Link></li>
+              <li><Link href="/services/mobile-app" className="hover:text-sky-400 transition-colors">Mobile Apps</Link></li>
+              <li><Link href="/services/digital-marketing" className="hover:text-sky-400 transition-colors">Digital Marketing</Link></li>
+              <li><Link href="/services/seo" className="hover:text-sky-400 transition-colors">SEO Optimization</Link></li>
+              <li><Link href="/services/ui-ux" className="hover:text-sky-400 transition-colors">UI/UX Design</Link></li>
             </ul>
           </div>
 
@@ -72,15 +72,15 @@ export function Footer() {
             <h3 className="text-white font-bold text-lg mb-6">Get in Touch</h3>
             <ul className="space-y-4">
               <li className="flex gap-3">
-                <MapPin className="w-5 h-5 text-emerald-500 shrink-0" />
+                <MapPin className="w-5 h-5 text-sky-500 shrink-0" />
                 <span className="text-sm">4056, 5th Main Road, Ayyapakam, Chennai, Tamil Nadu, India - 600077</span>
               </li>
               <li className="flex gap-3 items-center">
-                <Phone className="w-5 h-5 text-emerald-500 shrink-0" />
+                <Phone className="w-5 h-5 text-sky-500 shrink-0" />
                 <a href="tel:+914447740195" className="text-sm hover:text-white transition-colors">+91 44 4774 0195</a>
               </li>
               <li className="flex gap-3 items-center">
-                <Mail className="w-5 h-5 text-emerald-500 shrink-0" />
+                <Mail className="w-5 h-5 text-sky-500 shrink-0" />
                 <a href="mailto:sales@maanagaram.com" className="text-sm hover:text-white transition-colors">sales@maanagaram.com</a>
               </li>
             </ul>

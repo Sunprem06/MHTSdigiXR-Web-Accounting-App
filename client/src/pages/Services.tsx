@@ -172,8 +172,8 @@ export default function Services() {
     <div className="pt-24 pb-20">
       {/* Hero Section */}
       <section className="relative bg-slate-900 dark:bg-black py-20 mb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/30 to-sky-900/30" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-sky-900/30" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
         
         <div className="container mx-auto px-4 text-center relative z-10">
@@ -181,8 +181,8 @@ export default function Services() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 text-sm font-semibold mb-6">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-500/20 text-sky-300 text-sm font-semibold mb-6">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
               World-Class Solutions
             </div>
             <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white">Our Services</h1>
@@ -205,7 +205,7 @@ export default function Services() {
               whileHover={{ y: -8 }}
             >
               <Link href={`/services/${service.slug}`} data-testid={`link-service-${service.slug}`}>
-                <div className="h-full bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-700 transition-all duration-300 cursor-pointer group" data-testid={`card-service-${service.slug}`}>
+                <div className="h-full bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-2xl hover:border-sky-200 dark:hover:border-sky-700 transition-all duration-300 cursor-pointer group" data-testid={`card-service-${service.slug}`}>
                   <div className="relative h-48 overflow-hidden">
                     <img 
                       src={service.image} 
@@ -218,19 +218,19 @@ export default function Services() {
                     </div>
                   </div>
                   <div className="p-6">
-                    <h3 className="text-xl font-bold mb-3 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors dark:text-white">{service.title}</h3>
+                    <h3 className="text-xl font-bold mb-3 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors dark:text-white">{service.title}</h3>
                     <p className="text-slate-500 dark:text-slate-400 mb-4 leading-relaxed text-sm">
                       {service.desc}
                     </p>
                     <ul className="space-y-2 mb-6">
                       {service.features.map((feature, i) => (
                         <li key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 font-medium">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          <CheckCircle2 className="w-4 h-4 text-sky-500" />
                           {feature}
                         </li>
                       ))}
                     </ul>
-                    <div className="flex items-center text-emerald-600 dark:text-emerald-400 font-bold group-hover:translate-x-2 transition-transform" data-testid={`text-learn-more-${service.slug}`}>
+                    <div className="flex items-center text-sky-600 dark:text-sky-400 font-bold group-hover:translate-x-2 transition-transform" data-testid={`text-learn-more-${service.slug}`}>
                       Learn more <ArrowRight className="w-4 h-4 ml-2" />
                     </div>
                   </div>
@@ -244,9 +244,9 @@ export default function Services() {
         <section className="mt-24 mb-20">
           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl py-16 px-8">
             <div className="text-center mb-12">
-              <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm tracking-wider mb-3">WHY CHOOSE US</p>
+              <p className="text-sky-600 dark:text-sky-400 font-semibold text-sm tracking-wider mb-3">WHY CHOOSE US</p>
               <h2 className="text-3xl md:text-5xl font-bold dark:text-white">
-                Your Success is <span className="text-emerald-500 italic">Our Mission</span>
+                Your Success is <span className="text-sky-500 italic">Our Mission</span>
               </h2>
             </div>
 
@@ -260,8 +260,8 @@ export default function Services() {
                   transition={{ delay: i * 0.1 }}
                   className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm hover:shadow-lg transition-shadow text-center"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center mx-auto mb-6">
-                    <item.icon className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+                  <div className="w-16 h-16 rounded-2xl bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center mx-auto mb-6">
+                    <item.icon className="w-8 h-8 text-sky-600 dark:text-sky-400" />
                   </div>
                   <h3 className="text-lg font-bold mb-3 dark:text-white">{item.title}</h3>
                   <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{item.desc}</p>
@@ -275,9 +275,9 @@ export default function Services() {
         <section className="mb-24">
           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl py-16 px-8">
             <div className="text-center mb-12">
-              <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm tracking-wider mb-3">TECHNOLOGY STACK</p>
+              <p className="text-sky-600 dark:text-sky-400 font-semibold text-sm tracking-wider mb-3">TECHNOLOGY STACK</p>
               <h2 className="text-3xl md:text-5xl font-bold dark:text-white">
-                Powered by <span className="text-emerald-500 italic">Modern Tech</span>
+                Powered by <span className="text-sky-500 italic">Modern Tech</span>
               </h2>
               <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto mt-4">
                 We leverage cutting-edge technologies to build scalable, secure, and high-performance solutions.
@@ -310,9 +310,9 @@ export default function Services() {
         <section className="mb-20">
           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl py-16 px-8">
             <div className="text-center mb-12">
-              <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm tracking-wider mb-3">PRICING PLANS</p>
+              <p className="text-sky-600 dark:text-sky-400 font-semibold text-sm tracking-wider mb-3">PRICING PLANS</p>
               <h2 className="text-3xl md:text-5xl font-bold dark:text-white">
-                Transparent <span className="text-emerald-500 italic">Pricing</span>
+                Transparent <span className="text-sky-500 italic">Pricing</span>
               </h2>
               <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto mt-4">
                 Choose the plan that fits your needs. All plans include our quality guarantee.
@@ -327,10 +327,10 @@ export default function Services() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className={`relative bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg ${plan.popular ? 'ring-2 ring-emerald-500 scale-105' : ''}`}
+                  className={`relative bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg ${plan.popular ? 'ring-2 ring-sky-500 scale-105' : ''}`}
                 >
                   {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs font-bold px-4 py-1 rounded-full">
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-sky-500 text-white text-xs font-bold px-4 py-1 rounded-full">
                       RECOMMENDED
                     </div>
                   )}
@@ -346,7 +346,7 @@ export default function Services() {
                   <ul className="space-y-3 mb-8">
                     {plan.features.map((feature, j) => (
                       <li key={j} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-sky-500 shrink-0" />
                         {feature}
                       </li>
                     ))}
@@ -402,7 +402,7 @@ export default function Services() {
           viewport={{ once: true }}
           className="text-center"
         >
-          <div className="bg-gradient-to-br from-emerald-50 to-sky-50 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
+          <div className="bg-gradient-to-br from-sky-50 to-sky-50 dark:from-slate-800 dark:to-slate-800 rounded-3xl p-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Need a Custom Solution?</h2>
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
               Every business is unique. Let's discuss how we can create a tailored solution that perfectly fits your needs.
