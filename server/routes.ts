@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import path from "path";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 
 export async function registerRoutes(
@@ -12,6 +13,12 @@ export async function registerRoutes(
 
   // Register AI Chat Routes
   registerChatRoutes(app);
+
+  // Temporary download route for project zip
+  app.get("/download/project-zip", (req, res) => {
+    const zipPath = path.resolve(process.cwd(), "mhtsdigix-project.zip");
+    res.download(zipPath, "mhtsdigix-project.zip");
+  });
 
   // Services
   app.get(api.services.list.path, async (req, res) => {
