@@ -61,7 +61,7 @@ export function Navbar() {
                 MHTSdigiX
               </span>
               <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 tracking-wide">
-                Maanagaram Hi Tech Solutions
+                Maanagarams Hi Tech Solutions
               </span>
             </div>
           </Link>

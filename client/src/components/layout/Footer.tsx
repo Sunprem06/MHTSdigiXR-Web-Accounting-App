@@ -19,7 +19,7 @@ export function Footer() {
               />
               <div className="flex flex-col">
                 <span className="font-display font-extrabold text-lg text-white">MHTSdigiX</span>
-                <span className="text-[10px] font-medium text-slate-400 tracking-wide">Maanagaram Hi Tech Solutions</span>
+                <span className="text-[10px] font-medium text-slate-400 tracking-wide">Maanagarams Hi Tech Solutions</span>
               </div>
             </div>
             <p className="text-slate-400 mb-6 leading-relaxed">
@@ -88,7 +88,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500">
-          <p>@2026 All rights reserved by Maanagaram Hi Tech Solutions</p>
+          <p>@2026 All rights reserved by Maanagarams Hi Tech Solutions</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-white transition-colors">Terms of Service</a>

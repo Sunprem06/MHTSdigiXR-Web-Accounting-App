@@ -27,7 +27,7 @@ const FAQ_CATEGORIES: FAQCategory[] = [
       },
       {
         question: "How long has MHTSdigiX been in business?",
-        answer: "Maanagaram Hi Tech Solutions has been serving clients since 2015, with over 10+ years of combined expertise in digital marketing and web development. We have successfully delivered 500+ projects across various industries."
+        answer: "Maanagarams Hi Tech Solutions has been serving clients since 2015, with over 10+ years of combined expertise in digital marketing and web development. We have successfully delivered 500+ projects across various industries."
       },
       {
         question: "Do you work with clients outside India?",

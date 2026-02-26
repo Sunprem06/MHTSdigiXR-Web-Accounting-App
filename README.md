@@ -1,8 +1,8 @@
-# MHTSdigiX - Maanagaram Hi Tech Solutions Website
+# MHTSdigiX - Maanagarams Hi Tech Solutions Website
 
 ## Project Overview
 
-A professional digital agency website for **Maanagaram Hi Tech Solutions** (Brand: **MHTSdigiX**). Built with React, TypeScript, Express, and PostgreSQL. Features sky blue color scheme, AI chatbot named "Kayal", comprehensive service showcase, FAQ section, and Careers page.
+A professional digital agency website for **Maanagarams Hi Tech Solutions** (Brand: **MHTSdigiX**). Built with React, TypeScript, Express, and PostgreSQL. Features sky blue color scheme, AI chatbot named "Kayal", comprehensive service showcase, FAQ section, and Careers page.
 
 **Last Updated:** February 2026
 
