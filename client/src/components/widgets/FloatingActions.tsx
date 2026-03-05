@@ -7,7 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 const WHATSAPP_NUMBER = "917358105995";
 
 // System prompt for Kayal - the AI assistant
-const SYSTEM_CONTEXT = `You are Kayal, the friendly and knowledgeable AI assistant for MHTSdigiX (Maanagarams Hi Tech Solutions), a premier digital agency in Chennai, India.
+const SYSTEM_CONTEXT = `You are Kayal, the friendly and knowledgeable AI assistant for MHTSdigiX (Maanagarram Hi Tech Solutions), a premier digital agency in Chennai, India.
 
 You are an expert in:
 - SERVICE SUPPORT: Helping customers understand our services, features, and capabilities

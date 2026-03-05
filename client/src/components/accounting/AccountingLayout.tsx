@@ -90,7 +90,17 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
   const isActive = (path?: string) => {
     if (!path) return false;
     if (path === "/accounting") return location === "/accounting";
-    return location.startsWith(path.split("?")[0]);
+    const [pathBase, pathQuery] = path.split("?");
+    if (pathQuery) {
+      if (location !== pathBase) return false;
+      const currentParams = new URLSearchParams(window.location.search);
+      const targetParams = new URLSearchParams(pathQuery);
+      for (const [key, value] of targetParams.entries()) {
+        if (currentParams.get(key) !== value) return false;
+      }
+      return true;
+    }
+    return location === pathBase || (location.startsWith(pathBase + "/") && !window.location.search);
   };
 
   const sidebar = (

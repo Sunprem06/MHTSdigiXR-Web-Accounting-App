@@ -28,7 +28,7 @@ export default function About() {
               Your Extended <span className="text-gradient">Digital Team</span>
             </h1>
             <p className="text-lg text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
-              Maanagarams Hi Tech Solutions (MHTSdigiX) was founded in December 2022 with a vision to empower businesses through digital transformation. We genuinely feel like an extended marketing and technology arm for every brand we associate with.
+              Maanagarram Hi Tech Solutions (MHTSdigiX) was founded in December 2022 with a vision to empower businesses through digital transformation. We genuinely feel like an extended marketing and technology arm for every brand we associate with.
             </p>
             <p className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
               Based in Chennai, India, we serve clients globally, providing bespoke solutions that drive growth and efficiency. Our approach combines technical expertise with creative innovation to solve complex business challenges.

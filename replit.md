@@ -1,8 +1,8 @@
-# Maanagarams Hi Tech Solutions (MHTSdigiX)
+# Maanagarram Hi Tech Solutions (MHTSdigiX)
 
 ## Overview
 
-This is a full-stack digital agency website for Maanagarams Hi Tech Solutions, a company providing end-to-end digital services including web development, mobile apps, SEO, branding, and AI integrations. The application features a React frontend with a modern design system, Express backend with PostgreSQL database, integrated AI chat capabilities via Replit AI Integrations, and a full TallyPrime-inspired accounting system with role-based access control.
+This is a full-stack digital agency website for Maanagarram Hi Tech Solutions, a company providing end-to-end digital services including web development, mobile apps, SEO, branding, and AI integrations. The application features a React frontend with a modern design system, Express backend with PostgreSQL database, integrated AI chat capabilities via Replit AI Integrations, and a full TallyPrime-inspired accounting system with role-based access control.
 
 ## Recent Changes (Mar 2026)
 

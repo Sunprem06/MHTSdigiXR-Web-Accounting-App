@@ -443,7 +443,7 @@ async function seedDatabase() {
   const settings = await storage.getCompanySettings();
   if (!settings) {
     await storage.upsertCompanySettings({
-      companyName: "Maanagarams Hi Tech Solutions",
+      companyName: "Maanagarram Hi Tech Solutions",
       address: "Chennai, Tamil Nadu, India",
       gstin: "",
       phone: "+91 4447740195",
