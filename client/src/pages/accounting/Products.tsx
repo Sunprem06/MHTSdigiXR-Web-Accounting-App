@@ -11,9 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS, GST_RATES } from "@shared/schema";
 import type { Product } from "@shared/schema";
-import { Plus, Search, Package, Loader2, X, Save } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Plus, Search, Package, Loader2, X, Save, Trash2 } from "lucide-react";
 
 export default function Products() {
+  const { canDelete } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -42,6 +44,19 @@ export default function Products() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting/products"] });
       toast({ title: editingId ? "Product updated" : "Product created" });
       resetForm();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/accounting/products/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/products"] });
+      toast({ title: "Product deleted" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -188,7 +203,14 @@ export default function Products() {
                       <td className="px-4 py-3 text-right text-sm font-medium text-slate-900 dark:text-white">₹{parseFloat(p.rate).toLocaleString("en-IN")}</td>
                       <td className="px-4 py-3 text-center text-sm text-slate-600 dark:text-slate-300">{p.gstRate}%</td>
                       <td className="px-4 py-3 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => startEdit(p)} data-testid={`button-edit-product-${p.id}`}>Edit</Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => startEdit(p)} data-testid={`button-edit-product-${p.id}`}>Edit</Button>
+                          {canDelete && (
+                            <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" onClick={() => { if (confirm("Are you sure you want to delete this product?")) deleteMutation.mutate(p.id); }} disabled={deleteMutation.isPending} data-testid={`button-delete-product-${p.id}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

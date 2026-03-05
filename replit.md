@@ -6,6 +6,9 @@ This is a full-stack digital agency website for Maanagarram Hi Tech Solutions, a
 
 ## Recent Changes (Mar 2026)
 
+- **Delete Functionality**: Super Admin and Admin can delete Products, Parties, and Expense Claims with audit logging
+- **Voucher Product Mode**: Sales/Purchase vouchers support optional product/service line items with auto-generated double-entry ledger entries (GST-aware)
+- **Quick Add Party**: Quotation entry has inline dialog to create new customer without navigating away
 - **Expanded Accounting Modules**: Products/Services catalog, Parties (Customer/Vendor) master, Quotations, Expense Claims
 - **GST Compliance**: CGST/SGST/IGST calculations on vouchers, GST Summary report, SAC codes for services
 - **Credit/Debit Notes**: Added credit_note and debit_note voucher types

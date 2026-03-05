@@ -261,6 +261,25 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.delete("/api/accounting/parties/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    try {
+      const deleted = await storage.deleteParty(id);
+      if (!deleted) return res.status(404).json({ message: "Party not found" });
+      await storage.createAuditLog({
+        employeeId: req.user!.id, action: "delete", entity: "party",
+        entityId: id, details: `Deleted party`,
+        ipAddress: req.ip || null,
+      });
+      res.json({ message: "Deleted successfully" });
+    } catch (err: any) {
+      if (err.code === "23503") {
+        return res.status(400).json({ message: "Cannot delete party — it is referenced by vouchers or quotations" });
+      }
+      throw err;
+    }
+  });
+
   // Products/Services
   app.get("/api/accounting/products", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
     const productList = await storage.getProducts();
@@ -304,6 +323,18 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json(updated);
+  });
+
+  app.delete("/api/accounting/products/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteProduct(id);
+    if (!deleted) return res.status(404).json({ message: "Product not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "product",
+      entityId: id, details: `Deleted product`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
   });
 
   // Quotations
@@ -456,6 +487,23 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json(updated);
+  });
+
+  app.delete("/api/accounting/expenses/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const claim = await storage.getExpenseClaim(id);
+    if (!claim) return res.status(404).json({ message: "Expense claim not found" });
+    if (claim.status !== "pending") {
+      return res.status(400).json({ message: "Only pending expense claims can be deleted" });
+    }
+    const deleted = await storage.deleteExpenseClaim(id);
+    if (!deleted) return res.status(404).json({ message: "Expense claim not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "expense",
+      entityId: id, details: `Deleted expense claim: ${claim.claimNumber}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
   });
 
   // Vouchers

@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PARTY_TYPES } from "@shared/schema";
 import type { Party } from "@shared/schema";
-import { Plus, Search, Users, Loader2, X, Save } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Plus, Search, Users, Loader2, X, Save, Trash2 } from "lucide-react";
 
 const PARTY_TYPE_LABELS: Record<string, string> = {
   customer: "Customer", vendor: "Vendor", both: "Both",
@@ -28,6 +29,7 @@ const INDIAN_STATES = [
 ];
 
 export default function Parties() {
+  const { canDelete } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<string>("all");
@@ -57,6 +59,19 @@ export default function Parties() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting/parties"] });
       toast({ title: editingId ? "Party updated" : "Party created" });
       resetForm();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/accounting/parties/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/parties"] });
+      toast({ title: "Party deleted" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -245,7 +260,14 @@ export default function Parties() {
                         {parseFloat(p.openingBalance || "0") > 0 ? `₹${parseFloat(p.openingBalance || "0").toLocaleString("en-IN")} ${p.balanceType === "credit" ? "Cr" : "Dr"}` : "-"}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => startEdit(p)} data-testid={`button-edit-party-${p.id}`}>Edit</Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => startEdit(p)} data-testid={`button-edit-party-${p.id}`}>Edit</Button>
+                          {canDelete && (
+                            <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" onClick={() => { if (confirm("Are you sure you want to delete this party?")) deleteMutation.mutate(p.id); }} disabled={deleteMutation.isPending} data-testid={`button-delete-party-${p.id}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

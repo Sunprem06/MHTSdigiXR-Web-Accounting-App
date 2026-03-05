@@ -6,12 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import { GST_RATES } from "@shared/schema";
+import { GST_RATES, PARTY_TYPES } from "@shared/schema";
 import type { Party, Product } from "@shared/schema";
-import { Plus, Trash2, Loader2, Save } from "lucide-react";
+import { Plus, Trash2, Loader2, Save, UserPlus } from "lucide-react";
+
+const PARTY_TYPE_LABELS: Record<string, string> = {
+  customer: "Customer", vendor: "Vendor", both: "Both",
+};
+
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
+  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Delhi", "Jammu & Kashmir", "Ladakh", "Puducherry", "Chandigarh",
+  "Andaman & Nicobar", "Dadra & Nagar Haveli", "Lakshadweep",
+];
 
 interface LineItem {
   productId: string;
@@ -34,6 +49,12 @@ export default function QuotationEntry() {
   const [items, setItems] = useState<LineItem[]>([
     { productId: "", description: "", quantity: "1", rate: "", gstRate: "18" },
   ]);
+
+  const [showNewPartyDialog, setShowNewPartyDialog] = useState(false);
+  const [newParty, setNewParty] = useState({
+    name: "", type: "customer" as string, email: "", phone: "",
+    gstin: "", address: "", city: "", state: "", pincode: "",
+  });
 
   const { data: parties } = useQuery<Party[]>({ queryKey: ["/api/accounting/parties"] });
   const { data: products } = useQuery<Product[]>({ queryKey: ["/api/accounting/products"] });
@@ -124,6 +145,23 @@ export default function QuotationEntry() {
     },
   });
 
+  const createPartyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/accounting/parties", newParty);
+      return res.json();
+    },
+    onSuccess: (data: Party) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/parties"] });
+      toast({ title: "Party created successfully" });
+      setPartyId(String(data.id));
+      setShowNewPartyDialog(false);
+      setNewParty({ name: "", type: "customer", email: "", phone: "", gstin: "", address: "", city: "", state: "", pincode: "" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error creating party", description: err.message, variant: "destructive" });
+    },
+  });
+
   const customers = parties?.filter(p => p.type === "customer" || p.type === "both") || [];
 
   return (
@@ -152,12 +190,17 @@ export default function QuotationEntry() {
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Customer</label>
-                <Select value={partyId} onValueChange={setPartyId}>
-                  <SelectTrigger data-testid="select-quotation-party"><SelectValue placeholder="Select customer..." /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={partyId} onValueChange={setPartyId}>
+                    <SelectTrigger className="flex-1" data-testid="select-quotation-party"><SelectValue placeholder="Select customer..." /></SelectTrigger>
+                    <SelectContent>
+                      {customers.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="icon" onClick={() => setShowNewPartyDialog(true)} title="Add new customer" data-testid="button-quick-add-party">
+                    <UserPlus className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -285,6 +328,79 @@ export default function QuotationEntry() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={showNewPartyDialog} onOpenChange={setShowNewPartyDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-sky-500" />
+              Quick Add Customer
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Name *</label>
+                <Input value={newParty.name} onChange={e => setNewParty({...newParty, name: e.target.value})} placeholder="Company / Individual name" data-testid="input-new-party-name" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Type</label>
+                <Select value={newParty.type} onValueChange={v => setNewParty({...newParty, type: v})}>
+                  <SelectTrigger data-testid="select-new-party-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PARTY_TYPES.map(t => <SelectItem key={t} value={t}>{PARTY_TYPE_LABELS[t]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Phone</label>
+                <Input value={newParty.phone} onChange={e => setNewParty({...newParty, phone: e.target.value})} placeholder="+91 9876543210" data-testid="input-new-party-phone" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Email</label>
+                <Input type="email" value={newParty.email} onChange={e => setNewParty({...newParty, email: e.target.value})} placeholder="email@example.com" data-testid="input-new-party-email" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">GSTIN</label>
+                <Input value={newParty.gstin} onChange={e => setNewParty({...newParty, gstin: e.target.value.toUpperCase()})} placeholder="22AAAAA0000A1Z5" maxLength={15} data-testid="input-new-party-gstin" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Address</label>
+                <Input value={newParty.address} onChange={e => setNewParty({...newParty, address: e.target.value})} placeholder="Full address" data-testid="input-new-party-address" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">City</label>
+                <Input value={newParty.city} onChange={e => setNewParty({...newParty, city: e.target.value})} placeholder="Chennai" data-testid="input-new-party-city" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">State</label>
+                <Select value={newParty.state} onValueChange={v => setNewParty({...newParty, state: v})}>
+                  <SelectTrigger data-testid="select-new-party-state"><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <SelectContent>
+                    {INDIAN_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Pincode</label>
+                <Input value={newParty.pincode} onChange={e => setNewParty({...newParty, pincode: e.target.value})} placeholder="600001" maxLength={6} data-testid="input-new-party-pincode" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewPartyDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => createPartyMutation.mutate()}
+              disabled={!newParty.name || createPartyMutation.isPending}
+              className="bg-sky-600 hover:bg-sky-700 text-white"
+              data-testid="button-save-new-party"
+            >
+              {createPartyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+              Create & Select
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AccountingLayout>
   );
 }

@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS, EXPENSE_STATUSES } from "@shared/schema";
 import type { ExpenseClaim } from "@shared/schema";
-import { Plus, Loader2, X, Save, Receipt, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Loader2, X, Save, Receipt, CheckCircle, XCircle, Trash2 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
@@ -22,7 +22,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function Expenses() {
-  const { user, canApprove } = useAuth();
+  const { user, canApprove, canDelete } = useAuth();
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -48,6 +48,19 @@ export default function Expenses() {
       toast({ title: "Expense claim submitted" });
       setShowForm(false);
       setFormData({ date: new Date().toISOString().split("T")[0], category: "other", description: "", amount: "", receiptRef: "" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/accounting/expenses/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/expenses"] });
+      toast({ title: "Expense claim deleted" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -180,7 +193,7 @@ export default function Expenses() {
                     <th className="text-left text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Description</th>
                     <th className="text-right text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Amount</th>
                     <th className="text-center text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Status</th>
-                    {canApprove && <th className="text-right text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Actions</th>}
+                    {(canApprove || canDelete) && <th className="text-right text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -194,18 +207,25 @@ export default function Expenses() {
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${STATUS_COLORS[e.status]}`}>{e.status}</span>
                       </td>
-                      {canApprove && (
+                      {(canApprove || canDelete) && (
                         <td className="px-4 py-3 text-right">
-                          {e.status === "pending" && (
-                            <div className="flex items-center justify-end gap-1">
-                              <Button size="icon" variant="ghost" className="text-green-600 dark:text-green-400" onClick={() => updateMutation.mutate({ id: e.id, status: "approved" })} disabled={updateMutation.isPending} data-testid={`button-approve-expense-${e.id}`}>
-                                <CheckCircle className="w-4 h-4" />
+                          <div className="flex items-center justify-end gap-1">
+                            {canApprove && e.status === "pending" && (
+                              <>
+                                <Button size="icon" variant="ghost" className="text-green-600 dark:text-green-400" onClick={() => updateMutation.mutate({ id: e.id, status: "approved" })} disabled={updateMutation.isPending} data-testid={`button-approve-expense-${e.id}`}>
+                                  <CheckCircle className="w-4 h-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="text-red-600 dark:text-red-400" onClick={() => updateMutation.mutate({ id: e.id, status: "rejected", remarks: "Rejected" })} disabled={updateMutation.isPending} data-testid={`button-reject-expense-${e.id}`}>
+                                  <XCircle className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                            {canDelete && e.status === "pending" && (
+                              <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" onClick={() => { if (confirm("Are you sure you want to delete this expense claim?")) deleteMutation.mutate(e.id); }} disabled={deleteMutation.isPending} data-testid={`button-delete-expense-${e.id}`}>
+                                <Trash2 className="w-4 h-4" />
                               </Button>
-                              <Button size="icon" variant="ghost" className="text-red-600 dark:text-red-400" onClick={() => updateMutation.mutate({ id: e.id, status: "rejected", remarks: "Rejected" })} disabled={updateMutation.isPending} data-testid={`button-reject-expense-${e.id}`}>
-                                <XCircle className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>

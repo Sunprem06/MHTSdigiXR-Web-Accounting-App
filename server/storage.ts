@@ -88,7 +88,11 @@ export interface IStorage {
   getExpenseClaim(id: number): Promise<ExpenseClaim | undefined>;
   createExpenseClaim(claim: InsertExpenseClaim): Promise<ExpenseClaim>;
   updateExpenseClaim(id: number, data: Partial<InsertExpenseClaim>): Promise<ExpenseClaim | undefined>;
+  deleteExpenseClaim(id: number): Promise<boolean>;
   getNextClaimNumber(): Promise<string>;
+
+  deleteProduct(id: number): Promise<boolean>;
+  deleteParty(id: number): Promise<boolean>;
 
   getDashboardStats(): Promise<{
     totalIncome: number;
@@ -499,10 +503,25 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteExpenseClaim(id: number): Promise<boolean> {
+    const result = await db.delete(expenseClaims).where(eq(expenseClaims.id, id)).returning();
+    return result.length > 0;
+  }
+
   async getNextClaimNumber(): Promise<string> {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(expenseClaims);
     const num = (result?.count || 0) + 1;
     return `EXP-${String(num).padStart(5, "0")}`;
+  }
+
+  async deleteProduct(id: number): Promise<boolean> {
+    const result = await db.delete(products).where(eq(products.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deleteParty(id: number): Promise<boolean> {
+    const result = await db.delete(parties).where(eq(parties.id, id)).returning();
+    return result.length > 0;
   }
 
   async getDashboardStats() {
