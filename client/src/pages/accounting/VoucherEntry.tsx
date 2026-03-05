@@ -21,6 +21,8 @@ const TYPE_LABELS: Record<string, string> = {
   receipt: "Receipt",
   journal: "Journal",
   contra: "Contra",
+  credit_note: "Credit Note",
+  debit_note: "Debit Note",
 };
 
 interface EntryRow {
@@ -45,6 +47,15 @@ export default function VoucherEntry() {
     { ledgerAccountId: "", debit: "", credit: "" },
     { ledgerAccountId: "", debit: "", credit: "" },
   ]);
+
+  useEffect(() => {
+    setType(presetType);
+    setNarration("");
+    setEntries([
+      { ledgerAccountId: "", debit: "", credit: "" },
+      { ledgerAccountId: "", debit: "", credit: "" },
+    ]);
+  }, [presetType]);
 
   const { data: ledgers } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/accounting/ledgers"],

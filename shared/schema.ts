@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, integer, decimal, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, integer, decimal, date, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -103,6 +103,49 @@ export const companySettings = pgTable("company_settings", {
   phone: text("phone"),
   email: text("email"),
   logo: text("logo"),
+  state: text("state"),
+  panNumber: text("pan_number"),
+  bankName: text("bank_name"),
+  bankAccount: text("bank_account"),
+  bankIfsc: text("bank_ifsc"),
+  bankBranch: text("bank_branch"),
+});
+
+export const parties = pgTable("parties", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("customer"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  pincode: text("pincode"),
+  gstin: text("gstin"),
+  panNumber: text("pan_number"),
+  creditPeriod: integer("credit_period").default(30),
+  creditLimit: decimal("credit_limit", { precision: 15, scale: 2 }).default("0"),
+  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
+  balanceType: text("balance_type").default("debit"),
+  ledgerAccountId: integer("ledger_account_id").references(() => ledgerAccounts.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  productCode: text("product_code").notNull().unique(),
+  name: text("name").notNull(),
+  category: text("category").notNull().default("other"),
+  description: text("description"),
+  hsnSacCode: text("hsn_sac_code"),
+  unit: text("unit").default("project"),
+  rate: decimal("rate", { precision: 15, scale: 2 }).default("0").notNull(),
+  gstRate: decimal("gst_rate", { precision: 5, scale: 2 }).default("18").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const vouchers = pgTable("vouchers", {
@@ -113,6 +156,13 @@ export const vouchers = pgTable("vouchers", {
   narration: text("narration"),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
   status: text("status").notNull().default("draft"),
+  partyId: integer("party_id").references(() => parties.id),
+  gstRate: decimal("gst_rate", { precision: 5, scale: 2 }),
+  taxableAmount: decimal("taxable_amount", { precision: 15, scale: 2 }),
+  cgstAmount: decimal("cgst_amount", { precision: 15, scale: 2 }),
+  sgstAmount: decimal("sgst_amount", { precision: 15, scale: 2 }),
+  igstAmount: decimal("igst_amount", { precision: 15, scale: 2 }),
+  isInterState: boolean("is_inter_state").default(false),
   createdBy: integer("created_by").references(() => employees.id),
   approvedBy: integer("approved_by").references(() => employees.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -124,6 +174,44 @@ export const voucherEntries = pgTable("voucher_entries", {
   ledgerAccountId: integer("ledger_account_id").references(() => ledgerAccounts.id).notNull(),
   debit: decimal("debit", { precision: 15, scale: 2 }).default("0").notNull(),
   credit: decimal("credit", { precision: 15, scale: 2 }).default("0").notNull(),
+});
+
+export const quotations = pgTable("quotations", {
+  id: serial("id").primaryKey(),
+  quotationNumber: text("quotation_number").notNull().unique(),
+  date: date("date").notNull(),
+  validUntil: date("valid_until"),
+  partyId: integer("party_id").references(() => parties.id).notNull(),
+  items: jsonb("items").notNull().default([]),
+  subtotal: decimal("subtotal", { precision: 15, scale: 2 }).default("0").notNull(),
+  cgstTotal: decimal("cgst_total", { precision: 15, scale: 2 }).default("0"),
+  sgstTotal: decimal("sgst_total", { precision: 15, scale: 2 }).default("0"),
+  igstTotal: decimal("igst_total", { precision: 15, scale: 2 }).default("0"),
+  grandTotal: decimal("grand_total", { precision: 15, scale: 2 }).default("0").notNull(),
+  isInterState: boolean("is_inter_state").default(false),
+  notes: text("notes"),
+  termsAndConditions: text("terms_and_conditions"),
+  status: text("status").notNull().default("draft"),
+  convertedVoucherId: integer("converted_voucher_id").references(() => vouchers.id),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const expenseClaims = pgTable("expense_claims", {
+  id: serial("id").primaryKey(),
+  claimNumber: text("claim_number").notNull().unique(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  date: date("date").notNull(),
+  category: text("category").notNull().default("other"),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  receiptRef: text("receipt_ref"),
+  status: text("status").notNull().default("pending"),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  approvedAt: timestamp("approved_at"),
+  remarks: text("remarks"),
+  voucherId: integer("voucher_id").references(() => vouchers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const auditNotes = pgTable("audit_notes", {
@@ -148,6 +236,10 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
 export const insertVoucherSchema = createInsertSchema(vouchers).omit({ id: true, createdAt: true });
 export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit({ id: true });
 export const insertAuditNoteSchema = createInsertSchema(auditNotes).omit({ id: true, createdAt: true });
+export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true });
+export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
+export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, createdAt: true });
+export const insertExpenseClaimSchema = createInsertSchema(expenseClaims).omit({ id: true, createdAt: true });
 
 export type Post = typeof posts.$inferSelect;
 export type InsertPost = z.infer<typeof insertPostSchema>;
@@ -175,6 +267,14 @@ export type VoucherEntry = typeof voucherEntries.$inferSelect;
 export type InsertVoucherEntry = z.infer<typeof insertVoucherEntrySchema>;
 export type AuditNote = typeof auditNotes.$inferSelect;
 export type InsertAuditNote = z.infer<typeof insertAuditNoteSchema>;
+export type Party = typeof parties.$inferSelect;
+export type InsertParty = z.infer<typeof insertPartySchema>;
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Quotation = typeof quotations.$inferSelect;
+export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
+export type ExpenseClaim = typeof expenseClaims.$inferSelect;
+export type InsertExpenseClaim = z.infer<typeof insertExpenseClaimSchema>;
 
 export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer"] as const;
 export type Role = typeof ROLES[number];
@@ -189,8 +289,58 @@ export const ROLE_LABELS: Record<Role, string> = {
   viewer: "Viewer",
 };
 
-export const VOUCHER_TYPES = ["sales", "purchase", "payment", "receipt", "journal", "contra"] as const;
+export const VOUCHER_TYPES = ["sales", "purchase", "payment", "receipt", "journal", "contra", "credit_note", "debit_note"] as const;
 export type VoucherType = typeof VOUCHER_TYPES[number];
 
 export const VOUCHER_STATUSES = ["draft", "pending", "approved"] as const;
 export type VoucherStatus = typeof VOUCHER_STATUSES[number];
+
+export const PRODUCT_CATEGORIES = [
+  "web_development", "mobile_app", "seo", "smm", "branding",
+  "domain_hosting", "video_animation", "digital_marketing", "ui_ux_design", "consulting", "other"
+] as const;
+export type ProductCategory = typeof PRODUCT_CATEGORIES[number];
+
+export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
+  web_development: "Website Development",
+  mobile_app: "Mobile App Development",
+  seo: "SEO Optimization",
+  smm: "Social Media Marketing",
+  branding: "Branding & Graphics",
+  domain_hosting: "Domain & Hosting",
+  video_animation: "Video & Animation",
+  digital_marketing: "Digital Marketing",
+  ui_ux_design: "UI/UX Design",
+  consulting: "Consulting",
+  other: "Other",
+};
+
+export const PARTY_TYPES = ["customer", "vendor", "both"] as const;
+export type PartyType = typeof PARTY_TYPES[number];
+
+export const EXPENSE_CATEGORIES = [
+  "travel", "food", "transport", "accommodation", "office_supplies",
+  "communication", "client_meeting", "software", "hardware", "other"
+] as const;
+export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
+
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  travel: "Travel",
+  food: "Food & Beverages",
+  transport: "Transport",
+  accommodation: "Accommodation",
+  office_supplies: "Office Supplies",
+  communication: "Communication",
+  client_meeting: "Client Meeting",
+  software: "Software & Subscriptions",
+  hardware: "Hardware & Equipment",
+  other: "Other",
+};
+
+export const EXPENSE_STATUSES = ["pending", "approved", "rejected", "reimbursed"] as const;
+export type ExpenseStatus = typeof EXPENSE_STATUSES[number];
+
+export const GST_RATES = [0, 5, 12, 18, 28] as const;
+
+export const QUOTATION_STATUSES = ["draft", "sent", "accepted", "rejected", "expired", "converted"] as const;
+export type QuotationStatus = typeof QUOTATION_STATUSES[number];

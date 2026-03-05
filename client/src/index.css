@@ -28,6 +28,10 @@
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
   
+  --card: 0 0% 100%;
+  --card-foreground: 215 28% 17%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 28% 17%;
   --border: 214 32% 90%;
   --input: 214 32% 90%;
   --ring: 199 89% 48%;
@@ -47,6 +51,10 @@
   --accent-foreground: 199 89% 60%;
   --destructive: 0 62% 30%;
   --destructive-foreground: 0 84% 60%;
+  --card: 215 28% 14%;
+  --card-foreground: 210 40% 98%;
+  --popover: 215 28% 14%;
+  --popover-foreground: 210 40% 98%;
   --border: 217 33% 20%;
   --input: 217 33% 20%;
   --ring: 199 89% 55%;

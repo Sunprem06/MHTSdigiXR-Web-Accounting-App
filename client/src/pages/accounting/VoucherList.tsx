@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { VOUCHER_TYPES, VOUCHER_STATUSES } from "@shared/schema";
 import type { Voucher } from "@shared/schema";
 import {
-  Search, Plus, CheckCircle, Trash2, Eye, Loader2, FileText, Filter
+  Search, Plus, CheckCircle, Trash2, Eye, Loader2, FileText, Filter, Printer
 } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -23,6 +23,8 @@ const TYPE_LABELS: Record<string, string> = {
   receipt: "Receipt",
   journal: "Journal",
   contra: "Contra",
+  credit_note: "Credit Note",
+  debit_note: "Debit Note",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -48,8 +50,9 @@ export default function VoucherList() {
   if (dateTo) queryParams.set("dateTo", dateTo);
   const qs = queryParams.toString();
 
+  const voucherUrl = `/api/accounting/vouchers${qs ? `?${qs}` : ""}`;
   const { data: vouchers, isLoading } = useQuery<Voucher[]>({
-    queryKey: ["/api/accounting/vouchers", qs ? `?${qs}` : ""],
+    queryKey: [voucherUrl],
   });
 
   const approveMutation = useMutation({
@@ -222,6 +225,20 @@ export default function VoucherList() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {v.type === "sales" && v.status === "approved" && (
+                            <Link href={`/accounting/invoice/${v.id}`}>
+                              <Button size="icon" variant="ghost" className="text-sky-600 dark:text-sky-400" data-testid={`button-print-invoice-${v.id}`}>
+                                <Printer className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          )}
+                          {v.type === "receipt" && (
+                            <Link href={`/accounting/receipt/${v.id}`}>
+                              <Button size="icon" variant="ghost" className="text-sky-600 dark:text-sky-400" data-testid={`button-print-receipt-${v.id}`}>
+                                <Printer className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          )}
                           <Link href={`/accounting/vouchers/${v.id}`}>
                             <Button size="icon" variant="ghost" data-testid={`button-view-voucher-${v.id}`}>
                               <Eye className="w-4 h-4" />

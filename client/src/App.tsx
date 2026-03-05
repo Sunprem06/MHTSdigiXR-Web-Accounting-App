@@ -37,10 +37,18 @@ import AccountingDashboard from "@/pages/accounting/Dashboard";
 import Ledgers from "@/pages/accounting/Ledgers";
 import VoucherList from "@/pages/accounting/VoucherList";
 import VoucherEntry from "@/pages/accounting/VoucherEntry";
+import Products from "@/pages/accounting/Products";
+import Parties from "@/pages/accounting/Parties";
+import Quotations from "@/pages/accounting/Quotations";
+import QuotationEntry from "@/pages/accounting/QuotationEntry";
+import Expenses from "@/pages/accounting/Expenses";
+import InvoiceView from "@/pages/accounting/InvoiceView";
+import ReceiptView from "@/pages/accounting/ReceiptView";
 import DayBook from "@/pages/accounting/reports/DayBook";
 import TrialBalance from "@/pages/accounting/reports/TrialBalance";
 import ProfitLoss from "@/pages/accounting/reports/ProfitLoss";
 import BalanceSheet from "@/pages/accounting/reports/BalanceSheet";
+import GstSummary from "@/pages/accounting/reports/GstSummary";
 import EmployeeManagement from "@/pages/accounting/EmployeeManagement";
 import AuditLogPage from "@/pages/accounting/AuditLog";
 import SettingsPage from "@/pages/accounting/Settings";
@@ -92,11 +100,32 @@ function AccountingRouter() {
       <Route path="/accounting/ledgers">
         {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Ledgers /></ProtectedRoute>}
       </Route>
+      <Route path="/accounting/parties">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Parties /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/products">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Products /></ProtectedRoute>}
+      </Route>
       <Route path="/accounting/vouchers">
         {() => <ProtectedRoute><VoucherList /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/vouchers/new">
         {() => <ProtectedRoute roles={["super_admin", "admin", "senior_accountant", "accountant", "data_entry"]}><VoucherEntry /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/quotations">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Quotations /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/quotations/new">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "senior_accountant", "accountant"]}><QuotationEntry /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/expenses">
+        {() => <ProtectedRoute><Expenses /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/invoice/:id">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><InvoiceView /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/receipt/:id">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><ReceiptView /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/reports/day-book">
         {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><DayBook /></ProtectedRoute>}
@@ -109,6 +138,9 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/reports/balance-sheet">
         {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><BalanceSheet /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/reports/gst-summary">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><GstSummary /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/employees">
         {() => <ProtectedRoute roles={["super_admin", "admin"]}><EmployeeManagement /></ProtectedRoute>}

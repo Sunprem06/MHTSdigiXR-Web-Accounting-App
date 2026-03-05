@@ -24,8 +24,9 @@ export default function DayBook() {
   const [startDate, setStartDate] = useState(thirtyDaysAgo);
   const [endDate, setEndDate] = useState(today);
 
+  const dayBookUrl = `/api/accounting/reports/day-book?startDate=${startDate}&endDate=${endDate}`;
   const { data: entries, isLoading } = useQuery<DayBookEntry[]>({
-    queryKey: ["/api/accounting/reports/day-book", `?startDate=${startDate}&endDate=${endDate}`],
+    queryKey: [dayBookUrl],
   });
 
   return (

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, FileText, BarChart3, Users, Settings, LogOut,
   ChevronDown, ChevronRight, ShoppingCart, Package, CreditCard, Receipt,
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
-  Shield, Menu, X
+  Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Role } from "@shared/schema";
@@ -29,6 +29,14 @@ const navItems: NavItem[] = [
     roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
   },
   {
+    label: "Parties", path: "/accounting/parties", icon: UserCheck,
+    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
+  },
+  {
+    label: "Products", path: "/accounting/products", icon: Boxes,
+    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
+  },
+  {
     label: "Vouchers", icon: FileText,
     roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"],
     children: [
@@ -39,7 +47,17 @@ const navItems: NavItem[] = [
       { label: "Receipt", path: "/accounting/vouchers/new?type=receipt", icon: Receipt },
       { label: "Journal", path: "/accounting/vouchers/new?type=journal", icon: BookMarked },
       { label: "Contra", path: "/accounting/vouchers/new?type=contra", icon: ArrowLeftRight },
+      { label: "Credit Note", path: "/accounting/vouchers/new?type=credit_note", icon: FileText },
+      { label: "Debit Note", path: "/accounting/vouchers/new?type=debit_note", icon: FileText },
     ],
+  },
+  {
+    label: "Quotations", path: "/accounting/quotations", icon: FileSpreadsheet,
+    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
+  },
+  {
+    label: "Expenses", path: "/accounting/expenses", icon: Wallet,
+    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"],
   },
   {
     label: "Reports", icon: BarChart3,
@@ -49,6 +67,7 @@ const navItems: NavItem[] = [
       { label: "Trial Balance", path: "/accounting/reports/trial-balance", icon: Scale },
       { label: "Profit & Loss", path: "/accounting/reports/profit-loss", icon: TrendingUp },
       { label: "Balance Sheet", path: "/accounting/reports/balance-sheet", icon: PieChart },
+      { label: "GST Summary", path: "/accounting/reports/gst-summary", icon: IndianRupee },
     ],
   },
   {

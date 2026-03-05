@@ -6,11 +6,21 @@ This is a full-stack digital agency website for Maanagarram Hi Tech Solutions, a
 
 ## Recent Changes (Mar 2026)
 
+- **Expanded Accounting Modules**: Products/Services catalog, Parties (Customer/Vendor) master, Quotations, Expense Claims
+- **GST Compliance**: CGST/SGST/IGST calculations on vouchers, GST Summary report, SAC codes for services
+- **Credit/Debit Notes**: Added credit_note and debit_note voucher types
+- **Invoice & Receipt Views**: Printable GST tax invoice from Sales vouchers, Payment receipt from Receipt vouchers
+- **16 Account Groups**: Standard Indian chart of accounts with 40+ pre-loaded ledger accounts
+- **10 Pre-loaded Service Products**: Website Dev, Mobile App, SEO, SMM, Branding, Domain/Hosting, etc. with SAC codes
+- **Improved Dashboard**: Cash in Hand, Bank Balance, Receivables, Payables, Active FY display, Quick Actions
+- **Quotation Module**: Create quotations with line items, GST calc, convert to Sales Invoice
+- **Expense Management**: Employee expense claim submission, approval workflow
+- **Ledger Statements**: Transaction history with running balance per account
 - **Accounting Application**: Full TallyPrime 7.0-inspired accounting system with double-entry bookkeeping
 - **Role-Based Access Control**: 7 world-standard roles (Super Admin, Admin, Auditor, Senior Accountant, Accountant, Data Entry Operator, Viewer)
 - **Authentication System**: Passport.js with express-session, bcrypt password hashing, PostgreSQL session store
-- **Voucher System**: Sales, Purchase, Payment, Receipt, Journal, Contra voucher types with approval workflow
-- **Financial Reports**: Day Book, Trial Balance, Profit & Loss, Balance Sheet with print support
+- **Voucher System**: Sales, Purchase, Payment, Receipt, Journal, Contra, Credit Note, Debit Note with approval workflow
+- **Financial Reports**: Day Book, Trial Balance, Profit & Loss (Gross + Net), Balance Sheet (with Net Profit), GST Summary
 - **Audit Trail**: Comprehensive audit logging with auditor note capability
 - **Employee Management**: Role-based employee CRUD with permission hierarchy
 
@@ -68,6 +78,10 @@ The frontend follows a component-based architecture with:
 - **Financial Years**: Fiscal period management
 - **Company Settings**: Organization details for reports
 - **Audit Notes**: Auditor comments on entries
+- **Parties**: Customer/Vendor master with GSTIN, PAN, credit terms
+- **Products**: Service catalog with HSN/SAC codes, GST rates, pricing
+- **Quotations**: Estimates with line items, GST calculation, convert-to-invoice
+- **Expense Claims**: Employee expense submissions with approval workflow
 
 ### Accounting System Roles
 

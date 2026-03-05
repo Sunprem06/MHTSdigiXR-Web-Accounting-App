@@ -3,15 +3,17 @@ import {
   contactMessages, posts, services, caseStudies,
   employees, auditLogs, accountGroups, ledgerAccounts,
   financialYears, companySettings, vouchers, voucherEntries, auditNotes,
+  parties, products, quotations, expenseClaims,
   type InsertContactMessage, type InsertPost, type InsertService, type InsertCaseStudy,
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
   type InsertFinancialYear, type InsertCompanySettings, type InsertVoucher, type InsertVoucherEntry,
-  type InsertAuditNote,
+  type InsertAuditNote, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
   type ContactMessage, type Post, type Service, type CaseStudy,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
-  type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote
+  type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
+  type Party, type Product, type Quotation, type ExpenseClaim
 } from "@shared/schema";
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
   createContactMessage(message: InsertContactMessage): Promise<ContactMessage>;
@@ -43,8 +45,10 @@ export interface IStorage {
   updateLedgerAccount(id: number, data: Partial<InsertLedgerAccount>): Promise<LedgerAccount | undefined>;
   deleteLedgerAccount(id: number): Promise<boolean>;
   getVoucherEntriesByLedger(ledgerAccountId: number): Promise<VoucherEntry[]>;
+  getLedgerStatement(ledgerAccountId: number, startDate?: string, endDate?: string): Promise<Array<{ date: string; voucherNumber: string; type: string; narration: string | null; debit: number; credit: number; balance: number }>>;
 
   getFinancialYears(): Promise<FinancialYear[]>;
+  getActiveFinancialYear(): Promise<FinancialYear | undefined>;
   createFinancialYear(fy: InsertFinancialYear): Promise<FinancialYear>;
   updateFinancialYear(id: number, data: Partial<InsertFinancialYear>): Promise<FinancialYear | undefined>;
 
@@ -62,19 +66,47 @@ export interface IStorage {
   getAuditNotes(entity?: string, entityId?: number): Promise<AuditNote[]>;
   createAuditNote(note: InsertAuditNote): Promise<AuditNote>;
 
+  getParties(type?: string): Promise<Party[]>;
+  getParty(id: number): Promise<Party | undefined>;
+  createParty(party: InsertParty): Promise<Party>;
+  updateParty(id: number, data: Partial<InsertParty>): Promise<Party | undefined>;
+
+  getProducts(): Promise<Product[]>;
+  getProduct(id: number): Promise<Product | undefined>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product | undefined>;
+  getNextProductCode(category: string): Promise<string>;
+
+  getQuotations(filters?: { status?: string; partyId?: number }): Promise<Quotation[]>;
+  getQuotation(id: number): Promise<Quotation | undefined>;
+  createQuotation(quotation: InsertQuotation): Promise<Quotation>;
+  updateQuotation(id: number, data: Partial<InsertQuotation>): Promise<Quotation | undefined>;
+  deleteQuotation(id: number): Promise<boolean>;
+  getNextQuotationNumber(): Promise<string>;
+
+  getExpenseClaims(filters?: { employeeId?: number; status?: string }): Promise<ExpenseClaim[]>;
+  getExpenseClaim(id: number): Promise<ExpenseClaim | undefined>;
+  createExpenseClaim(claim: InsertExpenseClaim): Promise<ExpenseClaim>;
+  updateExpenseClaim(id: number, data: Partial<InsertExpenseClaim>): Promise<ExpenseClaim | undefined>;
+  getNextClaimNumber(): Promise<string>;
+
   getDashboardStats(): Promise<{
     totalIncome: number;
     totalExpenses: number;
     totalReceivables: number;
     totalPayables: number;
     pendingApprovals: number;
+    cashInHand: number;
+    bankBalance: number;
     recentVouchers: Voucher[];
+    activeFinancialYear: FinancialYear | null;
   }>;
 
-  getTrialBalance(): Promise<Array<{ accountId: number; accountName: string; groupName: string; debit: number; credit: number }>>;
-  getProfitAndLoss(startDate?: string, endDate?: string): Promise<{ income: Array<{ name: string; amount: number }>; expenses: Array<{ name: string; amount: number }>; netProfit: number }>;
-  getBalanceSheet(): Promise<{ assets: Array<{ name: string; amount: number }>; liabilities: Array<{ name: string; amount: number }>; capital: Array<{ name: string; amount: number }> }>;
-  getDayBook(startDate?: string, endDate?: string): Promise<Voucher[]>;
+  getTrialBalance(asOnDate?: string): Promise<Array<{ accountId: number; accountName: string; groupName: string; debit: number; credit: number }>>;
+  getProfitAndLoss(startDate?: string, endDate?: string): Promise<{ directIncome: Array<{ name: string; amount: number }>; indirectIncome: Array<{ name: string; amount: number }>; directExpenses: Array<{ name: string; amount: number }>; indirectExpenses: Array<{ name: string; amount: number }>; grossProfit: number; netProfit: number }>;
+  getBalanceSheet(): Promise<{ assets: Array<{ name: string; amount: number }>; liabilities: Array<{ name: string; amount: number }>; capital: Array<{ name: string; amount: number }>; netProfit: number }>;
+  getDayBook(startDate?: string, endDate?: string, type?: string): Promise<Voucher[]>;
+  getGstSummary(startDate?: string, endDate?: string): Promise<{ outputTax: { cgst: number; sgst: number; igst: number; total: number }; inputTax: { cgst: number; sgst: number; igst: number; total: number }; netLiability: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -203,8 +235,58 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, ledgerAccountId));
   }
 
+  async getLedgerStatement(ledgerAccountId: number, startDate?: string, endDate?: string) {
+    const account = await this.getLedgerAccount(ledgerAccountId);
+    if (!account) return [];
+
+    let conditions: any[] = [eq(voucherEntries.ledgerAccountId, ledgerAccountId)];
+
+    const allEntries = await db.select({
+      entryId: voucherEntries.id,
+      debit: voucherEntries.debit,
+      credit: voucherEntries.credit,
+      voucherId: voucherEntries.voucherId,
+    }).from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, ledgerAccountId));
+
+    const voucherIds = [...new Set(allEntries.map(e => e.voucherId))];
+    if (voucherIds.length === 0) return [];
+
+    let voucherConditions: any[] = [inArray(vouchers.id, voucherIds)];
+    if (startDate) voucherConditions.push(gte(vouchers.date, startDate));
+    if (endDate) voucherConditions.push(lte(vouchers.date, endDate));
+
+    const voucherList = await db.select().from(vouchers).where(and(...voucherConditions)).orderBy(vouchers.date);
+
+    let balance = parseFloat(account.openingBalance) * (account.balanceType === "credit" ? -1 : 1);
+    const result = [];
+
+    for (const v of voucherList) {
+      const entries = allEntries.filter(e => e.voucherId === v.id);
+      for (const entry of entries) {
+        const debit = parseFloat(entry.debit);
+        const credit = parseFloat(entry.credit);
+        balance += debit - credit;
+        result.push({
+          date: v.date,
+          voucherNumber: v.voucherNumber,
+          type: v.type,
+          narration: v.narration,
+          debit,
+          credit,
+          balance,
+        });
+      }
+    }
+    return result;
+  }
+
   async getFinancialYears(): Promise<FinancialYear[]> {
     return await db.select().from(financialYears).orderBy(desc(financialYears.startDate));
+  }
+
+  async getActiveFinancialYear(): Promise<FinancialYear | undefined> {
+    const [fy] = await db.select().from(financialYears).where(eq(financialYears.isActive, true));
+    return fy;
   }
 
   async createFinancialYear(fy: InsertFinancialYear): Promise<FinancialYear> {
@@ -276,7 +358,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextVoucherNumber(type: string): Promise<string> {
-    const prefix = type.charAt(0).toUpperCase();
+    const prefixMap: Record<string, string> = {
+      sales: "S", purchase: "P", payment: "PAY", receipt: "R",
+      journal: "J", contra: "C", credit_note: "CN", debit_note: "DN",
+    };
+    const prefix = prefixMap[type] || type.charAt(0).toUpperCase();
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(vouchers).where(eq(vouchers.type, type));
     const num = (result?.count || 0) + 1;
     return `${prefix}-${String(num).padStart(5, "0")}`;
@@ -298,6 +384,127 @@ export class DatabaseStorage implements IStorage {
     return newNote;
   }
 
+  async getParties(type?: string): Promise<Party[]> {
+    if (type) {
+      return await db.select().from(parties).where(or(eq(parties.type, type), eq(parties.type, "both"))).orderBy(parties.name);
+    }
+    return await db.select().from(parties).orderBy(parties.name);
+  }
+
+  async getParty(id: number): Promise<Party | undefined> {
+    const [party] = await db.select().from(parties).where(eq(parties.id, id));
+    return party;
+  }
+
+  async createParty(party: InsertParty): Promise<Party> {
+    const [newParty] = await db.insert(parties).values(party).returning();
+    return newParty;
+  }
+
+  async updateParty(id: number, data: Partial<InsertParty>): Promise<Party | undefined> {
+    const [updated] = await db.update(parties).set(data).where(eq(parties.id, id)).returning();
+    return updated;
+  }
+
+  async getProducts(): Promise<Product[]> {
+    return await db.select().from(products).orderBy(products.name);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product;
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const [newProduct] = await db.insert(products).values(product).returning();
+    return newProduct;
+  }
+
+  async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product | undefined> {
+    const [updated] = await db.update(products).set(data).where(eq(products.id, id)).returning();
+    return updated;
+  }
+
+  async getNextProductCode(category: string): Promise<string> {
+    const prefixMap: Record<string, string> = {
+      web_development: "SRV-WEB", mobile_app: "SRV-MOB", seo: "SRV-SEO",
+      smm: "SRV-SMM", branding: "SRV-BRD", domain_hosting: "SRV-DOM",
+      video_animation: "SRV-VID", digital_marketing: "SRV-DIG",
+      ui_ux_design: "SRV-UI", consulting: "SRV-CON", other: "SRV-OTH",
+    };
+    const prefix = prefixMap[category] || "SRV-OTH";
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(products).where(eq(products.category, category));
+    const num = (result?.count || 0) + 1;
+    return `${prefix}-${String(num).padStart(3, "0")}`;
+  }
+
+  async getQuotations(filters?: { status?: string; partyId?: number }): Promise<Quotation[]> {
+    let conditions = [];
+    if (filters?.status) conditions.push(eq(quotations.status, filters.status));
+    if (filters?.partyId) conditions.push(eq(quotations.partyId, filters.partyId));
+    if (conditions.length > 0) {
+      return await db.select().from(quotations).where(and(...conditions)).orderBy(desc(quotations.date));
+    }
+    return await db.select().from(quotations).orderBy(desc(quotations.date));
+  }
+
+  async getQuotation(id: number): Promise<Quotation | undefined> {
+    const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
+    return quotation;
+  }
+
+  async createQuotation(quotation: InsertQuotation): Promise<Quotation> {
+    const [newQuotation] = await db.insert(quotations).values(quotation).returning();
+    return newQuotation;
+  }
+
+  async updateQuotation(id: number, data: Partial<InsertQuotation>): Promise<Quotation | undefined> {
+    const [updated] = await db.update(quotations).set(data).where(eq(quotations.id, id)).returning();
+    return updated;
+  }
+
+  async deleteQuotation(id: number): Promise<boolean> {
+    const result = await db.delete(quotations).where(eq(quotations.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getNextQuotationNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(quotations);
+    const num = (result?.count || 0) + 1;
+    return `QTN-${String(num).padStart(5, "0")}`;
+  }
+
+  async getExpenseClaims(filters?: { employeeId?: number; status?: string }): Promise<ExpenseClaim[]> {
+    let conditions = [];
+    if (filters?.employeeId) conditions.push(eq(expenseClaims.employeeId, filters.employeeId));
+    if (filters?.status) conditions.push(eq(expenseClaims.status, filters.status));
+    if (conditions.length > 0) {
+      return await db.select().from(expenseClaims).where(and(...conditions)).orderBy(desc(expenseClaims.createdAt));
+    }
+    return await db.select().from(expenseClaims).orderBy(desc(expenseClaims.createdAt));
+  }
+
+  async getExpenseClaim(id: number): Promise<ExpenseClaim | undefined> {
+    const [claim] = await db.select().from(expenseClaims).where(eq(expenseClaims.id, id));
+    return claim;
+  }
+
+  async createExpenseClaim(claim: InsertExpenseClaim): Promise<ExpenseClaim> {
+    const [newClaim] = await db.insert(expenseClaims).values(claim).returning();
+    return newClaim;
+  }
+
+  async updateExpenseClaim(id: number, data: Partial<InsertExpenseClaim>): Promise<ExpenseClaim | undefined> {
+    const [updated] = await db.update(expenseClaims).set(data).where(eq(expenseClaims.id, id)).returning();
+    return updated;
+  }
+
+  async getNextClaimNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(expenseClaims);
+    const num = (result?.count || 0) + 1;
+    return `EXP-${String(num).padStart(5, "0")}`;
+  }
+
   async getDashboardStats() {
     const allVouchers = await db.select().from(vouchers).where(eq(vouchers.status, "approved"));
 
@@ -312,36 +519,81 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const incomeGroups = await db.select().from(accountGroups).where(eq(accountGroups.type, "income"));
-    const expenseGroups = await db.select().from(accountGroups).where(eq(accountGroups.type, "expense"));
+    const groups = await db.select().from(accountGroups);
+    const allAccounts = await db.select().from(ledgerAccounts);
+
+    const getAccountBalance = async (name: string) => {
+      const account = allAccounts.find(a => a.name === name);
+      if (!account) return 0;
+      const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, account.id));
+      let balance = parseFloat(account.openingBalance);
+      for (const e of entries) {
+        balance += parseFloat(e.debit) - parseFloat(e.credit);
+      }
+      return balance;
+    };
+
+    const cashInHand = await getAccountBalance("Cash");
+    const bankBalance = await getAccountBalance("Bank Account");
+
+    const debtorAccount = allAccounts.find(a => a.name === "Sundry Debtors");
+    const creditorAccount = allAccounts.find(a => a.name === "Sundry Creditors");
+
+    let totalReceivables = 0;
+    let totalPayables = 0;
+
+    if (debtorAccount) {
+      const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, debtorAccount.id));
+      totalReceivables = parseFloat(debtorAccount.openingBalance);
+      for (const e of entries) totalReceivables += parseFloat(e.debit) - parseFloat(e.credit);
+    }
+    if (creditorAccount) {
+      const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, creditorAccount.id));
+      totalPayables = parseFloat(creditorAccount.openingBalance);
+      for (const e of entries) totalPayables += parseFloat(e.credit) - parseFloat(e.debit);
+    }
 
     const [pendingResult] = await db.select({ count: sql<number>`count(*)` }).from(vouchers).where(eq(vouchers.status, "pending"));
     const pendingApprovals = pendingResult?.count || 0;
 
     const recentVouchers = await db.select().from(vouchers).orderBy(desc(vouchers.createdAt)).limit(10);
 
+    const activeFy = await this.getActiveFinancialYear();
+
     return {
       totalIncome,
       totalExpenses,
-      totalReceivables: 0,
-      totalPayables: 0,
+      totalReceivables,
+      totalPayables,
       pendingApprovals,
+      cashInHand,
+      bankBalance,
       recentVouchers,
+      activeFinancialYear: activeFy || null,
     };
   }
 
-  async getTrialBalance() {
+  async getTrialBalance(asOnDate?: string) {
     const accounts = await db.select().from(ledgerAccounts);
     const groups = await db.select().from(accountGroups);
     const groupMap = new Map(groups.map(g => [g.id, g.name]));
 
     const result = [];
     for (const account of accounts) {
+      let entryConditions: any[] = [eq(voucherEntries.ledgerAccountId, account.id)];
       const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, account.id));
+
+      let filteredEntries = entries;
+      if (asOnDate) {
+        const voucherList = await db.select().from(vouchers).where(lte(vouchers.date, asOnDate));
+        const validIds = new Set(voucherList.map(v => v.id));
+        filteredEntries = entries.filter(e => validIds.has(e.voucherId));
+      }
+
       let totalDebit = parseFloat(account.openingBalance) > 0 && account.balanceType === "debit" ? parseFloat(account.openingBalance) : 0;
       let totalCredit = parseFloat(account.openingBalance) > 0 && account.balanceType === "credit" ? parseFloat(account.openingBalance) : 0;
 
-      for (const entry of entries) {
+      for (const entry of filteredEntries) {
         totalDebit += parseFloat(entry.debit);
         totalCredit += parseFloat(entry.credit);
       }
@@ -360,41 +612,55 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProfitAndLoss(startDate?: string, endDate?: string) {
-    const incomeGroup = await db.select().from(accountGroups).where(eq(accountGroups.type, "income"));
-    const expenseGroup = await db.select().from(accountGroups).where(eq(accountGroups.type, "expense"));
-
-    const incomeIds = incomeGroup.map(g => g.id);
-    const expenseIds = expenseGroup.map(g => g.id);
-
+    const groups = await db.select().from(accountGroups);
     const allAccounts = await db.select().from(ledgerAccounts);
-    const incomeAccounts = allAccounts.filter(a => incomeIds.includes(a.groupId));
-    const expenseAccounts = allAccounts.filter(a => expenseIds.includes(a.groupId));
 
-    const income: Array<{ name: string; amount: number }> = [];
-    const expenses: Array<{ name: string; amount: number }> = [];
+    const directIncomeIds = groups.filter(g => g.name === "Direct Income").map(g => g.id);
+    const indirectIncomeIds = groups.filter(g => g.name === "Indirect Income").map(g => g.id);
+    const directExpenseIds = groups.filter(g => g.name === "Direct Expenses").map(g => g.id);
+    const indirectExpenseIds = groups.filter(g => g.name === "Indirect Expenses").map(g => g.id);
 
-    for (const account of incomeAccounts) {
-      const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, account.id));
-      let amount = 0;
-      for (const e of entries) {
-        amount += parseFloat(e.credit) - parseFloat(e.debit);
+    const getAmounts = async (groupIds: number[], isIncome: boolean) => {
+      const accounts = allAccounts.filter(a => groupIds.includes(a.groupId));
+      const result: Array<{ name: string; amount: number }> = [];
+      for (const account of accounts) {
+        const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, account.id));
+
+        let filteredEntries = entries;
+        if (startDate || endDate) {
+          let vConds: any[] = [];
+          if (startDate) vConds.push(gte(vouchers.date, startDate));
+          if (endDate) vConds.push(lte(vouchers.date, endDate));
+          const vList = await db.select().from(vouchers).where(and(...vConds));
+          const validIds = new Set(vList.map(v => v.id));
+          filteredEntries = entries.filter(e => validIds.has(e.voucherId));
+        }
+
+        let amount = 0;
+        for (const e of filteredEntries) {
+          amount += isIncome
+            ? parseFloat(e.credit) - parseFloat(e.debit)
+            : parseFloat(e.debit) - parseFloat(e.credit);
+        }
+        if (amount !== 0) result.push({ name: account.name, amount });
       }
-      if (amount !== 0) income.push({ name: account.name, amount });
-    }
+      return result;
+    };
 
-    for (const account of expenseAccounts) {
-      const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, account.id));
-      let amount = 0;
-      for (const e of entries) {
-        amount += parseFloat(e.debit) - parseFloat(e.credit);
-      }
-      if (amount !== 0) expenses.push({ name: account.name, amount });
-    }
+    const directIncome = await getAmounts(directIncomeIds, true);
+    const indirectIncome = await getAmounts(indirectIncomeIds, true);
+    const directExpenses = await getAmounts(directExpenseIds, false);
+    const indirectExpenses = await getAmounts(indirectExpenseIds, false);
 
-    const totalIncome = income.reduce((sum, i) => sum + i.amount, 0);
-    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalDirectIncome = directIncome.reduce((sum, i) => sum + i.amount, 0);
+    const totalIndirectIncome = indirectIncome.reduce((sum, i) => sum + i.amount, 0);
+    const totalDirectExpenses = directExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalIndirectExpenses = indirectExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-    return { income, expenses, netProfit: totalIncome - totalExpenses };
+    const grossProfit = totalDirectIncome - totalDirectExpenses;
+    const netProfit = grossProfit + totalIndirectIncome - totalIndirectExpenses;
+
+    return { directIncome, indirectIncome, directExpenses, indirectExpenses, grossProfit, netProfit };
   }
 
   async getBalanceSheet() {
@@ -405,12 +671,11 @@ export class DatabaseStorage implements IStorage {
     const liabilityGroups = groups.filter(g => g.type === "liability").map(g => g.id);
     const capitalGroups = groups.filter(g => g.type === "capital").map(g => g.id);
 
-    const computeBalances = async (accountIds: number[]) => {
+    const computeBalances = async (groupIds: number[]) => {
+      const accounts = allAccounts.filter(a => groupIds.includes(a.groupId));
       const result: Array<{ name: string; amount: number }> = [];
-      for (const id of accountIds) {
-        const account = allAccounts.find(a => a.id === id);
-        if (!account) continue;
-        const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, id));
+      for (const account of accounts) {
+        const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, account.id));
         let amount = parseFloat(account.openingBalance);
         for (const e of entries) {
           amount += parseFloat(e.debit) - parseFloat(e.credit);
@@ -420,26 +685,62 @@ export class DatabaseStorage implements IStorage {
       return result;
     };
 
-    const assetAccountIds = allAccounts.filter(a => assetGroups.includes(a.groupId)).map(a => a.id);
-    const liabilityAccountIds = allAccounts.filter(a => liabilityGroups.includes(a.groupId)).map(a => a.id);
-    const capitalAccountIds = allAccounts.filter(a => capitalGroups.includes(a.groupId)).map(a => a.id);
+    const pnl = await this.getProfitAndLoss();
 
     return {
-      assets: await computeBalances(assetAccountIds),
-      liabilities: await computeBalances(liabilityAccountIds),
-      capital: await computeBalances(capitalAccountIds),
+      assets: await computeBalances(assetGroups),
+      liabilities: await computeBalances(liabilityGroups),
+      capital: await computeBalances(capitalGroups),
+      netProfit: pnl.netProfit,
     };
   }
 
-  async getDayBook(startDate?: string, endDate?: string): Promise<Voucher[]> {
+  async getDayBook(startDate?: string, endDate?: string, type?: string): Promise<Voucher[]> {
     let conditions = [];
     if (startDate) conditions.push(gte(vouchers.date, startDate));
     if (endDate) conditions.push(lte(vouchers.date, endDate));
+    if (type) conditions.push(eq(vouchers.type, type));
 
     if (conditions.length > 0) {
       return await db.select().from(vouchers).where(and(...conditions)).orderBy(desc(vouchers.date));
     }
     return await db.select().from(vouchers).orderBy(desc(vouchers.date));
+  }
+
+  async getGstSummary(startDate?: string, endDate?: string) {
+    let conditions: any[] = [eq(vouchers.status, "approved")];
+    if (startDate) conditions.push(gte(vouchers.date, startDate));
+    if (endDate) conditions.push(lte(vouchers.date, endDate));
+
+    const allVouchers = await db.select().from(vouchers).where(and(...conditions));
+
+    const outputTax = { cgst: 0, sgst: 0, igst: 0, total: 0 };
+    const inputTax = { cgst: 0, sgst: 0, igst: 0, total: 0 };
+
+    for (const v of allVouchers) {
+      const cgst = parseFloat(v.cgstAmount || "0");
+      const sgst = parseFloat(v.sgstAmount || "0");
+      const igst = parseFloat(v.igstAmount || "0");
+
+      if (v.type === "sales" || v.type === "credit_note") {
+        outputTax.cgst += cgst;
+        outputTax.sgst += sgst;
+        outputTax.igst += igst;
+      } else if (v.type === "purchase" || v.type === "debit_note") {
+        inputTax.cgst += cgst;
+        inputTax.sgst += sgst;
+        inputTax.igst += igst;
+      }
+    }
+
+    outputTax.total = outputTax.cgst + outputTax.sgst + outputTax.igst;
+    inputTax.total = inputTax.cgst + inputTax.sgst + inputTax.igst;
+
+    return {
+      outputTax,
+      inputTax,
+      netLiability: outputTax.total - inputTax.total,
+    };
   }
 }
 
