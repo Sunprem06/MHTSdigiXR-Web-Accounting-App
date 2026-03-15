@@ -369,7 +369,8 @@ export async function registerRoutes(
   });
 
   app.patch("/api/accounting/quotations/:id", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant"), async (req, res) => {
-    const updated = await storage.updateQuotation(parseInt(req.params.id), req.body);
+    const { status, submittedAt, reviewedBy, reviewedAt, ...safeBody } = req.body;
+    const updated = await storage.updateQuotation(parseInt(req.params.id), safeBody);
     if (!updated) return res.status(404).json({ message: "Quotation not found" });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "update", entity: "quotation",
@@ -402,7 +403,7 @@ export async function registerRoutes(
     const updated = await storage.updateQuotation(quotation.id, {
       status: "submitted",
       submittedAt: new Date(),
-    } as any);
+    });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "submit", entity: "quotation",
       entityId: quotation.id, details: `Submitted quotation ${quotation.quotationNumber} for review`,
@@ -419,7 +420,7 @@ export async function registerRoutes(
       status: "sent",
       reviewedBy: req.user!.id,
       reviewedAt: new Date(),
-    } as any);
+    });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "approve", entity: "quotation",
       entityId: quotation.id, details: `Approved quotation ${quotation.quotationNumber}`,
@@ -438,7 +439,7 @@ export async function registerRoutes(
       reviewedBy: req.user!.id,
       reviewedAt: new Date(),
       notes: reason ? `Rejected: ${reason}` : (quotation.notes ?? undefined),
-    } as any);
+    });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "reject", entity: "quotation",
       entityId: quotation.id, details: `Rejected quotation ${quotation.quotationNumber}${reason ? ": " + reason : ""}`,
