@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { ChevronDown, HelpCircle, ArrowRight, MessageSquare, Search, Code, Smartphone, BarChart3, Palette, Server, Video, Monitor } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useSiteSettings } from "@/hooks/use-site-settings";
 import type { FaqItem } from "@shared/schema";
 
 interface FAQItem {
@@ -18,278 +17,6 @@ interface FAQCategory {
   faqs: FAQItem[];
 }
 
-const FAQ_CATEGORIES: FAQCategory[] = [
-  {
-    title: "General Questions",
-    icon: HelpCircle,
-    color: "from-sky-500 to-sky-600",
-    faqs: [
-      {
-        question: "What services does MHTSdigiXR offer?",
-        answer: "MHTSdigiXR offers comprehensive digital solutions including Web Development, Mobile App Development, Digital Marketing, UI/UX Design, SEO Optimization, Branding & Graphics, Domain & Hosting, and Video & Animation services. We provide end-to-end solutions to help businesses establish and grow their digital presence."
-      },
-      {
-        question: "How long has MHTSdigiXR been in business?",
-        answer: "Maanagarram Hi Tech Solutions has been serving clients since 2015, with over 10+ years of combined expertise in digital marketing and web development. We have successfully delivered 500+ projects across various industries."
-      },
-      {
-        question: "Do you work with clients outside India?",
-        answer: "Yes, we serve clients globally! While we are based in Chennai, India, we have successfully completed projects for clients across USA, UK, UAE, Australia, and other countries. We use modern collaboration tools to ensure seamless communication regardless of timezone."
-      },
-      {
-        question: "What makes MHTSdigiXR different from other agencies?",
-        answer: "We combine creativity with data-driven strategies to deliver measurable results. Our differentiators include: 24/7 customer support, transparent pricing with no hidden costs, dedicated project managers, 100% money-back guarantee, and a focus on ROI-driven solutions."
-      },
-      {
-        question: "How can I get a quote for my project?",
-        answer: "QUOTE_ANSWER_PLACEHOLDER"
-      }
-    ]
-  },
-  {
-    title: "Web Development",
-    icon: Code,
-    color: "from-blue-500 to-blue-600",
-    faqs: [
-      {
-        question: "What types of websites do you develop?",
-        answer: "We develop all types of websites including corporate websites, e-commerce platforms, portfolio sites, landing pages, blog websites, educational portals, booking systems, real estate websites, and custom web applications. We use modern technologies like React, Next.js, WordPress, and Shopify."
-      },
-      {
-        question: "How long does it take to build a website?",
-        answer: "Timeline varies based on complexity: Basic websites (5-7 pages) take 2-3 weeks, custom websites (10-15 pages) take 4-6 weeks, e-commerce sites take 6-8 weeks, and complex web applications can take 8-12+ weeks. Rush delivery options are available at additional cost."
-      },
-      {
-        question: "Will my website be mobile-friendly?",
-        answer: "Absolutely! All our websites are 100% responsive and optimized for all devices - desktops, tablets, and smartphones. We follow mobile-first design principles and test across multiple devices and browsers before delivery."
-      },
-      {
-        question: "Do you provide website maintenance?",
-        answer: "Yes, we offer comprehensive maintenance packages starting from ₹2,000/month. This includes security updates, bug fixes, content updates, performance monitoring, daily backups, and 24/7 technical support."
-      },
-      {
-        question: "Can you redesign my existing website?",
-        answer: "Yes! We specialize in website redesigns. We'll analyze your current site, understand your goals, preserve SEO value, migrate content safely, and deliver a modern, high-performing website that better represents your brand."
-      }
-    ]
-  },
-  {
-    title: "Mobile App Development",
-    icon: Smartphone,
-    color: "from-purple-500 to-purple-600",
-    faqs: [
-      {
-        question: "Do you build iOS and Android apps?",
-        answer: "Yes, we develop for both platforms! We offer native development (Swift for iOS, Kotlin for Android) and cross-platform solutions using React Native and Flutter. Cross-platform apps are cost-effective and maintain 95% code sharing between platforms."
-      },
-      {
-        question: "How much does a mobile app cost?",
-        answer: "App costs vary based on features: Simple apps (basic features) start from ₹50,000, medium complexity apps from ₹1,50,000, and enterprise apps from ₹3,00,000+. We provide detailed cost breakdowns after understanding your requirements."
-      },
-      {
-        question: "Will you publish the app to App Store and Play Store?",
-        answer: "Yes! We handle the entire publishing process including app store optimization (ASO), creating app listings, screenshots, descriptions, and managing the review process. We also assist with setting up developer accounts if needed."
-      },
-      {
-        question: "Do you provide app maintenance and updates?",
-        answer: "Yes, we offer app maintenance packages starting from ₹5,000/month. This covers bug fixes, OS compatibility updates, security patches, minor feature updates, and performance optimization."
-      },
-      {
-        question: "Can you integrate third-party services in apps?",
-        answer: "Absolutely! We integrate payment gateways (Razorpay, PayTM, Stripe), social logins, maps, push notifications, analytics, chat systems, cloud storage, and any API-based services your app needs."
-      }
-    ]
-  },
-  {
-    title: "Digital Marketing",
-    icon: BarChart3,
-    color: "from-orange-500 to-orange-600",
-    faqs: [
-      {
-        question: "What digital marketing services do you offer?",
-        answer: "We offer comprehensive digital marketing including SEO, Social Media Marketing (SMM), Pay-Per-Click (PPC) advertising, Content Marketing, Email Marketing, Influencer Marketing, WhatsApp Marketing, and Marketing Automation."
-      },
-      {
-        question: "How quickly can I see results from digital marketing?",
-        answer: "Results timeline varies: PPC ads show results within 1-2 weeks, Social Media Marketing within 2-4 weeks, while SEO typically takes 3-6 months for significant results. We provide monthly reports showing progress and ROI."
-      },
-      {
-        question: "What is your minimum marketing budget requirement?",
-        answer: "Our digital marketing packages start from ₹10,000/month (excluding ad spend). For optimal results, we recommend a minimum ad budget of ₹15,000-25,000/month for PPC and social media advertising."
-      },
-      {
-        question: "Do you manage Google Ads and Facebook Ads?",
-        answer: "Yes! We are Google Ads certified and Meta Business Partner. We manage campaigns across Google Search, Display, YouTube, Facebook, Instagram, LinkedIn, and Twitter with advanced targeting and optimization."
-      },
-      {
-        question: "How do you measure marketing success?",
-        answer: "We track KPIs including website traffic, leads generated, conversion rates, cost per lead, return on ad spend (ROAS), engagement rates, and revenue growth. You receive detailed monthly reports with insights and recommendations."
-      }
-    ]
-  },
-  {
-    title: "UI/UX Design",
-    icon: Monitor,
-    color: "from-pink-500 to-pink-600",
-    faqs: [
-      {
-        question: "What is included in your UI/UX design service?",
-        answer: "Our UI/UX service includes user research, competitor analysis, user personas, information architecture, wireframing, high-fidelity mockups, interactive prototypes, design systems, usability testing, and design handoff to developers."
-      },
-      {
-        question: "What design tools do you use?",
-        answer: "We use industry-standard tools including Figma, Adobe XD, Sketch, and InVision for design and prototyping. We also use tools like Hotjar and UserTesting for usability research and analysis."
-      },
-      {
-        question: "Can you redesign my existing app or website?",
-        answer: "Yes! We conduct UX audits to identify pain points, analyze user behavior data, and create redesigns that improve user experience, increase conversions, and align with modern design trends."
-      },
-      {
-        question: "Do you provide design files after completion?",
-        answer: "Absolutely! You receive complete ownership of all design files, assets, and components. We provide organized Figma files, exported assets in all required formats, and comprehensive design documentation."
-      },
-      {
-        question: "How many design revisions are included?",
-        answer: "Our packages include 3 rounds of revisions at each stage (wireframes, mockups, prototypes). Additional revisions are available at nominal charges. We ensure you're 100% satisfied with the final design."
-      }
-    ]
-  },
-  {
-    title: "SEO Optimization",
-    icon: Search,
-    color: "from-green-500 to-green-600",
-    faqs: [
-      {
-        question: "What is included in your SEO service?",
-        answer: "Our SEO service includes keyword research, on-page optimization, technical SEO audit, content optimization, link building, local SEO, Google My Business optimization, competitor analysis, and monthly ranking reports."
-      },
-      {
-        question: "How long does SEO take to show results?",
-        answer: "SEO is a long-term strategy. Initial improvements can be seen in 1-2 months, significant ranking improvements in 3-4 months, and substantial organic traffic growth in 6-12 months. Results depend on competition and current site status."
-      },
-      {
-        question: "Do you guarantee first page rankings?",
-        answer: "While we don't guarantee specific rankings (as no ethical SEO agency can), we guarantee improved visibility, increased organic traffic, and measurable ROI. We've achieved first-page rankings for 90% of our clients."
-      },
-      {
-        question: "Will you help with local SEO?",
-        answer: "Yes! We specialize in local SEO including Google My Business optimization, local citations, review management, local keyword targeting, and map pack optimization. Perfect for businesses targeting local customers."
-      },
-      {
-        question: "Do you provide SEO reports?",
-        answer: "Yes, you receive detailed monthly reports covering keyword rankings, organic traffic, backlink profile, technical health score, competitor comparison, and actionable recommendations for continued growth."
-      }
-    ]
-  },
-  {
-    title: "Branding & Graphics",
-    icon: Palette,
-    color: "from-red-500 to-red-600",
-    faqs: [
-      {
-        question: "What branding services do you offer?",
-        answer: "We offer complete branding solutions including logo design, brand identity development, brand guidelines, business cards, letterheads, brochures, social media kits, packaging design, and marketing collateral."
-      },
-      {
-        question: "How many logo concepts will I receive?",
-        answer: "Our standard logo package includes 3-5 unique concepts. After you select a direction, we provide unlimited revisions until you're completely satisfied. You receive final files in all formats (AI, EPS, PNG, JPG, SVG)."
-      },
-      {
-        question: "Do you create brand guidelines?",
-        answer: "Yes! Our brand identity package includes comprehensive brand guidelines covering logo usage, color palette, typography, imagery style, voice & tone, and application examples across various media."
-      },
-      {
-        question: "Can you design social media content?",
-        answer: "Absolutely! We create custom social media templates, post designs, story templates, cover images, and ad creatives. We can also provide monthly content design packages for consistent posting."
-      },
-      {
-        question: "What file formats do I receive?",
-        answer: "You receive all deliverables in multiple formats: source files (AI, PSD, Figma), vector formats (EPS, SVG), web formats (PNG, JPG, WebP), and print-ready PDFs. All files are properly organized and named."
-      }
-    ]
-  },
-  {
-    title: "Domain & Hosting",
-    icon: Server,
-    color: "from-cyan-500 to-cyan-600",
-    faqs: [
-      {
-        question: "Do you help with domain registration?",
-        answer: "Yes! We help you find and register the perfect domain name. We search across all TLDs (.com, .in, .co, .io, etc.), check availability, and handle the complete registration process."
-      },
-      {
-        question: "What type of hosting do you provide?",
-        answer: "We offer various hosting solutions: Shared Hosting (for small sites), VPS Hosting (for growing businesses), Cloud Hosting (for high traffic), and Dedicated Servers (for enterprise needs). All include SSL certificates."
-      },
-      {
-        question: "What is your uptime guarantee?",
-        answer: "We guarantee 99.9% uptime for all our hosting plans. Our servers are monitored 24/7, and we have automated failover systems to ensure your website stays online."
-      },
-      {
-        question: "Is SSL certificate included?",
-        answer: "Yes! All our hosting packages include free SSL certificates (Let's Encrypt or premium options). SSL ensures your website is secure and trusted by browsers and search engines."
-      },
-      {
-        question: "Do you provide email hosting?",
-        answer: "Yes, we provide professional email hosting with your domain (e.g., you@yourcompany.com). Our packages include spam protection, 25GB+ storage per mailbox, and mobile sync capabilities."
-      }
-    ]
-  },
-  {
-    title: "Video & Animation",
-    icon: Video,
-    color: "from-yellow-500 to-yellow-600",
-    faqs: [
-      {
-        question: "What types of videos do you create?",
-        answer: "We create explainer videos, product demos, corporate videos, social media reels, testimonial videos, animated logos, motion graphics, whiteboard animations, 3D animations, and video ads."
-      },
-      {
-        question: "How long does video production take?",
-        answer: "Timeline varies: Simple motion graphics take 1-2 weeks, explainer videos 2-3 weeks, and complex 3D animations 4-6 weeks. Rush delivery is available for urgent projects at additional cost."
-      },
-      {
-        question: "Do you provide scriptwriting?",
-        answer: "Yes! Our video packages include professional scriptwriting. We develop compelling scripts that communicate your message effectively, aligned with your brand voice and target audience."
-      },
-      {
-        question: "What video formats do you deliver?",
-        answer: "We deliver videos in multiple formats optimized for different platforms: MP4, MOV, WebM, and platform-specific formats for YouTube, Instagram, Facebook, LinkedIn, and websites."
-      },
-      {
-        question: "Can you create videos for social media?",
-        answer: "Absolutely! We create short-form content optimized for Instagram Reels, YouTube Shorts, TikTok, and Facebook Stories. We understand platform-specific requirements and best practices."
-      }
-    ]
-  },
-  {
-    title: "Pricing & Payment",
-    icon: HelpCircle,
-    color: "from-sky-500 to-sky-600",
-    faqs: [
-      {
-        question: "What are your payment terms?",
-        answer: "We typically work with 50% advance payment to start the project and 50% upon completion. For larger projects, we offer milestone-based payments. We accept bank transfers, UPI, credit cards, and PayPal."
-      },
-      {
-        question: "Do you offer EMI or payment plans?",
-        answer: "Yes! For projects above ₹50,000, we offer flexible payment plans spread across 3-6 months. This makes it easier for businesses to invest in quality digital solutions without financial strain."
-      },
-      {
-        question: "Is there a refund policy?",
-        answer: "Yes, we offer a 100% money-back guarantee for website projects if we fail to deliver as per the agreed scope. Refund requests must be made within 7 days of project delivery with valid reasons."
-      },
-      {
-        question: "Do you provide invoices with GST?",
-        answer: "Yes, we are a GST-registered company and provide proper tax invoices for all transactions. Our GSTIN is available on request for businesses needing input tax credit."
-      },
-      {
-        question: "Are there any hidden costs?",
-        answer: "No hidden costs! We provide detailed quotations upfront covering all aspects of the project. Any additional requirements beyond the agreed scope are discussed and quoted separately before proceeding."
-      }
-    ]
-  }
-];
 
 function FAQAccordion({ item, isOpen, onClick }: { item: FAQItem; isOpen: boolean; onClick: () => void }) {
   return (
@@ -339,41 +66,29 @@ const CATEGORY_STYLES: Record<string, { icon: typeof HelpCircle; color: string }
 };
 
 export default function FAQ() {
-  const siteSettings = useSiteSettings();
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
   const [activeCategory, setActiveCategory] = useState<string>("General Questions");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: apiFaqs = [] } = useQuery<FaqItem[]>({ queryKey: ["/api/faqs"] });
+  const { data: apiFaqs = [], isLoading } = useQuery<FaqItem[]>({ queryKey: ["/api/faqs"] });
 
   const toggleItem = (categoryTitle: string, questionIndex: number) => {
     const key = `${categoryTitle}-${questionIndex}`;
     setOpenItems(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const quoteAnswer = `Getting a quote is easy! You can fill out our contact form, chat with Kayal (our AI assistant)${siteSettings.phone ? `, call us at ${siteSettings.phone}` : ''}${siteSettings.whatsappNumber ? `, or WhatsApp us at +${siteSettings.whatsappNumber.replace(/^(\d{2})/, '$1 ')}` : ''}. We typically respond within 2-4 hours and provide detailed proposals within 24-48 hours.`;
-
   const buildCategories = (): FAQCategory[] => {
-    if (apiFaqs.length > 0) {
-      const catMap = new Map<string, FAQItem[]>();
-      apiFaqs.forEach(faq => {
-        const cat = faq.category || "General Questions";
-        if (!catMap.has(cat)) catMap.set(cat, []);
-        catMap.get(cat)!.push({ question: faq.question, answer: faq.answer });
-      });
-      return Array.from(catMap.entries()).map(([title, faqs]) => ({
-        title,
-        icon: CATEGORY_STYLES[title]?.icon || HelpCircle,
-        color: CATEGORY_STYLES[title]?.color || "from-sky-500 to-sky-600",
-        faqs,
-      }));
-    }
-    return FAQ_CATEGORIES.map(category => ({
-      ...category,
-      faqs: category.faqs.map(faq => ({
-        ...faq,
-        answer: faq.answer === "QUOTE_ANSWER_PLACEHOLDER" ? quoteAnswer : faq.answer,
-      })),
+    const catMap = new Map<string, FAQItem[]>();
+    apiFaqs.forEach(faq => {
+      const cat = faq.category || "General Questions";
+      if (!catMap.has(cat)) catMap.set(cat, []);
+      catMap.get(cat)!.push({ question: faq.question, answer: faq.answer });
+    });
+    return Array.from(catMap.entries()).map(([title, faqs]) => ({
+      title,
+      icon: CATEGORY_STYLES[title]?.icon || HelpCircle,
+      color: CATEGORY_STYLES[title]?.color || "from-sky-500 to-sky-600",
+      faqs,
     }));
   };
 
@@ -433,6 +148,11 @@ export default function FAQ() {
       </section>
 
       <div className="container mx-auto px-4 md:px-6">
+        {isLoading ? (
+          <div className="text-center py-16 text-slate-500 dark:text-slate-400">Loading FAQs...</div>
+        ) : apiFaqs.length === 0 ? (
+          <div className="text-center py-16 text-slate-500 dark:text-slate-400">No FAQs available yet. Check back soon!</div>
+        ) : (<>
         {/* Category Tabs */}
         <div className="mb-12 overflow-x-auto">
           <div className="flex flex-wrap gap-3 justify-center min-w-max md:min-w-0">
@@ -504,6 +224,7 @@ export default function FAQ() {
           )}
         </div>
 
+        </>)}
         {/* Still Have Questions CTA */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}

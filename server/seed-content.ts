@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { faqItems, testimonials, siteStats, posts } from "@shared/schema";
+import { faqItems, testimonials, siteStats, posts, caseStudies } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
 export async function seedContent() {
@@ -18,6 +18,17 @@ export async function seedContent() {
       { question: "What digital marketing services do you provide?", answer: "We offer Social Media Marketing, Google Ads (PPC), Content Marketing, Email Marketing, Influencer Marketing, and Brand Strategy services. All campaigns are data-driven with transparent ROI reporting.", category: "Digital Marketing", displayOrder: 10, isActive: true },
       { question: "How long does it take to see SEO results?", answer: "SEO is a long-term strategy. You can expect to see initial improvements in 3-4 months, with significant results typically visible in 6-12 months, depending on competition and industry.", category: "SEO", displayOrder: 11, isActive: true },
       { question: "What is your design process?", answer: "Our design process includes: Research & Discovery, Wireframing, UI Design in Figma/Adobe XD, Client Review & Iterations, Prototyping, and Final Handoff. We ensure 3 rounds of revisions are included.", category: "Design", displayOrder: 12, isActive: true },
+      { question: "Will my website be SEO optimized?", answer: "Yes! All our websites come with on-page SEO optimization including meta tags, structured data, fast load times, and mobile-friendly design.", category: "Web Development", displayOrder: 13, isActive: true },
+      { question: "What branding services do you offer?", answer: "We offer complete branding solutions including logo design, brand identity development, brand guidelines, business cards, letterheads, brochures, social media kits, and marketing collateral.", category: "Branding & Graphics", displayOrder: 14, isActive: true },
+      { question: "How many logo concepts will I receive?", answer: "Our standard logo package includes 3-5 unique concepts. After you select a direction, we provide unlimited revisions until you're completely satisfied.", category: "Branding & Graphics", displayOrder: 15, isActive: true },
+      { question: "Do you help with domain registration?", answer: "Yes! We help you find and register the perfect domain name across all TLDs (.com, .in, .co, .io, etc.), and handle the complete registration process.", category: "Domain & Hosting", displayOrder: 16, isActive: true },
+      { question: "What type of hosting do you provide?", answer: "We offer Shared Hosting, VPS Hosting, Cloud Hosting, and Dedicated Servers. All plans include SSL certificates, 99.9% uptime guarantee, and 24/7 monitoring.", category: "Domain & Hosting", displayOrder: 17, isActive: true },
+      { question: "What types of videos do you create?", answer: "We create explainer videos, product demos, corporate videos, social media reels, testimonial videos, animated logos, motion graphics, whiteboard animations, and video ads.", category: "Video & Animation", displayOrder: 18, isActive: true },
+      { question: "What are your payment terms?", answer: "We typically work with 50% advance payment to start the project and 50% upon completion. For larger projects, we offer milestone-based payments. We accept bank transfers, UPI, credit cards, and PayPal.", category: "Pricing & Payment", displayOrder: 19, isActive: true },
+      { question: "Do you offer EMI or payment plans?", answer: "Yes! For projects above INR 50,000, we offer flexible payment plans spread across 3-6 months. This makes it easier for businesses to invest in quality digital solutions.", category: "Pricing & Payment", displayOrder: 20, isActive: true },
+      { question: "Are there any hidden costs?", answer: "No hidden costs! We provide detailed quotations upfront covering all aspects of the project. Any additional requirements beyond the agreed scope are discussed and quoted separately.", category: "Pricing & Payment", displayOrder: 21, isActive: true },
+      { question: "Do you provide website maintenance?", answer: "Yes, we offer comprehensive maintenance packages starting from INR 2,000/month. This includes security updates, bug fixes, content updates, performance monitoring, and 24/7 technical support.", category: "Support", displayOrder: 22, isActive: true },
+      { question: "How can I get a quote for my project?", answer: "Getting a quote is easy! Fill out our contact form, chat with Kayal (our AI assistant), or email us at info@mhtsdigixr.com. We typically respond within 2-4 hours and provide detailed proposals within 24-48 hours.", category: "General Questions", displayOrder: 23, isActive: true },
     ]);
   }
 
@@ -47,6 +58,16 @@ export async function seedContent() {
       { title: "The Future of Web Development in 2026", slug: "future-web-development-2026", content: "Discover the latest trends shaping the web, from AI-driven interfaces to WebAssembly. The web development landscape continues to evolve rapidly with new frameworks, tools, and approaches emerging every year.", summary: "Discover the latest trends shaping the web, from AI-driven interfaces to WebAssembly.", coverImage: "https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=600&q=80", author: "Admin", status: "published" },
       { title: "Why SEO is Crucial for Small Businesses", slug: "seo-crucial-small-businesses", content: "Learn how search engine optimization can level the playing field for growing companies. SEO helps small businesses compete with larger corporations by improving their visibility in search results.", summary: "Learn how search engine optimization can level the playing field for growing companies.", coverImage: "https://images.unsplash.com/photo-1432888498266-38ffec3eaf0a?w=600&q=80", author: "Marketing Team", status: "published" },
       { title: "Mobile App Design Principles", slug: "mobile-app-design-principles", content: "Key principles for designing intuitive and engaging mobile experiences. Great mobile apps start with understanding user behavior and designing interfaces that feel natural and effortless.", summary: "Key principles for designing intuitive and engaging mobile experiences.", coverImage: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&q=80", author: "Design Lead", status: "published" },
+    ]);
+  }
+
+  const [csCount] = await db.select({ count: sql<number>`count(*)::int` }).from(caseStudies);
+  if ((csCount?.count ?? 0) === 0) {
+    await db.insert(caseStudies).values([
+      { title: "E-commerce Platform for Fashion Brand", client: "StyleVista", description: "Built a full-featured e-commerce platform with advanced product filtering, payment integration, and inventory management.", image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&q=80", category: "Web Development", results: ["150% Increase in Sales", "3x Faster Load Time"] },
+      { title: "Healthcare Appointment App", client: "MediCare Plus", description: "Developed a cross-platform mobile app for managing doctor appointments, prescriptions, and health records.", image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&q=80", category: "Mobile App", results: ["50k+ Downloads", "4.8 Star Rating"] },
+      { title: "Corporate Rebranding", client: "TechFlow Inc", description: "Complete brand identity redesign including logo, color palette, typography, and brand guidelines.", image: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=600&q=80", category: "Branding", results: ["Modern Identity", "Unified Brand Voice"] },
+      { title: "SEO Campaign for Real Estate", client: "Urban Properties", description: "Comprehensive SEO strategy including keyword research, on-page optimization, content creation, and link building.", image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&q=80", category: "Digital Marketing", results: ["#1 Ranking for Keywords", "200% More Leads"] },
     ]);
   }
 

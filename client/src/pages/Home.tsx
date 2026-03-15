@@ -18,39 +18,6 @@ const FEATURES = [
   { icon: Video, title: "Video & Animation", desc: "Engaging visual content for your brand" },
 ];
 
-const STATS = [
-  { value: 3, suffix: "+", label: "Years Experience", icon: Award },
-  { value: 150, suffix: "+", label: "Projects Delivered", icon: Code },
-  { value: 50, suffix: "+", label: "Happy Clients", icon: Users },
-  { value: 98, suffix: "%", label: "Client Satisfaction", icon: Star },
-];
-
-const TESTIMONIALS = [
-  {
-    content: "MHTSdigiXR transformed our online presence completely. Their web development team delivered a stunning e-commerce platform that increased our sales by 200%.",
-    name: "Rajesh Kumar",
-    role: "CEO, RetailMax",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"
-  },
-  {
-    content: "The mobile app they built for our restaurant chain is phenomenal. User-friendly interface and seamless ordering experience. Highly recommend!",
-    name: "Priya Sharma",
-    role: "Founder, Spice Garden",
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face"
-  },
-  {
-    content: "Their digital marketing strategies helped us reach new markets we never thought possible. ROI increased by 300% in just 6 months.",
-    name: "Arun Venkatesh",
-    role: "Marketing Head, TechFlow",
-    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face"
-  },
-  {
-    content: "Professional, responsive, and creative team. They understood our vision and delivered beyond expectations. Best decision we made for our startup.",
-    name: "Divya Nair",
-    role: "Co-founder, EduSpark",
-    image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face"
-  },
-];
 
 const CLIENT_LOGOS = [
   { name: "TechFlow", initial: "TF" },
@@ -135,13 +102,9 @@ export default function Home() {
   const { data: apiTestimonials = [] } = useQuery<Testimonial[]>({ queryKey: ["/api/testimonials"] });
   const { data: apiStats = [] } = useQuery<SiteStat[]>({ queryKey: ["/api/site-stats"] });
 
-  const testimonialsList = apiTestimonials.length > 0
-    ? apiTestimonials.map(t => ({ content: t.content, name: t.clientName, role: `${t.role}${t.company ? `, ${t.company}` : ""}`, image: t.imageUrl || "" }))
-    : TESTIMONIALS;
+  const testimonialsList = apiTestimonials.map(t => ({ content: t.content, name: t.clientName, role: `${t.role}${t.company ? `, ${t.company}` : ""}`, image: t.imageUrl || "" }));
 
-  const statsList = apiStats.length > 0
-    ? apiStats.map(st => ({ value: parseInt(st.value) || 0, suffix: st.suffix || "", label: st.label, icon: ICON_MAP[st.icon || "Star"] || Star }))
-    : STATS;
+  const statsList = apiStats.map(st => ({ value: parseInt(st.value) || 0, suffix: st.suffix || "", label: st.label, icon: ICON_MAP[st.icon || "Star"] || Star }));
 
   useEffect(() => {
     if (testimonialsList.length === 0) return;
