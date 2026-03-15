@@ -233,13 +233,15 @@ function JobCard({ job, isExpanded, onToggle, careersEmail }: { job: JobPosition
             </div>
           </div>
 
-          <a
-            href={`mailto:${careersEmail}?subject=Application for ${job.title}`}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all"
-            data-testid={`button-apply-${job.id}`}
-          >
-            <Send className="w-4 h-4" /> Apply Now
-          </a>
+          {careersEmail && (
+            <a
+              href={`mailto:${careersEmail}?subject=Application for ${job.title}`}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all"
+              data-testid={`button-apply-${job.id}`}
+            >
+              <Send className="w-4 h-4" /> Apply Now
+            </a>
+          )}
         </motion.div>
       )}
     </motion.div>
@@ -416,13 +418,15 @@ export default function Careers() {
               We're always looking for talented people. Send us your resume and we'll keep you in mind for future opportunities.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <a 
-                href={`mailto:${s.careersEmail}?subject=General Application`}
-                className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg"
-                data-testid="button-send-resume"
-              >
-                <Send className="w-5 h-5" /> Send Your Resume
-              </a>
+              {s.careersEmail && (
+                <a 
+                  href={`mailto:${s.careersEmail}?subject=General Application`}
+                  className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg"
+                  data-testid="button-send-resume"
+                >
+                  <Send className="w-5 h-5" /> Send Your Resume
+                </a>
+              )}
               <Link 
                 href="/contact" 
                 className="inline-flex items-center gap-2 px-8 py-4 rounded-full border-2 border-sky-500 text-sky-600 dark:text-sky-400 font-semibold hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-all"

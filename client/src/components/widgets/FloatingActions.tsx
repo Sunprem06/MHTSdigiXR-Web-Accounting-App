@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 
-function buildSystemContext(s: { email: string; phone: string; whatsappNumber: string; websiteUrl: string; address: string }) {
-  return `You are Kayal, the friendly and knowledgeable AI assistant for MHTSdigiXR (Maanagarram Hi Tech Solutions), a premier digital agency in Chennai, India.
+function buildSystemContext(s: { brandName: string; companyName: string; email: string; phone: string; whatsappNumber: string; websiteUrl: string; address: string }) {
+  return `You are Kayal, the friendly and knowledgeable AI assistant for ${s.brandName || 'MHTSdigiXR'} (${s.companyName || 'Maanagarram Hi Tech Solutions'}), a premier digital agency in Chennai, India.
 
 You are an expert in:
 - SERVICE SUPPORT: Helping customers understand our services, features, and capabilities

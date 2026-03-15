@@ -96,7 +96,7 @@ export default function Settings() {
   }, [settings]);
 
   const saveMutation = useMutation({
-    mutationFn: async (data: Omit<CompanySettings, "id">) => {
+    mutationFn: async (data: Partial<Omit<CompanySettings, "id">>) => {
       const res = await apiRequest("PUT", "/api/accounting/company-settings", data);
       return res.json();
     },
