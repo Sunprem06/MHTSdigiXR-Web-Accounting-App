@@ -452,7 +452,9 @@ export async function registerRoutes(
   app.post("/api/accounting/quotations/:id/convert", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
     const quotation = await storage.getQuotation(parseInt(req.params.id));
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
-    if (quotation.status === "converted") return res.status(400).json({ message: "Quotation already converted" });
+    if (quotation.status !== "accepted" && quotation.status !== "sent") {
+      return res.status(400).json({ message: "Only approved quotations can be converted to invoices" });
+    }
 
     const voucherNumber = await storage.getNextVoucherNumber("sales");
     const voucher = await storage.createVoucher({
