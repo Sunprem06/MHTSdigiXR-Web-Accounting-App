@@ -63,7 +63,7 @@ export default function CaseStudiesManagement() {
   const openEdit = (item: CaseStudy) => {
     setEditingItem(item);
     const resultsStr = Array.isArray(item.results) ? (item.results as string[]).join("\n") : "";
-    setForm({ title: item.title, client: item.client, category: (item as any).category || "Web Development", description: item.description, image: item.image, results: resultsStr });
+    setForm({ title: item.title, client: item.client, category: item.category || "Web Development", description: item.description, image: item.image, results: resultsStr });
     setDialogOpen(true);
   };
 

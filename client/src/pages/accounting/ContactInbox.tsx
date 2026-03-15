@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
-import { Mail, MailOpen, Trash2, Eye, ArrowLeft, Clock } from "lucide-react";
+import { Mail, MailOpen, Trash2, Eye, ArrowLeft, Clock, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,10 +17,32 @@ export default function ContactInbox() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("contacts.manage");
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [readFilter, setReadFilter] = useState<string>("all");
 
   const { data: messages = [], isLoading } = useQuery<ContactMessage[]>({
     queryKey: ["/api/accounting/contact-messages"],
   });
+
+  const filteredMessages = useMemo(() => {
+    let filtered = messages;
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      filtered = filtered.filter(m => m.createdAt && new Date(m.createdAt) >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(m => m.createdAt && new Date(m.createdAt) <= to);
+    }
+    if (readFilter === "unread") {
+      filtered = filtered.filter(m => !m.isRead);
+    } else if (readFilter === "read") {
+      filtered = filtered.filter(m => m.isRead);
+    }
+    return filtered;
+  }, [messages, dateFrom, dateTo, readFilter]);
 
   const markReadMutation = useMutation({
     mutationFn: async ({ id, isRead }: { id: number; isRead: boolean }) => {
@@ -41,12 +66,13 @@ export default function ContactInbox() {
 
   const handleView = (msg: ContactMessage) => {
     setSelectedMessage(msg);
-    if (!msg.isRead) {
+    if (!msg.isRead && canManage) {
       markReadMutation.mutate({ id: msg.id, isRead: true });
     }
   };
 
   const unreadCount = messages.filter(m => !m.isRead).length;
+  const hasFilters = dateFrom || dateTo || readFilter !== "all";
 
   if (selectedMessage) {
     return (
@@ -89,6 +115,9 @@ export default function ContactInbox() {
               <Clock className="w-3 h-3" />
               {new Date(selectedMessage.createdAt!).toLocaleString()}
             </div>
+            {selectedMessage.phone && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Phone: {selectedMessage.phone}</p>
+            )}
             <div className="prose dark:prose-invert max-w-none">
               <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap" data-testid="text-message-content">{selectedMessage.message}</p>
             </div>
@@ -107,13 +136,43 @@ export default function ContactInbox() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-4 mb-6 p-4 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 font-medium">
+          <Filter className="w-4 h-4" /> Filters
+        </div>
+        <div>
+          <Label className="text-xs">From Date</Label>
+          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40" data-testid="input-date-from" />
+        </div>
+        <div>
+          <Label className="text-xs">To Date</Label>
+          <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40" data-testid="input-date-to" />
+        </div>
+        <div>
+          <Label className="text-xs">Status</Label>
+          <Select value={readFilter} onValueChange={setReadFilter}>
+            <SelectTrigger className="w-32" data-testid="select-read-filter"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="unread">Unread</SelectItem>
+              <SelectItem value="read">Read</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); setReadFilter("all"); }} data-testid="button-clear-filters">
+            Clear
+          </Button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-center py-12 text-slate-500">Loading...</div>
-      ) : messages.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">No messages yet</div>
+      ) : filteredMessages.length === 0 ? (
+        <div className="text-center py-12 text-slate-500">{hasFilters ? "No messages match your filters" : "No messages yet"}</div>
       ) : (
         <div className="space-y-2">
-          {messages.map(msg => (
+          {filteredMessages.map(msg => (
             <div
               key={msg.id}
               onClick={() => handleView(msg)}

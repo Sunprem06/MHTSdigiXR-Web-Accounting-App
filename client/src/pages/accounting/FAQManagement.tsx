@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
-import { Plus, Pencil, Trash2, Eye, EyeOff, GripVertical } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,28 @@ export default function FAQManagement() {
     },
   });
 
+  const reorderMutation = useMutation({
+    mutationFn: async ({ id, newOrder }: { id: number; newOrder: number }) => {
+      await apiRequest("PATCH", `/api/accounting/faqs/${id}`, { displayOrder: newOrder });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/faqs"] });
+    },
+  });
+
+  const moveItem = (item: FaqItem, direction: "up" | "down") => {
+    const categoryItems = items
+      .filter(i => i.category === item.category)
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+    const idx = categoryItems.findIndex(i => i.id === item.id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= categoryItems.length) return;
+
+    const swapItem = categoryItems[swapIdx];
+    reorderMutation.mutate({ id: item.id, newOrder: swapItem.displayOrder });
+    reorderMutation.mutate({ id: swapItem.id, newOrder: item.displayOrder });
+  };
+
   const openNew = () => {
     setEditingItem(null);
     const maxOrder = items.length > 0 ? Math.max(...items.map(i => i.displayOrder)) : 0;
@@ -87,37 +109,63 @@ export default function FAQManagement() {
         <div className="text-center py-12 text-slate-500">No FAQ items yet</div>
       ) : (
         <div className="space-y-6">
-          {categories.map(cat => (
-            <div key={cat}>
-              <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">{cat}</h2>
-              <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
-                {items.filter(i => i.category === cat).map(item => (
-                  <div key={item.id} className="flex items-start gap-3 p-4" data-testid={`row-faq-${item.id}`}>
-                    <GripVertical className="w-4 h-4 text-slate-300 mt-1 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-slate-900 dark:text-white text-sm">{item.question}</span>
-                        {!item.isActive && <Badge variant="outline" className="text-[10px]">Hidden</Badge>}
-                      </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{item.answer}</p>
-                    </div>
-                    <div className="flex gap-1 flex-shrink-0">
+          {categories.map(cat => {
+            const categoryItems = items.filter(i => i.category === cat).sort((a, b) => a.displayOrder - b.displayOrder);
+            return (
+              <div key={cat}>
+                <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">{cat}</h2>
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
+                  {categoryItems.map((item, idx) => (
+                    <div key={item.id} className="flex items-start gap-3 p-4" data-testid={`row-faq-${item.id}`}>
                       {hasPermission("content.edit") && (
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(item)} data-testid={`button-edit-${item.id}`}>
-                          <Pencil className="w-4 h-4" />
-                        </Button>
+                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            disabled={idx === 0 || reorderMutation.isPending}
+                            onClick={() => moveItem(item, "up")}
+                            data-testid={`button-move-up-${item.id}`}
+                          >
+                            <ChevronUp className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            disabled={idx === categoryItems.length - 1 || reorderMutation.isPending}
+                            onClick={() => moveItem(item, "down")}
+                            data-testid={`button-move-down-${item.id}`}
+                          >
+                            <ChevronDown className="w-4 h-4" />
+                          </Button>
+                        </div>
                       )}
-                      {hasPermission("content.delete") && (
-                        <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(item.id)} data-testid={`button-delete-${item.id}`}>
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-slate-900 dark:text-white text-sm">{item.question}</span>
+                          {!item.isActive && <Badge variant="outline" className="text-[10px]">Hidden</Badge>}
+                        </div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{item.answer}</p>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {hasPermission("content.edit") && (
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(item)} data-testid={`button-edit-${item.id}`}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {hasPermission("content.delete") && (
+                          <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(item.id)} data-testid={`button-delete-${item.id}`}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -144,15 +192,9 @@ export default function FAQManagement() {
               <Label>Answer</Label>
               <Textarea value={form.answer} onChange={e => setForm(f => ({ ...f, answer: e.target.value }))} rows={4} data-testid="input-answer" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Display Order</Label>
-                <Input type="number" value={form.displayOrder} onChange={e => setForm(f => ({ ...f, displayOrder: parseInt(e.target.value) || 0 }))} data-testid="input-order" />
-              </div>
-              <div className="flex items-center gap-3 pt-6">
-                <Switch checked={form.isActive} onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))} data-testid="switch-active" />
-                <Label>Active (visible on website)</Label>
-              </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={form.isActive} onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))} data-testid="switch-active" />
+              <Label>Active (visible on website)</Label>
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

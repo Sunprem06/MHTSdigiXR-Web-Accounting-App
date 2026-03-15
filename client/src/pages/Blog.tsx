@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Calendar, User } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import type { Post } from "@shared/schema";
 
 export default function Blog() {
@@ -72,9 +73,9 @@ export default function Blog() {
                   <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 line-clamp-3">
                     {post.summary}
                   </p>
-                  <button className="text-sky-600 dark:text-sky-400 font-bold text-sm hover:underline" data-testid={`button-read-article-${post.id}`}>
+                  <Link href={`/blog/${post.slug}`} className="text-sky-600 dark:text-sky-400 font-bold text-sm hover:underline" data-testid={`link-read-article-${post.id}`}>
                     Read Article
-                  </button>
+                  </Link>
                 </div>
               </motion.div>
             ))}

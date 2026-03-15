@@ -28,6 +28,7 @@ import Careers from "@/pages/Careers";
 import Workflow from "@/pages/Workflow";
 import CaseStudies from "@/pages/CaseStudies";
 import Blog from "@/pages/Blog";
+import BlogPost from "@/pages/BlogPost";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import NotFound from "@/pages/not-found";
@@ -90,6 +91,7 @@ function WebsiteRouter() {
             <Route path="/workflow" component={Workflow} />
             <Route path="/case-studies" component={CaseStudies} />
             <Route path="/blog" component={Blog} />
+            <Route path="/blog/:slug" component={BlogPost} />
             <Route path="/about" component={About} />
             <Route path="/contact" component={Contact} />
             <Route component={NotFound} />

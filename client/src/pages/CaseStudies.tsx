@@ -52,7 +52,7 @@ export default function CaseStudies() {
         title: s.title,
         client: s.client,
         image: s.image,
-        category: (s as any).category || "Web Development",
+        category: s.category || "Web Development",
         description: s.description,
         results: (Array.isArray(s.results) ? s.results : []) as string[],
       }))
