@@ -8,10 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
 import { GST_RATES, PARTY_TYPES } from "@shared/schema";
-import type { Party, Product, Quotation } from "@shared/schema";
+import type { Party, Product, Quotation, Employee } from "@shared/schema";
 import { Plus, Trash2, Loader2, Save, UserPlus } from "lucide-react";
 
 const PARTY_TYPE_LABELS: Record<string, string> = {
@@ -38,10 +39,13 @@ interface LineItem {
 
 export default function QuotationEntry() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [, editParams] = useRoute("/accounting/quotations/:id/edit");
   const editId = editParams?.id ? parseInt(editParams.id) : null;
   const isEditMode = !!editId;
+
+  const canAssign = user?.role === "super_admin" || user?.role === "admin" || user?.role === "senior_accountant";
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [validUntil, setValidUntil] = useState("");
@@ -49,6 +53,7 @@ export default function QuotationEntry() {
   const [isInterState, setIsInterState] = useState(false);
   const [notes, setNotes] = useState("");
   const [termsAndConditions, setTermsAndConditions] = useState("1. Payment due within 30 days of invoice.\n2. All prices are in INR.\n3. GST will be charged as applicable.");
+  const [assignedTo, setAssignedTo] = useState("");
   const [items, setItems] = useState<LineItem[]>([
     { productId: "", description: "", quantity: "1", rate: "", gstRate: "18" },
   ]);
@@ -61,6 +66,10 @@ export default function QuotationEntry() {
 
   const { data: parties } = useQuery<Party[]>({ queryKey: ["/api/accounting/parties"] });
   const { data: products } = useQuery<Product[]>({ queryKey: ["/api/accounting/products"] });
+  const { data: employeeList } = useQuery<Employee[]>({
+    queryKey: ["/api/accounting/employees"],
+    enabled: canAssign,
+  });
   const { data: nextNumber } = useQuery<{ quotationNumber: string }>({
     queryKey: ["/api/accounting/quotations/next-number"],
     enabled: !isEditMode,
@@ -87,6 +96,7 @@ export default function QuotationEntry() {
       setIsInterState(existingQuotation.isInterState || false);
       setNotes(existingQuotation.notes || "");
       setTermsAndConditions(existingQuotation.termsAndConditions || "");
+      setAssignedTo(existingQuotation.assignedTo ? String(existingQuotation.assignedTo) : "");
       const existingItems = existingQuotation.items as Array<{ productId?: number; description?: string; quantity?: number; rate?: number; gstRate?: number }>;
       if (existingItems?.length) {
         setItems(existingItems.map((item) => ({
@@ -167,7 +177,7 @@ export default function QuotationEntry() {
         igstTotal: calculations.igstTotal.toFixed(2),
         grandTotal: calculations.grandTotal.toFixed(2),
         isInterState, notes, termsAndConditions,
-        status: isEditMode ? existingQuotation?.status || "draft" : "draft",
+        ...(assignedTo ? { assignedTo: parseInt(assignedTo) } : {}),
       };
       if (isEditMode) {
         await apiRequest("PATCH", `/api/accounting/quotations/${editId}`, body);
@@ -255,11 +265,24 @@ export default function QuotationEntry() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                 <input type="checkbox" checked={isInterState} onChange={e => setIsInterState(e.target.checked)} className="rounded border-slate-300 dark:border-slate-600" data-testid="checkbox-inter-state" />
                 Inter-State Supply (IGST)
               </label>
+              {canAssign && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Assign To</label>
+                  <Select value={assignedTo} onValueChange={setAssignedTo}>
+                    <SelectTrigger className="w-[200px]" data-testid="select-assign-to"><SelectValue placeholder="Self (default)" /></SelectTrigger>
+                    <SelectContent>
+                      {employeeList?.filter(e => e.isActive).map(e => (
+                        <SelectItem key={e.id} value={String(e.id)}>{e.fullName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -396,9 +396,10 @@ export async function registerRoutes(
     const quotation = await storage.getQuotation(parseInt(req.params.id));
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
     if (quotation.status !== "draft") return res.status(400).json({ message: "Only draft quotations can be submitted" });
-    const isAdmin = req.user!.role === "super_admin" || req.user!.role === "admin" || req.user!.role === "senior_accountant";
-    if (!isAdmin && quotation.createdBy !== req.user!.id) {
-      return res.status(403).json({ message: "You can only submit your own quotations" });
+    const isManager = req.user!.role === "super_admin" || req.user!.role === "admin" || req.user!.role === "senior_accountant";
+    const isOwner = quotation.createdBy === req.user!.id || quotation.assignedTo === req.user!.id;
+    if (!isManager && !isOwner) {
+      return res.status(403).json({ message: "You can only submit quotations assigned to you or created by you" });
     }
     const updated = await storage.updateQuotation(quotation.id, {
       status: "submitted",
@@ -417,7 +418,7 @@ export async function registerRoutes(
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
     if (quotation.status !== "submitted") return res.status(400).json({ message: "Only submitted quotations can be approved" });
     const updated = await storage.updateQuotation(quotation.id, {
-      status: "sent",
+      status: "accepted",
       reviewedBy: req.user!.id,
       reviewedAt: new Date(),
     });

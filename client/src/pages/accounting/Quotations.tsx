@@ -114,7 +114,7 @@ export default function Quotations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting/quotations"] });
-      toast({ title: "Quotation approved and marked as Sent" });
+      toast({ title: "Quotation approved" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -156,7 +156,7 @@ export default function Quotations() {
   const canSubmitQuotation = (q: Quotation) => {
     if (q.status !== "draft") return false;
     if (canApprove) return true;
-    return q.createdBy === user?.id;
+    return q.createdBy === user?.id || q.assignedTo === user?.id;
   };
 
   return (
