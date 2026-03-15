@@ -709,11 +709,6 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
-    const [employee] = await db.select().from(employees).where(eq(employees.email, email));
-    return employee;
-  }
-
   async getDashboardStats() {
     const allVouchers = await db.select().from(vouchers).where(eq(vouchers.status, "approved"));
 
