@@ -3,7 +3,7 @@ import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRoute } from "wouter";
-import type { Voucher, Party, CompanySettings } from "@shared/schema";
+import type { Voucher, VoucherEntry, Party, CompanySettings } from "@shared/schema";
 import { Loader2, Printer, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 
@@ -39,7 +39,7 @@ export default function InvoiceView() {
   const [, params] = useRoute("/accounting/invoice/:id");
   const voucherId = params?.id ? parseInt(params.id) : 0;
 
-  const { data: voucher, isLoading: loadingVoucher } = useQuery<any>({
+  const { data: voucher, isLoading: loadingVoucher } = useQuery<Voucher & { entries: VoucherEntry[] }>({
     queryKey: [`/api/accounting/vouchers/${voucherId}`],
     enabled: !!voucherId,
   });
@@ -115,7 +115,7 @@ export default function InvoiceView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {voucher.entries.map((e: any, idx: number) => (
+                  {voucher.entries.map((e, idx) => (
                     <tr key={e.id} className="border-b border-slate-100 dark:border-slate-800">
                       <td className="px-3 py-2 text-slate-400">{idx + 1}</td>
                       <td className="px-3 py-2 text-slate-700 dark:text-slate-300">Ledger #{e.ledgerAccountId}</td>
