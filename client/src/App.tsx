@@ -99,7 +99,7 @@ function AccountingRouter() {
     <Switch>
       <Route path="/accounting/login" component={AccountingLogin} />
       <Route path="/accounting">
-        {() => <ProtectedRoute><AccountingDashboard /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="dashboard.view"><AccountingDashboard /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/ledgers">
         {() => <ProtectedRoute requiredPermission="ledgers.view"><Ledgers /></ProtectedRoute>}
