@@ -1517,6 +1517,198 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json({ message: "Deleted successfully" });
+  // SMTP Settings (Super Admin only)
+  app.get("/api/accounting/smtp-settings", requireAuth, requireRole("super_admin"), async (req, res) => {
+    const settings = await storage.getSmtpSettings();
+    if (!settings) return res.json(null);
+    const { password: _, ...safe } = settings;
+    res.json({ ...safe, password: "••••••••" });
+  });
+
+  app.put("/api/accounting/smtp-settings", requireAuth, requireRole("super_admin"), async (req, res) => {
+    try {
+      const { host, port, username, password, fromName, fromEmail, secure } = req.body;
+      if (!host || !username || !fromName || !fromEmail) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+      const existing = await storage.getSmtpSettings();
+      const effectivePassword = (!password || password === "••••••••") && existing ? existing.password : password;
+      if (!effectivePassword) {
+        return res.status(400).json({ message: "Password is required" });
+      }
+      const settings = await storage.upsertSmtpSettings({
+        host, port: port || 587, username, password: effectivePassword, fromName, fromEmail, secure: secure || false,
+      });
+      await storage.createAuditLog({
+        employeeId: req.user!.id, action: "update", entity: "smtp_settings",
+        details: "Updated SMTP settings",
+        ipAddress: req.ip || null,
+      });
+      const { password: _, ...safe } = settings;
+      res.json({ ...safe, password: "••••••••" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to save SMTP settings" });
+    }
+  });
+
+  app.post("/api/accounting/smtp-settings/test", requireAuth, requireRole("super_admin"), async (req, res) => {
+    try {
+      const smtpConfig = await storage.getSmtpSettings();
+      if (!smtpConfig) {
+        return res.status(400).json({ message: "SMTP settings not configured" });
+      }
+      const transporter = nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure,
+        auth: { user: smtpConfig.username, pass: smtpConfig.password },
+      });
+      await transporter.verify();
+      await transporter.sendMail({
+        from: `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>`,
+        to: req.user!.email,
+        subject: "SMTP Test - MHTSdigiXR Accounting",
+        text: "This is a test email from MHTSdigiXR Accounting. SMTP settings are working correctly.",
+        html: "<p>This is a test email from <strong>MHTSdigiXR Accounting</strong>. SMTP settings are working correctly.</p>",
+      });
+      res.json({ message: `Test email sent to ${req.user!.email}` });
+    } catch (err: any) {
+      res.status(500).json({ message: `SMTP test failed: ${err.message}` });
+    }
+  });
+
+  // Password Reset (public routes)
+  function hashToken(rawToken: string): string {
+    return crypto.createHash("sha256").update(rawToken).digest("hex");
+  }
+
+  function getAppBaseUrl(): string | null {
+    if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL;
+    if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+    if (process.env.REPL_SLUG && process.env.REPL_OWNER) return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+    return null;
+  }
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const smtpConfig = await storage.getSmtpSettings();
+      if (!smtpConfig) {
+        return res.status(503).json({ message: "Password reset is not configured — contact your administrator" });
+      }
+
+      const employee = await storage.getEmployeeByEmail(email);
+      if (!employee || !employee.isActive) {
+        return res.json({ message: "If an account with that email exists, a reset link has been sent." });
+      }
+
+      const baseUrl = getAppBaseUrl();
+      if (!baseUrl) {
+        console.error("APP_BASE_URL is not configured and no Replit domain detected");
+        return res.status(503).json({ message: "Password reset is not fully configured — contact your administrator" });
+      }
+
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const hashedTokenValue = hashToken(rawToken);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      await storage.createPasswordResetToken({
+        token: hashedTokenValue,
+        employeeId: employee.id,
+        expiresAt,
+        used: false,
+      });
+
+      const resetUrl = `${baseUrl}/accounting/reset-password?token=${rawToken}`;
+
+      const transporter = nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure,
+        auth: { user: smtpConfig.username, pass: smtpConfig.password },
+      });
+
+      await transporter.sendMail({
+        from: `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>`,
+        to: employee.email,
+        subject: "Password Reset - MHTSdigiXR Accounting",
+        text: `Hello ${employee.fullName},\n\nYou requested a password reset. Click the link below to set a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you did not request this, please ignore this email.`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0ea5e9;">Password Reset</h2>
+            <p>Hello ${employee.fullName},</p>
+            <p>You requested a password reset for your MHTSdigiXR Accounting account.</p>
+            <p><a href="${resetUrl}" style="display: inline-block; background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">Reset Password</a></p>
+            <p style="color: #666; font-size: 14px;">This link expires in 1 hour.</p>
+            <p style="color: #666; font-size: 14px;">If you did not request this, please ignore this email.</p>
+          </div>
+        `,
+      });
+
+      res.json({ message: "If an account with that email exists, a reset link has been sent." });
+    } catch (err: any) {
+      console.error("Forgot password error:", err);
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  app.get("/api/auth/validate-reset-token", async (req, res) => {
+    try {
+      const { token } = req.query;
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ valid: false, message: "Token is required" });
+      }
+      const hashedTokenValue = hashToken(token);
+      const resetToken = await storage.getPasswordResetToken(hashedTokenValue);
+      if (!resetToken) {
+        return res.json({ valid: false, message: "Invalid reset link" });
+      }
+      if (resetToken.used) {
+        return res.json({ valid: false, message: "This reset link has already been used" });
+      }
+      if (new Date() > resetToken.expiresAt) {
+        return res.json({ valid: false, message: "This reset link has expired" });
+      }
+      res.json({ valid: true });
+    } catch (err: any) {
+      console.error("Validate reset token error:", err);
+      res.status(500).json({ valid: false, message: "Failed to validate reset link" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token and password are required" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const hashedTokenValue = hashToken(token);
+      const consumed = await storage.consumePasswordResetToken(hashedTokenValue);
+      if (!consumed) {
+        return res.status(400).json({ message: "Invalid, expired, or already used reset link" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await storage.updateEmployee(consumed.employeeId, { password: hashedPassword });
+
+      res.json({ message: "Password has been reset successfully" });
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  app.get("/api/auth/smtp-configured", async (_req, res) => {
+    const smtpConfig = await storage.getSmtpSettings();
+    res.json({ configured: !!smtpConfig });
   });
 
   // Seed data

@@ -169,11 +169,12 @@ export interface IStorage {
   getSmtpSettings(): Promise<SmtpSettings | undefined>;
   upsertSmtpSettings(data: InsertSmtpSettings): Promise<SmtpSettings>;
 
+  getEmployeeByEmail(email: string): Promise<Employee | undefined>;
+
   createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken>;
   getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
   markPasswordResetTokenUsed(id: number): Promise<void>;
-  getEmployeeByEmail(email: string): Promise<Employee | undefined>;
-
+  consumePasswordResetToken(hashedToken: string): Promise<PasswordResetToken | null>;
   getDashboardStats(): Promise<{
     totalIncome: number;
     totalExpenses: number;
@@ -698,6 +699,54 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
+  async getSmtpSettings(): Promise<SmtpSettings | undefined> {
+    const [settings] = await db.select().from(smtpSettings).limit(1);
+    return settings;
+  }
+
+  async upsertSmtpSettings(settings: InsertSmtpSettings): Promise<SmtpSettings> {
+    const existing = await this.getSmtpSettings();
+    if (existing) {
+      const [updated] = await db.update(smtpSettings).set(settings).where(eq(smtpSettings.id, existing.id)).returning();
+      return updated;
+    }
+    const [newSettings] = await db.insert(smtpSettings).values(settings).returning();
+    return newSettings;
+  }
+
+  async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
+    const [employee] = await db.select().from(employees).where(eq(employees.email, email));
+    return employee;
+  }
+
+  async createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [newToken] = await db.insert(passwordResetTokens).values(token).returning();
+    return newToken;
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [result] = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.token, token));
+    return result;
+  }
+
+  async markPasswordResetTokenUsed(id: number): Promise<void> {
+    await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, id));
+  }
+
+  async consumePasswordResetToken(hashedToken: string): Promise<PasswordResetToken | null> {
+    const [result] = await db.update(passwordResetTokens)
+      .set({ used: true })
+      .where(
+        and(
+          eq(passwordResetTokens.token, hashedToken),
+          eq(passwordResetTokens.used, false),
+          gte(passwordResetTokens.expiresAt, new Date())
+        )
+      )
+      .returning();
+    return result || null;
+  }
+
   async getDashboardStats() {
     const allVouchers = await db.select().from(vouchers).where(eq(vouchers.status, "approved"));
 
@@ -1157,6 +1206,21 @@ export class DatabaseStorage implements IStorage {
 
   async markPasswordResetTokenUsed(id: number): Promise<void> {
     await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, id));
+  }
+
+  async consumePasswordResetToken(hashedToken: string): Promise<PasswordResetToken | null> {
+    const [token] = await db
+      .update(passwordResetTokens)
+      .set({ used: true })
+      .where(
+        and(
+          eq(passwordResetTokens.token, hashedToken),
+          eq(passwordResetTokens.used, false),
+          gte(passwordResetTokens.expiresAt, new Date())
+        )
+      )
+      .returning();
+    return token || null;
   }
 
   async getEmployeeByEmail(email: string): Promise<Employee | undefined> {

@@ -12,8 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send } from "lucide-react";
 
 interface CompanySettings {
   id?: number;
@@ -104,6 +104,14 @@ export default function Settings() {
   const [fyStart, setFyStart] = useState("");
   const [fyEnd, setFyEnd] = useState("");
 
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpUsername, setSmtpUsername] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpFromName, setSmtpFromName] = useState("");
+  const [smtpFromEmail, setSmtpFromEmail] = useState("");
+  const [smtpSecure, setSmtpSecure] = useState(false);
+
   const { data: settings, isLoading: settingsLoading } = useQuery<CompanySettings>({
     queryKey: ["/api/accounting/company-settings"],
   });
@@ -117,14 +125,35 @@ export default function Settings() {
     enabled: isSuperAdmin,
   });
 
-  interface SmtpData { host: string; port: number; secure: boolean | null; username: string; fromName: string; fromEmail: string; }
-  const { data: smtpData } = useQuery<SmtpData | null>({
+  interface SmtpSettingsData {
+    id?: number;
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    fromName: string;
+    fromEmail: string;
+    secure: boolean;
+  }
+
+  const { data: smtpData, isLoading: smtpLoading } = useQuery<SmtpSettingsData | null>({
     queryKey: ["/api/accounting/smtp-settings"],
     enabled: isSuperAdmin,
   });
 
+  useEffect(() => {
+    if (smtpData) {
+      setSmtpHost(smtpData.host || "");
+      setSmtpPort(String(smtpData.port || 587));
+      setSmtpUsername(smtpData.username || "");
+      setSmtpFromName(smtpData.fromName || "");
+      setSmtpFromEmail(smtpData.fromEmail || "");
+      setSmtpSecure(smtpData.secure || false);
+    }
+  }, [smtpData]);
+
   const saveSmtpMutation = useMutation({
-    mutationFn: async (data: object) => {
+    mutationFn: async (data: { host: string; port: number; username: string; password: string; fromName: string; fromEmail: string; secure: boolean }) => {
       const res = await apiRequest("PUT", "/api/accounting/smtp-settings", data);
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
@@ -132,7 +161,7 @@ export default function Settings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting/smtp-settings"] });
       setSmtpPassword("");
-      toast({ title: "Email settings saved" });
+      toast({ title: "Email settings saved", description: "SMTP settings saved successfully" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -147,6 +176,17 @@ export default function Settings() {
     onError: (e: Error) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
+  const handleSmtpSave = () => {
+    saveSmtpMutation.mutate({
+      host: smtpHost,
+      port: parseInt(smtpPort) || 587,
+      username: smtpUsername,
+      password: smtpPassword,
+      fromName: smtpFromName,
+      fromEmail: smtpFromEmail,
+      secure: smtpSecure,
+    });
+  };
   useEffect(() => {
     if (settings) {
       setCompanyName(settings.companyName || "");
@@ -685,6 +725,119 @@ export default function Settings() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              Email / SMTP Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {smtpLoading ? (
+              <div className="flex items-center justify-center py-8" data-testid="loading-smtp">
+                <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
+              </div>
+            ) : (
+              <div className="space-y-4 max-w-lg">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Configure SMTP settings to enable password reset emails. These credentials are used to send emails from the system.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>SMTP Host</Label>
+                    <Input
+                      value={smtpHost}
+                      onChange={(e) => setSmtpHost(e.target.value)}
+                      placeholder="e.g., smtp.gmail.com"
+                      data-testid="input-smtp-host"
+                    />
+                  </div>
+                  <div>
+                    <Label>Port</Label>
+                    <Input
+                      value={smtpPort}
+                      onChange={(e) => setSmtpPort(e.target.value)}
+                      placeholder="587"
+                      type="number"
+                      data-testid="input-smtp-port"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Username</Label>
+                  <Input
+                    value={smtpUsername}
+                    onChange={(e) => setSmtpUsername(e.target.value)}
+                    placeholder="your-email@gmail.com"
+                    data-testid="input-smtp-username"
+                  />
+                </div>
+                <div>
+                  <Label>Password</Label>
+                  <Input
+                    type="password"
+                    value={smtpPassword}
+                    onChange={(e) => setSmtpPassword(e.target.value)}
+                    placeholder={smtpData ? "Enter new password to change" : "App password or SMTP password"}
+                    data-testid="input-smtp-password"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>From Name</Label>
+                    <Input
+                      value={smtpFromName}
+                      onChange={(e) => setSmtpFromName(e.target.value)}
+                      placeholder="MHTSdigiXR Accounting"
+                      data-testid="input-smtp-from-name"
+                    />
+                  </div>
+                  <div>
+                    <Label>From Email</Label>
+                    <Input
+                      type="email"
+                      value={smtpFromEmail}
+                      onChange={(e) => setSmtpFromEmail(e.target.value)}
+                      placeholder="noreply@example.com"
+                      data-testid="input-smtp-from-email"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={smtpSecure}
+                    onCheckedChange={setSmtpSecure}
+                    data-testid="switch-smtp-secure"
+                  />
+                  <Label className="cursor-pointer">Use TLS/SSL (port 465)</Label>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleSmtpSave}
+                    disabled={saveSmtpMutation.isPending || !smtpHost || !smtpUsername || (!smtpPassword && !smtpData) || !smtpFromName || !smtpFromEmail}
+                    data-testid="button-save-smtp"
+                  >
+                    {saveSmtpMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Save SMTP Settings
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const email = prompt("Enter email address to send test to:", user?.email || "");
+                      if (email) testSmtpMutation.mutate(email);
+                    }}
+                    disabled={testSmtpMutation.isPending || !smtpData}
+                    data-testid="button-test-smtp"
+                  >
+                    {testSmtpMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                    Send Test Email
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Dialog open={fyOpen} onOpenChange={setFyOpen}>
           <DialogContent data-testid="dialog-add-financial-year">

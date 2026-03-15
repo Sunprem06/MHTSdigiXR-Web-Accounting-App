@@ -357,6 +357,26 @@ export const jobApplications = pgTable("job_applications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const smtpSettings = pgTable("smtp_settings", {
+  id: serial("id").primaryKey(),
+  host: text("host").notNull(),
+  port: integer("port").notNull().default(587),
+  username: text("username").notNull(),
+  password: text("password").notNull(),
+  fromName: text("from_name").notNull(),
+  fromEmail: text("from_email").notNull(),
+  secure: boolean("secure").notNull().default(false),
+});
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertPostSchema = createInsertSchema(posts).omit({ id: true, createdAt: true });
 export const insertContactMessageSchema = createInsertSchema(contactMessages).omit({ id: true, createdAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true });
@@ -382,6 +402,8 @@ export const insertFaqItemSchema = createInsertSchema(faqItems).omit({ id: true,
 export const insertTestimonialSchema = createInsertSchema(testimonials).omit({ id: true, createdAt: true });
 export const insertSiteStatSchema = createInsertSchema(siteStats).omit({ id: true });
 export const insertPricingPlanSchema = createInsertSchema(pricingPlans).omit({ id: true, createdAt: true });
+export const insertSmtpSettingsSchema = createInsertSchema(smtpSettings).omit({ id: true });
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 
 export type Post = typeof posts.$inferSelect;
 export type InsertPost = z.infer<typeof insertPostSchema>;
@@ -433,6 +455,10 @@ export type Testimonial = typeof testimonials.$inferSelect;
 export type InsertTestimonial = z.infer<typeof insertTestimonialSchema>;
 export type SiteStat = typeof siteStats.$inferSelect;
 export type InsertSiteStat = z.infer<typeof insertSiteStatSchema>;
+export type SmtpSettings = typeof smtpSettings.$inferSelect;
+export type InsertSmtpSettings = z.infer<typeof insertSmtpSettingsSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 
 export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer", "sales_person", "sales_manager"] as const;
 export type Role = typeof ROLES[number];
