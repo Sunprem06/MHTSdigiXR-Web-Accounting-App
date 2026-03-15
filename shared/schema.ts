@@ -407,7 +407,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   super_admin: [...ALL_PERMISSIONS],
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.")),
-  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "jobs.view", "reports.view", "audit.view", "audit.notes"],
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "reports.view", "audit.view", "audit.notes"],
   senior_accountant: [
     "dashboard.view",
     "ledgers.view", "ledgers.create", "ledgers.edit",

@@ -259,15 +259,15 @@ export default function JobPostings() {
                       </td>
                       <td className="p-3">
                         <div className="flex gap-1">
+                          {canEdit && (
+                            <Button size="sm" variant="ghost" onClick={() => openEdit(p)} title="Edit" data-testid={`button-edit-${p.id}`}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          )}
                           {canEdit && p.status === "draft" && (
-                            <>
-                              <Button size="sm" variant="ghost" onClick={() => publishMutation.mutate(p.id)} title="Publish" data-testid={`button-publish-${p.id}`}>
-                                <Send className="w-4 h-4 text-green-600" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => openEdit(p)} title="Edit" data-testid={`button-edit-${p.id}`}>
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                            </>
+                            <Button size="sm" variant="ghost" onClick={() => publishMutation.mutate(p.id)} title="Publish" data-testid={`button-publish-${p.id}`}>
+                              <Send className="w-4 h-4 text-green-600" />
+                            </Button>
                           )}
                           {canEdit && p.status === "open" && (
                             <Button size="sm" variant="ghost" onClick={() => closeMutation.mutate(p.id)} title="Close" data-testid={`button-close-${p.id}`}>

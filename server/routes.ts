@@ -969,9 +969,6 @@ export async function registerRoutes(
   app.patch("/api/accounting/job-postings/:id", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
     const existing = await storage.getJobPosting(parseInt(req.params.id));
     if (!existing) return res.status(404).json({ message: "Job posting not found" });
-    if (existing.status !== "draft") {
-      return res.status(400).json({ message: "Only draft postings can be edited. Close the posting first to modify." });
-    }
     const { title, department, location, type, experience, description, requirements, responsibilities, salaryRange, vacancies, closingDate } = req.body;
     const validTypes = ["full_time", "part_time", "contract", "internship"];
     const allowedFields: Partial<typeof existing> = {};
@@ -1054,7 +1051,8 @@ export async function registerRoutes(
   // ===== JOB APPLICATIONS MANAGEMENT (Accounting) =====
   app.get("/api/accounting/job-applications", requireAuth, requirePermission("jobs.view"), async (req, res) => {
     const filters: { jobPostingId?: number; status?: string } = {};
-    if (req.query.jobPostingId) filters.jobPostingId = parseInt(req.query.jobPostingId as string);
+    const jobIdParam = (req.query.jobPostingId || req.query.jobId) as string | undefined;
+    if (jobIdParam) filters.jobPostingId = parseInt(jobIdParam);
     if (req.query.status) filters.status = req.query.status as string;
     const apps = await storage.getJobApplications(filters);
     res.json(apps);
@@ -1080,6 +1078,20 @@ export async function registerRoutes(
     if (req.body.notes !== undefined) data.notes = req.body.notes;
     const updated = await storage.updateJobApplication(id, data);
     if (!updated) return res.status(404).json({ message: "Application not found" });
+    if (updated.status === "hired") {
+      const posting = await storage.getJobPosting(updated.jobPostingId);
+      if (posting && posting.vacancies > 0) {
+        const hiredCount = (await storage.getJobApplications({ jobPostingId: posting.id, status: "hired" })).length;
+        if (hiredCount >= posting.vacancies && posting.status === "open") {
+          await storage.updateJobPosting(posting.id, { status: "closed" });
+          await storage.createAuditLog({
+            employeeId: req.user!.id, action: "auto_close", entity: "job_posting",
+            entityId: posting.id, details: `Auto-closed: all ${posting.vacancies} vacancy(ies) filled`,
+            ipAddress: req.ip || null,
+          });
+        }
+      }
+    }
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "update", entity: "job_application",
       entityId: id, details: `Updated application status to ${updated.status}`,
