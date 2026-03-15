@@ -90,6 +90,15 @@ export async function registerRoutes(
       const input = api.contact.create.input.parse(req.body);
       const message = await storage.createContactMessage(input);
       res.status(201).json(message);
+
+      try {
+        const smtp = await storage.getSmtpSettings();
+        if (smtp) {
+          const adminEmail = smtp.fromEmail;
+          const body = `New contact form submission:\n\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\nService: ${input.service || "Not specified"}\n\nMessage:\n${input.message}\n\n---\nView all messages in the Contact Inbox at /accounting/contact-inbox`;
+          await sendEmail(adminEmail, "New Contact Message — MHTSdigiXR", body);
+        }
+      } catch (_emailErr) {}
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
@@ -963,37 +972,6 @@ export async function registerRoutes(
     const page = await storage.updateLegalPage(req.params.slug, updates);
     if (!page) return res.status(404).json({ message: "Legal page not found" });
     res.json(page);
-  });
-
-  // SMTP Settings
-  app.get("/api/accounting/smtp-settings", requireAuth, requireRole("super_admin"), async (_req, res) => {
-    const smtp = await storage.getSmtpSettings();
-    if (!smtp) return res.json(null);
-    const { password: _, ...safe } = smtp;
-    res.json(safe);
-  });
-
-  app.put("/api/accounting/smtp-settings", requireAuth, requireRole("super_admin"), async (req, res) => {
-    const { host, port, secure, username, password, fromName, fromEmail } = req.body;
-    if (!host || !port || !username || !password || !fromName || !fromEmail) {
-      return res.status(400).json({ message: "All SMTP fields are required" });
-    }
-    const saved = await storage.upsertSmtpSettings({ host, port: parseInt(port), secure: !!secure, username, password, fromName, fromEmail });
-    const { password: _, ...safe } = saved;
-    res.json(safe);
-  });
-
-  app.post("/api/accounting/smtp-settings/test", requireAuth, requireRole("super_admin"), async (req, res) => {
-    const { testEmail } = req.body;
-    if (!testEmail) return res.status(400).json({ message: "Test email address is required" });
-    const smtp = await storage.getSmtpSettings();
-    if (!smtp) return res.status(400).json({ message: "SMTP settings not configured yet" });
-    const sent = await sendEmail(testEmail, "Test Email — MHTSdigiXR", `This is a test email from MHTSdigiXR.\n\nIf you received this, your SMTP settings are working correctly.`);
-    if (sent) {
-      res.json({ message: `Test email sent to ${testEmail}` });
-    } else {
-      res.status(500).json({ message: "Failed to send test email. Check your SMTP settings." });
-    }
   });
 
   // Audit Logs

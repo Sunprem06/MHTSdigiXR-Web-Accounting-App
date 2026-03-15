@@ -709,21 +709,6 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getSmtpSettings(): Promise<SmtpSettings | undefined> {
-    const [settings] = await db.select().from(smtpSettings).limit(1);
-    return settings;
-  }
-
-  async upsertSmtpSettings(settings: InsertSmtpSettings): Promise<SmtpSettings> {
-    const existing = await this.getSmtpSettings();
-    if (existing) {
-      const [updated] = await db.update(smtpSettings).set(settings).where(eq(smtpSettings.id, existing.id)).returning();
-      return updated;
-    }
-    const [newSettings] = await db.insert(smtpSettings).values(settings).returning();
-    return newSettings;
-  }
-
   async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
     const [employee] = await db.select().from(employees).where(eq(employees.email, email));
     return employee;

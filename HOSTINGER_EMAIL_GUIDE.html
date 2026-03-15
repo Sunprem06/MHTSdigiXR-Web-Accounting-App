@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MHTSdigiXR Email Integration Guide for Hostinger</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            color: #333;
+        }
+        h1 { color: #0ea5e9; border-bottom: 3px solid #0ea5e9; padding-bottom: 10px; }
+        h2 { color: #0284c7; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        h3 { color: #0369a1; }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        pre code { background: transparent; color: inherit; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th { background: #0ea5e9; color: white; }
+        tr:nth-child(even) { background: #f8fafc; }
+        .important {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #dcfce7;
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .step-box {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        ul, ol { padding-left: 25px; }
+        li { margin: 8px 0; }
+        .logo { text-align: center; margin-bottom: 30px; }
+        .logo h1 { font-size: 28px; margin: 0; }
+        .logo p { color: #64748b; margin: 5px 0; }
+        hr { border: none; border-top: 2px solid #e2e8f0; margin: 30px 0; }
+        .email-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        .email-icon {
+            background: #0ea5e9;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        .email-details strong { display: block; color: #0284c7; }
+        .email-details span { color: #64748b; font-size: 14px; }
+        @media print {
+            body { padding: 20px; }
+            pre { white-space: pre-wrap; word-wrap: break-word; }
+            .step-box { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="logo">
+    <h1>MHTSdigiXR Email Integration Guide</h1>
+    <p>Hostinger Free Email Setup for mhtsdigixr.com</p>
+    <p><strong>Document Version:</strong> 1.0 | <strong>Last Updated:</strong> March 2026</p>
+</div>
+
+<hr>
+
+<div class="important">
+    <strong>PREREQUISITE</strong><br><br>
+    You need an active <strong>Hostinger hosting plan</strong> with the domain <strong>mhtsdigixr.com</strong> already connected. Hostinger provides <strong>5 free email accounts</strong> with most hosting plans. This guide covers creating those email accounts and connecting them to your MHTSdigiXR website for automated emails (password resets, welcome messages, contact form notifications).
+</div>
+
+<h2>Step 1: Create Email Accounts on Hostinger</h2>
+<div class="step-box">
+    <ol>
+        <li>Log in to your <strong>Hostinger hPanel</strong> at <code>hpanel.hostinger.com</code></li>
+        <li>Click on <strong>Emails</strong> in the top menu</li>
+        <li>Select your domain <strong>mhtsdigixr.com</strong></li>
+        <li>Click <strong>Create Email Account</strong></li>
+        <li>Enter the email name (e.g. <code>info</code>) and a <strong>strong password</strong></li>
+        <li>Click <strong>Create</strong></li>
+        <li>Repeat for each email account you want to create (up to 5)</li>
+    </ol>
+</div>
+
+<h2>Step 2: Suggested Email Accounts (5 Free)</h2>
+<div class="step-box">
+    <p>Here are the recommended email accounts to create for your business:</p>
+
+    <div class="email-card">
+        <div class="email-icon">1</div>
+        <div class="email-details">
+            <strong>info@mhtsdigixr.com</strong>
+            <span>Main business contact. Used for general enquiries, displayed on website footer and contact page.</span>
+        </div>
+    </div>
+
+    <div class="email-card">
+        <div class="email-icon">2</div>
+        <div class="email-details">
+            <strong>noreply@mhtsdigixr.com</strong>
+            <span>Automated system emails. Best choice for SMTP "From Email" in Settings. Used for password resets, welcome emails, and contact form notifications.</span>
+        </div>
+    </div>
+
+    <div class="email-card">
+        <div class="email-icon">3</div>
+        <div class="email-details">
+            <strong>careers@mhtsdigixr.com</strong>
+            <span>Job applications and recruitment. Displayed on the Careers page.</span>
+        </div>
+    </div>
+
+    <div class="email-card">
+        <div class="email-icon">4</div>
+        <div class="email-details">
+            <strong>support@mhtsdigixr.com</strong>
+            <span>Customer support and post-sale communication.</span>
+        </div>
+    </div>
+
+    <div class="email-card">
+        <div class="email-icon">5</div>
+        <div class="email-details">
+            <strong>admin@mhtsdigixr.com</strong>
+            <span>Internal admin communications and account management.</span>
+        </div>
+    </div>
+</div>
+
+<h2>Step 3: Get Your SMTP Credentials</h2>
+<div class="step-box">
+    <p>After creating at least one email account, get the SMTP settings:</p>
+    <ol>
+        <li>In hPanel, go to <strong>Emails</strong> &rarr; <strong>Email Accounts</strong></li>
+        <li>Click on your email account (e.g. <code>noreply@mhtsdigixr.com</code>)</li>
+        <li>Click <strong>Connect Devices</strong> or <strong>Configuration Settings</strong></li>
+        <li>Note down the <strong>Outgoing (SMTP)</strong> settings</li>
+    </ol>
+
+    <p><strong>Hostinger SMTP Settings:</strong></p>
+    <table>
+        <tr>
+            <th>Setting</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>SMTP Host</td>
+            <td><code>smtp.hostinger.com</code></td>
+        </tr>
+        <tr>
+            <td>SMTP Port</td>
+            <td><code>465</code></td>
+        </tr>
+        <tr>
+            <td>Security</td>
+            <td><code>SSL</code> (Secure = ON)</td>
+        </tr>
+        <tr>
+            <td>Username</td>
+            <td>Your full email address (e.g. <code>noreply@mhtsdigixr.com</code>)</td>
+        </tr>
+        <tr>
+            <td>Password</td>
+            <td>The password you set when creating the email account</td>
+        </tr>
+    </table>
+
+    <div class="important">
+        <strong>Important:</strong> The SMTP username must be the <strong>full email address</strong>, not just the name part. Use <code>noreply@mhtsdigixr.com</code>, not just <code>noreply</code>.
+    </div>
+</div>
+
+<h2>Step 4: Configure SMTP in Your MHTSdigiXR App</h2>
+<div class="step-box">
+    <ol>
+        <li>Open your website and go to <code>/accounting/login</code></li>
+        <li>Log in as <strong>Super Admin</strong>:
+            <ul>
+                <li>Username: <code>superadmin</code></li>
+                <li>Password: <code>admin123</code> (or your custom password)</li>
+            </ul>
+        </li>
+        <li>In the sidebar, click <strong>Settings</strong></li>
+        <li>Scroll down to the <strong>SMTP Settings</strong> section</li>
+        <li>Fill in the following fields:
+            <table>
+                <tr>
+                    <th>Field</th>
+                    <th>Enter This</th>
+                </tr>
+                <tr>
+                    <td>Host</td>
+                    <td><code>smtp.hostinger.com</code></td>
+                </tr>
+                <tr>
+                    <td>Port</td>
+                    <td><code>465</code></td>
+                </tr>
+                <tr>
+                    <td>Secure (SSL)</td>
+                    <td>Toggle <strong>ON</strong></td>
+                </tr>
+                <tr>
+                    <td>Username</td>
+                    <td><code>noreply@mhtsdigixr.com</code></td>
+                </tr>
+                <tr>
+                    <td>Password</td>
+                    <td>Your email account password</td>
+                </tr>
+                <tr>
+                    <td>From Name</td>
+                    <td><code>MHTSdigiXR</code></td>
+                </tr>
+                <tr>
+                    <td>From Email</td>
+                    <td><code>noreply@mhtsdigixr.com</code></td>
+                </tr>
+            </table>
+        </li>
+        <li>Click <strong>Save</strong></li>
+    </ol>
+</div>
+
+<h2>Step 5: Test Your Email Connection</h2>
+<div class="step-box">
+    <ol>
+        <li>After saving SMTP settings, click the <strong>Test Connection</strong> button</li>
+        <li>A test email will be sent to your logged-in Super Admin email address</li>
+        <li>Check your inbox (and spam folder) for the test email</li>
+        <li>If you see <strong>"Test email sent successfully"</strong>, your email integration is complete!</li>
+    </ol>
+
+    <div class="success">
+        <strong>Success!</strong> If the test email arrives, all automated emails from your website will now work correctly.
+    </div>
+</div>
+
+<hr>
+
+<h2>Emails Your App Sends Automatically</h2>
+<div class="step-box">
+    <p>Once SMTP is configured, the following emails are sent automatically by the system:</p>
+
+    <table>
+        <tr>
+            <th>Email Type</th>
+            <th>When It's Sent</th>
+            <th>Sent To</th>
+        </tr>
+        <tr>
+            <td><strong>Password Reset</strong></td>
+            <td>When an employee clicks "Forgot Password?" on the login page</td>
+            <td>The employee's email address</td>
+        </tr>
+        <tr>
+            <td><strong>Welcome Email</strong></td>
+            <td>When a Super Admin creates a new employee account</td>
+            <td>The new employee's email address</td>
+        </tr>
+        <tr>
+            <td><strong>Contact Form Notification</strong></td>
+            <td>When a website visitor submits the Contact Us form</td>
+            <td>The SMTP "From Email" address (admin notification)</td>
+        </tr>
+        <tr>
+            <td><strong>SMTP Test</strong></td>
+            <td>When Super Admin clicks "Test Connection" in Settings</td>
+            <td>The Super Admin's email address</td>
+        </tr>
+    </table>
+
+    <div class="important">
+        <strong>Note:</strong> If SMTP is not configured, all email features are silently skipped. The website still works normally &mdash; contact form messages are saved to the database, employees can still log in, etc. Email is an optional enhancement.
+    </div>
+</div>
+
+<hr>
+
+<h2>Access Your Email (Webmail)</h2>
+<div class="step-box">
+    <p>To read and send emails from your Hostinger accounts:</p>
+    <ol>
+        <li>Go to <strong>hpanel.hostinger.com</strong> &rarr; <strong>Emails</strong></li>
+        <li>Click <strong>Webmail</strong> next to your email account</li>
+        <li>Or go directly to: <code>https://mail.hostinger.com</code></li>
+        <li>Log in with your full email address and password</li>
+    </ol>
+
+    <p><strong>Mobile / Desktop Email Clients:</strong></p>
+    <p>You can also add your Hostinger email to Gmail, Outlook, Apple Mail, or any email app using these settings:</p>
+    <table>
+        <tr>
+            <th>Setting</th>
+            <th>Incoming (IMAP)</th>
+            <th>Outgoing (SMTP)</th>
+        </tr>
+        <tr>
+            <td>Server</td>
+            <td><code>imap.hostinger.com</code></td>
+            <td><code>smtp.hostinger.com</code></td>
+        </tr>
+        <tr>
+            <td>Port</td>
+            <td><code>993</code></td>
+            <td><code>465</code></td>
+        </tr>
+        <tr>
+            <td>Security</td>
+            <td>SSL</td>
+            <td>SSL</td>
+        </tr>
+        <tr>
+            <td>Username</td>
+            <td colspan="2">Your full email address</td>
+        </tr>
+        <tr>
+            <td>Password</td>
+            <td colspan="2">Your email account password</td>
+        </tr>
+    </table>
+</div>
+
+<hr>
+
+<h2>Troubleshooting</h2>
+<div class="step-box">
+    <table>
+        <tr>
+            <th>Problem</th>
+            <th>Solution</th>
+        </tr>
+        <tr>
+            <td>"Password reset is not configured" on Forgot Password page</td>
+            <td>SMTP is not set up yet. Follow Steps 3-5 above to configure it.</td>
+        </tr>
+        <tr>
+            <td>Test email fails with "Connection refused"</td>
+            <td>Check that Host is <code>smtp.hostinger.com</code>, Port is <code>465</code>, and Secure is ON.</td>
+        </tr>
+        <tr>
+            <td>Test email fails with "Authentication failed"</td>
+            <td>Verify your Username is the <strong>full email address</strong> and Password is correct. Try logging into webmail first to confirm credentials work.</td>
+        </tr>
+        <tr>
+            <td>Emails go to spam folder</td>
+            <td>Make sure your domain has proper DNS records (SPF, DKIM). In hPanel &rarr; Emails &rarr; DNS Zone, verify these records exist. Hostinger usually sets them up automatically.</td>
+        </tr>
+        <tr>
+            <td>Contact form doesn't send notification</td>
+            <td>Contact form messages are always saved to the database regardless of SMTP. The email notification only works when SMTP is configured. Check Contact Inbox in the accounting app.</td>
+        </tr>
+        <tr>
+            <td>Password reset link doesn't work</td>
+            <td>Reset links expire after 1 hour. Make sure the employee clicks the link promptly. If expired, they can request a new one.</td>
+        </tr>
+        <tr>
+            <td>Port 587 vs 465</td>
+            <td>Hostinger supports both. Port 465 with SSL (Secure ON) is recommended. Port 587 with STARTTLS also works &mdash; set Secure OFF and the app will use STARTTLS automatically.</td>
+        </tr>
+    </table>
+</div>
+
+<hr>
+
+<h2>Quick Reference Card</h2>
+<div class="step-box">
+    <table>
+        <tr>
+            <th>Item</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>SMTP Host</td>
+            <td><code>smtp.hostinger.com</code></td>
+        </tr>
+        <tr>
+            <td>SMTP Port</td>
+            <td><code>465</code> (SSL)</td>
+        </tr>
+        <tr>
+            <td>Secure</td>
+            <td>ON</td>
+        </tr>
+        <tr>
+            <td>IMAP Host</td>
+            <td><code>imap.hostinger.com</code></td>
+        </tr>
+        <tr>
+            <td>IMAP Port</td>
+            <td><code>993</code> (SSL)</td>
+        </tr>
+        <tr>
+            <td>Webmail URL</td>
+            <td><code>https://mail.hostinger.com</code></td>
+        </tr>
+        <tr>
+            <td>Settings Page</td>
+            <td><code>/accounting/login</code> &rarr; Settings &rarr; SMTP</td>
+        </tr>
+        <tr>
+            <td>Max Free Accounts</td>
+            <td>5</td>
+        </tr>
+    </table>
+</div>
+
+<hr>
+
+<p style="text-align: center; color: #64748b;">
+    <strong>MHTSdigiXR</strong> - Maanagarram Hi Tech Solutions<br>
+    Email Integration Guide for mhtsdigixr.com
+</p>
+
+</body>
+</html>
