@@ -72,11 +72,13 @@ export default function Invoices() {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-invoices-title">Invoices</h1>
             <p className="text-slate-500 dark:text-slate-400 mt-1">Create and manage sales invoices</p>
           </div>
-          <Link href="/accounting/invoices/new">
-            <Button className="bg-sky-600 hover:bg-sky-700 text-white" data-testid="button-new-invoice">
-              <Plus className="w-4 h-4 mr-2" />New Invoice
-            </Button>
-          </Link>
+          {(user?.role === "super_admin" || user?.role === "admin" || user?.role === "senior_accountant" || user?.role === "accountant") && (
+            <Link href="/accounting/invoices/new">
+              <Button className="bg-sky-600 hover:bg-sky-700 text-white" data-testid="button-new-invoice">
+                <Plus className="w-4 h-4 mr-2" />New Invoice
+              </Button>
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">

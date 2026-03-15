@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { ArrowRight } from "lucide-react";
 
-// Placeholder data since we don't have a real DB populated yet
 const PROJECTS = [
   {
     id: 1,
@@ -41,12 +40,24 @@ const PROJECTS = [
 export default function CaseStudies() {
   return (
     <div className="pt-24 pb-20">
-      <section className="bg-slate-50 py-16 mb-16 border-b border-slate-200">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">Case Studies</h1>
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            Real results for real businesses. Explore how we've helped our clients achieve their goals.
-          </p>
+      <section className="relative bg-slate-900 dark:bg-black py-20 mb-16 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-sky-900/30" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-500/20 text-sky-300 text-sm font-semibold mb-6">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+              Our Portfolio
+            </div>
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white">Case Studies</h1>
+            <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+              Real results for real businesses. Explore how we've helped our clients achieve their goals.
+            </p>
+          </motion.div>
         </div>
       </section>
 
@@ -59,7 +70,8 @@ export default function CaseStudies() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="group bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-md hover:shadow-xl transition-all"
+              className="group bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-xl transition-all"
+              data-testid={`card-case-study-${project.id}`}
             >
               <div className="relative h-64 overflow-hidden">
                 <img 
@@ -67,23 +79,23 @@ export default function CaseStudies() {
                   alt={project.title} 
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
-                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-slate-900 uppercase tracking-wider">
+                <div className="absolute top-4 left-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                   {project.category}
                 </div>
               </div>
               <div className="p-8">
-                <h3 className="text-2xl font-bold mb-2 group-hover:text-sky-600 transition-colors">{project.title}</h3>
-                <p className="text-slate-500 mb-6">Client: {project.client}</p>
+                <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors" data-testid={`text-case-title-${project.id}`}>{project.title}</h3>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">Client: {project.client}</p>
                 
                 <div className="flex flex-wrap gap-2 mb-6">
                   {project.results.map((result, i) => (
-                    <span key={i} className="px-3 py-1 bg-sky-50 text-sky-700 text-sm font-medium rounded-lg">
+                    <span key={i} className="px-3 py-1 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 text-sm font-medium rounded-lg">
                       {result}
                     </span>
                   ))}
                 </div>
 
-                <Link href="/contact" className="inline-flex items-center font-bold text-slate-900 group-hover:translate-x-2 transition-transform">
+                <Link href="/contact" className="inline-flex items-center font-bold text-slate-900 dark:text-white group-hover:translate-x-2 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-all" data-testid={`link-view-case-${project.id}`}>
                   View Case Study <ArrowRight className="w-4 h-4 ml-2" />
                 </Link>
               </div>
