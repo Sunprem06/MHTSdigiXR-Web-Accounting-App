@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { requireAuth, requireRole, requirePermission } from "./auth";
+import { requireAuth, requirePermission } from "./auth";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 
 export async function registerRoutes(
@@ -70,7 +70,7 @@ export async function registerRoutes(
   });
 
   // Roles
-  app.get("/api/accounting/roles", requireAuth, async (req, res) => {
+  app.get("/api/accounting/roles", requireAuth, requirePermission("roles.view"), async (req, res) => {
     const allRoles = await storage.getRoles();
     res.json(allRoles);
   });
@@ -164,24 +164,27 @@ export async function registerRoutes(
     res.json(allEmployees.filter(e => e.isActive).map(e => ({ id: e.id, fullName: e.fullName, role: e.role })));
   });
 
-  app.get("/api/accounting/employees", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.get("/api/accounting/employees", requireAuth, requirePermission("employees.manage"), async (req, res) => {
     const allEmployees = await storage.getEmployees();
     const safeEmployees = allEmployees.map(({ password, ...rest }) => rest);
-    if (req.user!.role === "admin") {
+    if (req.user!.role !== "super_admin") {
       return res.json(safeEmployees.filter(e => e.role !== "super_admin"));
     }
     res.json(safeEmployees);
   });
 
-  app.post("/api/accounting/employees", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.post("/api/accounting/employees", requireAuth, requirePermission("employees.manage"), async (req, res) => {
     try {
-      const { username, email, password, fullName, role } = req.body;
-      if (req.user!.role === "admin" && (role === "super_admin" || role === "admin")) {
-        return res.status(403).json({ message: "Admin cannot create Super Admin or Admin accounts" });
+      const { username, email, password, fullName, role, permissions: userPermissions } = req.body;
+      if (req.user!.role !== "super_admin" && (role === "super_admin" || role === "admin")) {
+        return res.status(403).json({ message: "Only Super Admin can create Super Admin or Admin accounts" });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
+      const { ALL_PERMISSIONS: AP } = await import("@shared/schema");
+      const validPerms = Array.isArray(userPermissions) ? userPermissions.filter((p: string) => (AP as readonly string[]).includes(p)) : undefined;
       const employee = await storage.createEmployee({
         username, email, password: hashedPassword, fullName, role,
+        permissions: validPerms || null,
         isActive: true, createdBy: req.user!.id,
       });
       await storage.createAuditLog({
@@ -199,12 +202,12 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/accounting/employees/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.patch("/api/accounting/employees/:id", requireAuth, requirePermission("employees.manage"), async (req, res) => {
     const id = parseInt(req.params.id);
     const target = await storage.getEmployeeById(id);
     if (!target) return res.status(404).json({ message: "Employee not found" });
 
-    if (req.user!.role === "admin" && (target.role === "super_admin" || target.role === "admin")) {
+    if (req.user!.role !== "super_admin" && (target.role === "super_admin" || target.role === "admin")) {
       return res.status(403).json({ message: "Cannot modify this account" });
     }
 
@@ -212,13 +215,19 @@ export async function registerRoutes(
     if (req.body.fullName) data.fullName = req.body.fullName;
     if (req.body.email) data.email = req.body.email;
     if (req.body.role) {
-      if (req.user!.role === "admin" && (req.body.role === "super_admin" || req.body.role === "admin")) {
+      if (req.user!.role !== "super_admin" && (req.body.role === "super_admin" || req.body.role === "admin")) {
         return res.status(403).json({ message: "Cannot assign this role" });
       }
       data.role = req.body.role;
     }
     if (typeof req.body.isActive === "boolean") data.isActive = req.body.isActive;
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
+    if (req.body.permissions !== undefined) {
+      const { ALL_PERMISSIONS: AP } = await import("@shared/schema");
+      data.permissions = Array.isArray(req.body.permissions)
+        ? req.body.permissions.filter((p: string) => (AP as readonly string[]).includes(p))
+        : null;
+    }
 
     const updated = await storage.updateEmployee(id, data);
     if (!updated) return res.status(404).json({ message: "Employee not found" });
@@ -234,24 +243,24 @@ export async function registerRoutes(
   });
 
   // Account Groups
-  app.get("/api/accounting/account-groups", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/account-groups", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const groups = await storage.getAccountGroups();
     res.json(groups);
   });
 
   // Ledger Accounts
-  app.get("/api/accounting/ledgers", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/ledgers", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const accounts = await storage.getLedgerAccounts();
     res.json(accounts);
   });
 
-  app.get("/api/accounting/ledgers/:id", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/ledgers/:id", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const account = await storage.getLedgerAccount(parseInt(req.params.id));
     if (!account) return res.status(404).json({ message: "Ledger account not found" });
     res.json(account);
   });
 
-  app.get("/api/accounting/ledgers/:id/statement", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/ledgers/:id/statement", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const statement = await storage.getLedgerStatement(
       parseInt(req.params.id),
       req.query.startDate as string,
@@ -260,7 +269,7 @@ export async function registerRoutes(
     res.json(statement);
   });
 
-  app.post("/api/accounting/ledgers", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.post("/api/accounting/ledgers", requireAuth, requirePermission("ledgers.create"), async (req, res) => {
     const account = await storage.createLedgerAccount({ ...req.body, createdBy: req.user!.id });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "create", entity: "ledger",
@@ -270,7 +279,7 @@ export async function registerRoutes(
     res.status(201).json(account);
   });
 
-  app.patch("/api/accounting/ledgers/:id", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.patch("/api/accounting/ledgers/:id", requireAuth, requirePermission("ledgers.edit"), async (req, res) => {
     const updated = await storage.updateLedgerAccount(parseInt(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Ledger account not found" });
     await storage.createAuditLog({
@@ -281,7 +290,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/accounting/ledgers/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.delete("/api/accounting/ledgers/:id", requireAuth, requirePermission("ledgers.edit"), async (req, res) => {
     const id = parseInt(req.params.id);
     const entries = await storage.getVoucherEntriesByLedger(id);
     if (entries.length > 0) {
@@ -298,18 +307,18 @@ export async function registerRoutes(
   });
 
   // Parties (Customers/Vendors)
-  app.get("/api/accounting/parties", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/parties", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const partyList = await storage.getParties(req.query.type as string);
     res.json(partyList);
   });
 
-  app.get("/api/accounting/parties/:id", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/parties/:id", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const party = await storage.getParty(parseInt(req.params.id));
     if (!party) return res.status(404).json({ message: "Party not found" });
     res.json(party);
   });
 
-  app.post("/api/accounting/parties", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant"), async (req, res) => {
+  app.post("/api/accounting/parties", requireAuth, requirePermission("parties.create"), async (req, res) => {
     const groups = await storage.getAccountGroups();
     const debtorGroup = groups.find(g => g.name === "Sundry Debtors" || g.name === "Current Assets");
     const creditorGroup = groups.find(g => g.name === "Sundry Creditors" || g.name === "Current Liabilities");
@@ -344,7 +353,7 @@ export async function registerRoutes(
     res.status(201).json(party);
   });
 
-  app.patch("/api/accounting/parties/:id", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.patch("/api/accounting/parties/:id", requireAuth, requirePermission("parties.edit"), async (req, res) => {
     const updated = await storage.updateParty(parseInt(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Party not found" });
     await storage.createAuditLog({
@@ -355,7 +364,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/accounting/parties/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.delete("/api/accounting/parties/:id", requireAuth, requirePermission("parties.delete"), async (req, res) => {
     const id = parseInt(req.params.id);
     try {
       const deleted = await storage.deleteParty(id);
@@ -375,12 +384,12 @@ export async function registerRoutes(
   });
 
   // Products/Services
-  app.get("/api/accounting/products", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/products", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const productList = await storage.getProducts();
     res.json(productList);
   });
 
-  app.get("/api/accounting/products/:id", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/products/:id", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const product = await storage.getProduct(parseInt(req.params.id));
     if (!product) return res.status(404).json({ message: "Product not found" });
     res.json(product);
@@ -391,7 +400,7 @@ export async function registerRoutes(
     res.json({ productCode: code });
   });
 
-  app.post("/api/accounting/products", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.post("/api/accounting/products", requireAuth, requirePermission("products.create"), async (req, res) => {
     try {
       const product = await storage.createProduct({ ...req.body, createdBy: req.user!.id });
       await storage.createAuditLog({
@@ -408,7 +417,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/accounting/products/:id", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.patch("/api/accounting/products/:id", requireAuth, requirePermission("products.edit"), async (req, res) => {
     const updated = await storage.updateProduct(parseInt(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Product not found" });
     await storage.createAuditLog({
@@ -419,7 +428,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/accounting/products/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.delete("/api/accounting/products/:id", requireAuth, requirePermission("products.delete"), async (req, res) => {
     const id = parseInt(req.params.id);
     const deleted = await storage.deleteProduct(id);
     if (!deleted) return res.status(404).json({ message: "Product not found" });
@@ -432,11 +441,11 @@ export async function registerRoutes(
   });
 
   // Quotations
-  app.get("/api/accounting/quotations", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
+  app.get("/api/accounting/quotations", requireAuth, requirePermission("quotations.view"), async (req, res) => {
     const filters: any = {};
     if (req.query.status) filters.status = req.query.status;
     if (req.query.partyId) filters.partyId = parseInt(req.query.partyId as string);
-    if (req.user!.role === "data_entry") filters.createdBy = req.user!.id;
+    if (!req.user!.permissions?.includes("quotations.edit")) filters.createdBy = req.user!.id;
     const quotationList = await storage.getQuotations(filters);
     res.json(quotationList);
   });
@@ -446,13 +455,13 @@ export async function registerRoutes(
     res.json({ quotationNumber: number });
   });
 
-  app.get("/api/accounting/quotations/:id", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/quotations/:id", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const quotation = await storage.getQuotation(parseInt(req.params.id));
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
     res.json(quotation);
   });
 
-  app.post("/api/accounting/quotations", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
+  app.post("/api/accounting/quotations", requireAuth, requirePermission("quotations.create"), async (req, res) => {
     const quotation = await storage.createQuotation({ ...req.body, createdBy: req.user!.id, assignedTo: req.body.assignedTo || req.user!.id });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "create", entity: "quotation",
@@ -462,7 +471,7 @@ export async function registerRoutes(
     res.status(201).json(quotation);
   });
 
-  app.patch("/api/accounting/quotations/:id", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant"), async (req, res) => {
+  app.patch("/api/accounting/quotations/:id", requireAuth, requirePermission("quotations.edit"), async (req, res) => {
     const { status, submittedAt, reviewedBy, reviewedAt, ...safeBody } = req.body;
     const updated = await storage.updateQuotation(parseInt(req.params.id), safeBody);
     if (!updated) return res.status(404).json({ message: "Quotation not found" });
@@ -474,7 +483,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/accounting/quotations/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.delete("/api/accounting/quotations/:id", requireAuth, requirePermission("quotations.delete"), async (req, res) => {
     const id = parseInt(req.params.id);
     const deleted = await storage.deleteQuotation(id);
     if (!deleted) return res.status(404).json({ message: "Quotation not found" });
@@ -486,11 +495,11 @@ export async function registerRoutes(
     res.json({ message: "Deleted successfully" });
   });
 
-  app.post("/api/accounting/quotations/:id/submit", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
+  app.post("/api/accounting/quotations/:id/submit", requireAuth, requirePermission("quotations.create"), async (req, res) => {
     const quotation = await storage.getQuotation(parseInt(req.params.id));
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
     if (quotation.status !== "draft") return res.status(400).json({ message: "Only draft quotations can be submitted" });
-    const isManager = req.user!.role === "super_admin" || req.user!.role === "admin" || req.user!.role === "senior_accountant";
+    const isManager = req.user!.permissions?.includes("quotations.approve") || false;
     const isOwner = quotation.createdBy === req.user!.id || quotation.assignedTo === req.user!.id;
     if (!isManager && !isOwner) {
       return res.status(403).json({ message: "You can only submit quotations assigned to you or created by you" });
@@ -507,7 +516,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.post("/api/accounting/quotations/:id/approve", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.post("/api/accounting/quotations/:id/approve", requireAuth, requirePermission("quotations.approve"), async (req, res) => {
     const quotation = await storage.getQuotation(parseInt(req.params.id));
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
     if (quotation.status !== "submitted") return res.status(400).json({ message: "Only submitted quotations can be approved" });
@@ -524,7 +533,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.post("/api/accounting/quotations/:id/reject", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.post("/api/accounting/quotations/:id/reject", requireAuth, requirePermission("quotations.approve"), async (req, res) => {
     const quotation = await storage.getQuotation(parseInt(req.params.id));
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
     if (quotation.status !== "submitted") return res.status(400).json({ message: "Only submitted quotations can be rejected" });
@@ -543,7 +552,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.post("/api/accounting/quotations/:id/convert", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.post("/api/accounting/quotations/:id/convert", requireAuth, requirePermission("quotations.approve"), async (req, res) => {
     const quotation = await storage.getQuotation(parseInt(req.params.id));
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
     if (quotation.status !== "accepted" && quotation.status !== "sent") {
@@ -583,7 +592,7 @@ export async function registerRoutes(
   app.get("/api/accounting/expenses", requireAuth, async (req, res) => {
     const filters: any = {};
     if (req.query.status) filters.status = req.query.status;
-    if (req.user!.role === "data_entry" || req.user!.role === "viewer") {
+    if (!req.user!.permissions?.includes("expenses.approve")) {
       filters.employeeId = req.user!.id;
     } else if (req.query.employeeId) {
       filters.employeeId = parseInt(req.query.employeeId as string);
@@ -600,7 +609,7 @@ export async function registerRoutes(
   app.get("/api/accounting/expenses/:id", requireAuth, async (req, res) => {
     const claim = await storage.getExpenseClaim(parseInt(req.params.id));
     if (!claim) return res.status(404).json({ message: "Expense claim not found" });
-    if ((req.user!.role === "data_entry" || req.user!.role === "viewer") && claim.employeeId !== req.user!.id) {
+    if (!req.user!.permissions?.includes("expenses.approve") && claim.employeeId !== req.user!.id) {
       return res.status(403).json({ message: "Access denied" });
     }
     res.json(claim);
@@ -622,7 +631,7 @@ export async function registerRoutes(
     res.status(201).json(claim);
   });
 
-  app.patch("/api/accounting/expenses/:id", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.patch("/api/accounting/expenses/:id", requireAuth, requirePermission("expenses.approve"), async (req, res) => {
     const id = parseInt(req.params.id);
     const claim = await storage.getExpenseClaim(id);
     if (!claim) return res.status(404).json({ message: "Expense claim not found" });
@@ -644,7 +653,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/accounting/expenses/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.delete("/api/accounting/expenses/:id", requireAuth, requirePermission("expenses.approve"), async (req, res) => {
     const id = parseInt(req.params.id);
     const claim = await storage.getExpenseClaim(id);
     if (!claim) return res.status(404).json({ message: "Expense claim not found" });
@@ -662,13 +671,13 @@ export async function registerRoutes(
   });
 
   // Vouchers
-  app.get("/api/accounting/vouchers", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
+  app.get("/api/accounting/vouchers", requireAuth, requirePermission("vouchers.view"), async (req, res) => {
     const filters: any = {};
     if (req.query.type) filters.type = req.query.type;
     if (req.query.status) filters.status = req.query.status;
     if (req.query.startDate) filters.startDate = req.query.startDate;
     if (req.query.endDate) filters.endDate = req.query.endDate;
-    if (req.user!.role === "data_entry") filters.createdBy = req.user!.id;
+    if (!req.user!.permissions?.includes("vouchers.edit")) filters.createdBy = req.user!.id;
 
     const voucherList = await storage.getVouchers(filters);
     res.json(voucherList);
@@ -679,17 +688,17 @@ export async function registerRoutes(
     res.json({ voucherNumber: number });
   });
 
-  app.get("/api/accounting/vouchers/:id", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
+  app.get("/api/accounting/vouchers/:id", requireAuth, requirePermission("vouchers.view"), async (req, res) => {
     const voucher = await storage.getVoucher(parseInt(req.params.id));
     if (!voucher) return res.status(404).json({ message: "Voucher not found" });
-    if (req.user!.role === "data_entry" && voucher.createdBy !== req.user!.id) {
+    if (!req.user!.permissions?.includes("vouchers.edit") && voucher.createdBy !== req.user!.id) {
       return res.status(403).json({ message: "Access denied" });
     }
     const entries = await storage.getVoucherEntries(voucher.id);
     res.json({ ...voucher, entries });
   });
 
-  app.post("/api/accounting/vouchers", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
+  app.post("/api/accounting/vouchers", requireAuth, requirePermission("vouchers.create"), async (req, res) => {
     const { entries, ...voucherData } = req.body;
 
     if (!entries || !Array.isArray(entries) || entries.length < 2) {
@@ -706,7 +715,7 @@ export async function registerRoutes(
     }
 
     let status = voucherData.status || "pending";
-    if (req.user!.role === "data_entry") status = "draft";
+    if (!req.user!.permissions?.includes("vouchers.approve")) status = "draft";
 
     const voucher = await storage.createVoucher(
       { ...voucherData, status, totalAmount: String(totalDebit), createdBy: req.user!.id },
@@ -720,7 +729,7 @@ export async function registerRoutes(
     res.status(201).json(voucher);
   });
 
-  app.patch("/api/accounting/vouchers/:id/status", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+  app.patch("/api/accounting/vouchers/:id/status", requireAuth, requirePermission("vouchers.approve"), async (req, res) => {
     const { status } = req.body;
     const approvedBy = status === "approved" ? req.user!.id : undefined;
     const updated = await storage.updateVoucherStatus(parseInt(req.params.id), status, approvedBy);
@@ -733,7 +742,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/accounting/vouchers/:id", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
+  app.delete("/api/accounting/vouchers/:id", requireAuth, requirePermission("vouchers.approve"), async (req, res) => {
     const id = parseInt(req.params.id);
     const deleted = await storage.deleteVoucher(id);
     if (!deleted) return res.status(404).json({ message: "Voucher not found" });
@@ -746,61 +755,61 @@ export async function registerRoutes(
   });
 
   // Reports
-  app.get("/api/accounting/reports/trial-balance", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/reports/trial-balance", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const data = await storage.getTrialBalance(req.query.asOnDate as string);
     res.json(data);
   });
 
-  app.get("/api/accounting/reports/profit-loss", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/reports/profit-loss", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const data = await storage.getProfitAndLoss(req.query.startDate as string, req.query.endDate as string);
     res.json(data);
   });
 
-  app.get("/api/accounting/reports/balance-sheet", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/reports/balance-sheet", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const data = await storage.getBalanceSheet();
     res.json(data);
   });
 
-  app.get("/api/accounting/reports/day-book", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/reports/day-book", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const data = await storage.getDayBook(req.query.startDate as string, req.query.endDate as string, req.query.type as string);
     res.json(data);
   });
 
-  app.get("/api/accounting/reports/gst-summary", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/reports/gst-summary", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
     const data = await storage.getGstSummary(req.query.startDate as string, req.query.endDate as string);
     res.json(data);
   });
 
   // Financial Years
-  app.get("/api/accounting/financial-years", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/financial-years", requireAuth, requirePermission("dashboard.view"), async (req, res) => {
     const years = await storage.getFinancialYears();
     res.json(years);
   });
 
-  app.post("/api/accounting/financial-years", requireAuth, requireRole("super_admin"), async (req, res) => {
+  app.post("/api/accounting/financial-years", requireAuth, requirePermission("settings.manage"), async (req, res) => {
     const fy = await storage.createFinancialYear(req.body);
     res.status(201).json(fy);
   });
 
-  app.patch("/api/accounting/financial-years/:id", requireAuth, requireRole("super_admin"), async (req, res) => {
+  app.patch("/api/accounting/financial-years/:id", requireAuth, requirePermission("settings.manage"), async (req, res) => {
     const updated = await storage.updateFinancialYear(parseInt(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Financial year not found" });
     res.json(updated);
   });
 
   // Company Settings
-  app.get("/api/accounting/company-settings", requireAuth, requireRole("super_admin", "admin", "auditor"), async (req, res) => {
+  app.get("/api/accounting/company-settings", requireAuth, requirePermission("settings.view"), async (req, res) => {
     const settings = await storage.getCompanySettings();
     res.json(settings || {});
   });
 
-  app.put("/api/accounting/company-settings", requireAuth, requireRole("super_admin"), async (req, res) => {
+  app.put("/api/accounting/company-settings", requireAuth, requirePermission("settings.manage"), async (req, res) => {
     const settings = await storage.upsertCompanySettings(req.body);
     res.json(settings);
   });
 
   // Audit Logs
-  app.get("/api/accounting/audit-logs", requireAuth, requireRole("super_admin", "admin", "auditor"), async (req, res) => {
+  app.get("/api/accounting/audit-logs", requireAuth, requirePermission("audit.view"), async (req, res) => {
     const filters: any = {};
     if (req.query.employeeId) filters.employeeId = parseInt(req.query.employeeId as string);
     if (req.query.action) filters.action = req.query.action;
@@ -811,12 +820,12 @@ export async function registerRoutes(
   });
 
   // Audit Notes
-  app.get("/api/accounting/audit-notes", requireAuth, requireRole("super_admin", "admin", "auditor"), async (req, res) => {
+  app.get("/api/accounting/audit-notes", requireAuth, requirePermission("audit.view"), async (req, res) => {
     const notes = await storage.getAuditNotes(req.query.entity as string, req.query.entityId ? parseInt(req.query.entityId as string) : undefined);
     res.json(notes);
   });
 
-  app.post("/api/accounting/audit-notes", requireAuth, requireRole("auditor"), async (req, res) => {
+  app.post("/api/accounting/audit-notes", requireAuth, requirePermission("audit.notes"), async (req, res) => {
     const note = await storage.createAuditNote({ ...req.body, auditorId: req.user!.id });
     res.status(201).json(note);
   });

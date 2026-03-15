@@ -102,61 +102,61 @@ function AccountingRouter() {
         {() => <ProtectedRoute><AccountingDashboard /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/ledgers">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Ledgers /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="ledgers.view"><Ledgers /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/parties">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Parties /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="parties.view"><Parties /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/products">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Products /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="products.view"><Products /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/vouchers">
-        {() => <ProtectedRoute><VoucherList /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="vouchers.view"><VoucherList /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/vouchers/new">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "senior_accountant", "accountant", "data_entry"]}><VoucherEntry /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="vouchers.create"><VoucherEntry /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/quotations">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Quotations /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="quotations.view"><Quotations /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/quotations/new">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "senior_accountant", "accountant"]}><QuotationEntry /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="quotations.create"><QuotationEntry /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/quotations/:id/edit">
-        {() => <ProtectedRoute roles={["super_admin", "admin"]}><QuotationEntry /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="quotations.edit"><QuotationEntry /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/quotations/:id/view">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><QuotationView /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="quotations.view"><QuotationView /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/invoices">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Invoices /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="invoices.view"><Invoices /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/invoices/new">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "senior_accountant", "accountant"]}><InvoiceEntry /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="invoices.create"><InvoiceEntry /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/expenses">
-        {() => <ProtectedRoute><Expenses /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="expenses.view"><Expenses /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/invoice/:id">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><InvoiceView /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="invoices.view"><InvoiceView /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/receipt/:id">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><ReceiptView /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="vouchers.view"><ReceiptView /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/reports/day-book">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><DayBook /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="reports.view"><DayBook /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/reports/trial-balance">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><TrialBalance /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="reports.view"><TrialBalance /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/reports/profit-loss">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><ProfitLoss /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="reports.view"><ProfitLoss /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/reports/balance-sheet">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><BalanceSheet /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="reports.view"><BalanceSheet /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/reports/gst-summary">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><GstSummary /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="reports.view"><GstSummary /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/employees">
         {() => <ProtectedRoute requiredPermission="employees.manage"><EmployeeManagement /></ProtectedRoute>}

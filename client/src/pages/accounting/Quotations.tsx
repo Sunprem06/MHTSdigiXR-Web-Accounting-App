@@ -38,7 +38,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function Quotations() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, hasPermission, hasAnyPermission } = useAuth();
   const [, setLocation] = useLocation();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -46,9 +46,9 @@ export default function Quotations() {
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const isAdmin = user?.role === "super_admin" || user?.role === "admin";
-  const canApprove = user?.role === "super_admin" || user?.role === "admin" || user?.role === "senior_accountant";
-  const canCreate = user?.role !== "auditor" && user?.role !== "viewer";
+  const isAdmin = hasAnyPermission("quotations.delete");
+  const canApprove = hasPermission("quotations.approve");
+  const canCreate = hasPermission("quotations.create");
 
   const { data: quotations, isLoading } = useQuery<Quotation[]>({
     queryKey: ["/api/accounting/quotations"],
