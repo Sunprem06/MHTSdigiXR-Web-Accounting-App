@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useRoute } from "wouter";
-import type { Quotation, Party, Product, CompanySettings, Employee } from "@shared/schema";
+import type { Quotation, Party, Product, CompanySettings } from "@shared/schema";
 import { Loader2, Printer, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 
@@ -30,9 +30,9 @@ export default function QuotationView() {
   const { data: parties } = useQuery<Party[]>({ queryKey: ["/api/accounting/parties"] });
   const { data: products } = useQuery<Product[]>({ queryKey: ["/api/accounting/products"] });
   const { data: company } = useQuery<CompanySettings>({ queryKey: ["/api/accounting/company-settings"] });
-  const { data: employees } = useQuery<Employee[]>({ queryKey: ["/api/accounting/employees"] });
+  const { data: employeeDir } = useQuery<{ id: number; fullName: string }[]>({ queryKey: ["/api/accounting/employees/directory"] });
 
-  const employeeMap = new Map(employees?.map(e => [e.id, e.fullName]) || []);
+  const employeeMap = new Map(employeeDir?.map(e => [e.id, e.fullName]) || []);
 
   if (isLoading) {
     return <AccountingLayout><div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-sky-500" /></div></AccountingLayout>;

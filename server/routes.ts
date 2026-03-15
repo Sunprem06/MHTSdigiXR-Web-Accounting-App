@@ -70,6 +70,11 @@ export async function registerRoutes(
   });
 
   // Employees
+  app.get("/api/accounting/employees/directory", requireAuth, async (req, res) => {
+    const allEmployees = await storage.getEmployees();
+    res.json(allEmployees.filter(e => e.isActive).map(e => ({ id: e.id, fullName: e.fullName, role: e.role })));
+  });
+
   app.get("/api/accounting/employees", requireAuth, requireRole("super_admin", "admin"), async (req, res) => {
     const allEmployees = await storage.getEmployees();
     const safeEmployees = allEmployees.map(({ password, ...rest }) => rest);

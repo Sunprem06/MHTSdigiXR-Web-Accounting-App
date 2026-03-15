@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link, useLocation } from "wouter";
 import { QUOTATION_STATUSES } from "@shared/schema";
-import type { Quotation, Party, Employee } from "@shared/schema";
+import type { Quotation, Party } from "@shared/schema";
 import { Plus, Loader2, FileText, Eye, ArrowRight, Trash2, Search, Pencil, Send, CheckCircle, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -58,8 +58,8 @@ export default function Quotations() {
     queryKey: ["/api/accounting/parties"],
   });
 
-  const { data: employees } = useQuery<Employee[]>({
-    queryKey: ["/api/accounting/employees"],
+  const { data: employees } = useQuery<{ id: number; fullName: string; role: string }[]>({
+    queryKey: ["/api/accounting/employees/directory"],
   });
 
   const partyMap = new Map(parties?.map(p => [p.id, p.name]) || []);
