@@ -1,9 +1,11 @@
 import { motion, useInView } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Star, Users, Award, TrendingUp, Quote, Trophy, Target, Lightbulb, CheckCircle2, Zap, Shield, Clock } from "lucide-react";
+import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Star, Users, Award, TrendingUp, Quote, Trophy, Target, Lightbulb, CheckCircle2, Zap, Shield, Clock, Heart } from "lucide-react";
 import { useServices } from "@/hooks/use-services";
 import { useSiteSettings } from "@/hooks/use-site-settings";
+import { useQuery } from "@tanstack/react-query";
 import { useRef, useEffect, useState } from "react";
+import type { Testimonial, SiteStat } from "@shared/schema";
 
 const FEATURES = [
   { icon: Globe, title: "Domain & Hosting", desc: "Reliable infrastructure for your digital presence" },
@@ -123,17 +125,31 @@ function AnimatedCounter({ value, suffix }: { value: number; suffix: string }) {
   return <span ref={ref}>{count}{suffix}</span>;
 }
 
+const ICON_MAP: Record<string, typeof Star> = { Star, Users, Award, Code, TrendingUp, Trophy, Target, Zap, Shield, Clock, Heart, Globe };
+
 export default function Home() {
   const { data: services } = useServices();
   const s = useSiteSettings();
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
 
+  const { data: apiTestimonials = [] } = useQuery<Testimonial[]>({ queryKey: ["/api/testimonials"] });
+  const { data: apiStats = [] } = useQuery<SiteStat[]>({ queryKey: ["/api/site-stats"] });
+
+  const testimonialsList = apiTestimonials.length > 0
+    ? apiTestimonials.map(t => ({ content: t.content, name: t.clientName, role: `${t.role}${t.company ? `, ${t.company}` : ""}`, image: t.imageUrl || "" }))
+    : TESTIMONIALS;
+
+  const statsList = apiStats.length > 0
+    ? apiStats.map(st => ({ value: parseInt(st.value) || 0, suffix: st.suffix || "", label: st.label, icon: ICON_MAP[st.icon || "Star"] || Star }))
+    : STATS;
+
   useEffect(() => {
+    if (testimonialsList.length === 0) return;
     const timer = setInterval(() => {
-      setCurrentTestimonial((prev) => (prev + 1) % TESTIMONIALS.length);
+      setCurrentTestimonial((prev) => (prev + 1) % testimonialsList.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [testimonialsList.length]);
 
   return (
     <div className="overflow-hidden">
@@ -300,7 +316,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-r from-sky-900/20 to-sky-900/20" />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {STATS.map((stat, i) => (
+            {statsList.map((stat, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 20 }}
@@ -548,24 +564,26 @@ export default function Home() {
               <Quote className="absolute top-6 left-6 w-12 h-12 text-sky-200 dark:text-sky-800" />
               <div className="relative z-10">
                 <p className="text-xl md:text-2xl text-slate-700 dark:text-slate-200 mb-8 leading-relaxed italic">
-                  "{TESTIMONIALS[currentTestimonial].content}"
+                  "{testimonialsList[currentTestimonial]?.content}"
                 </p>
                 <div className="flex items-center gap-4">
-                  <img 
-                    src={TESTIMONIALS[currentTestimonial].image} 
-                    alt={TESTIMONIALS[currentTestimonial].name}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-lg"
-                  />
+                  {testimonialsList[currentTestimonial]?.image && (
+                    <img 
+                      src={testimonialsList[currentTestimonial].image} 
+                      alt={testimonialsList[currentTestimonial].name}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-lg"
+                    />
+                  )}
                   <div>
-                    <div className="font-bold text-slate-900 dark:text-white">{TESTIMONIALS[currentTestimonial].name}</div>
-                    <div className="text-slate-500 dark:text-slate-400 text-sm">{TESTIMONIALS[currentTestimonial].role}</div>
+                    <div className="font-bold text-slate-900 dark:text-white">{testimonialsList[currentTestimonial]?.name}</div>
+                    <div className="text-slate-500 dark:text-slate-400 text-sm">{testimonialsList[currentTestimonial]?.role}</div>
                   </div>
                 </div>
               </div>
             </motion.div>
 
             <div className="flex justify-center gap-2 mt-8">
-              {TESTIMONIALS.map((_, i) => (
+              {testimonialsList.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setCurrentTestimonial(i)}

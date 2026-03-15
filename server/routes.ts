@@ -29,13 +29,13 @@ export async function registerRoutes(
   });
 
   app.get(api.posts.list.path, async (req, res) => {
-    const posts = await storage.getPosts();
-    res.json(posts);
+    const allPosts = await storage.getPosts();
+    res.json(allPosts.filter(p => p.status === "published"));
   });
 
   app.get(api.posts.get.path, async (req, res) => {
     const post = await storage.getPost(req.params.slug);
-    if (!post) {
+    if (!post || post.status !== "published") {
       return res.status(404).json({ message: "Post not found" });
     }
     res.json(post);
@@ -44,6 +44,21 @@ export async function registerRoutes(
   app.get(api.caseStudies.list.path, async (req, res) => {
     const studies = await storage.getCaseStudies();
     res.json(studies);
+  });
+
+  app.get("/api/faqs", async (_req, res) => {
+    const items = await storage.getFaqItems(true);
+    res.json(items);
+  });
+
+  app.get("/api/testimonials", async (_req, res) => {
+    const items = await storage.getTestimonials(true);
+    res.json(items);
+  });
+
+  app.get("/api/site-stats", async (_req, res) => {
+    const items = await storage.getSiteStats();
+    res.json(items);
   });
 
   app.post(api.contact.create.path, async (req, res) => {
@@ -919,6 +934,214 @@ export async function registerRoutes(
       }
       throw err;
     }
+  });
+
+  // ===== CONTACT INBOX (Accounting) =====
+  app.get("/api/accounting/contact-messages", requireAuth, requirePermission("contacts.view"), async (_req, res) => {
+    const messages = await storage.getContactMessages();
+    res.json(messages);
+  });
+
+  app.get("/api/accounting/contact-messages/unread-count", requireAuth, requirePermission("contacts.view"), async (_req, res) => {
+    const count = await storage.getUnreadContactCount();
+    res.json({ count });
+  });
+
+  app.patch("/api/accounting/contact-messages/:id", requireAuth, requirePermission("contacts.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const data: { isRead?: boolean } = {};
+    if (req.body.isRead !== undefined) data.isRead = req.body.isRead;
+    const updated = await storage.updateContactMessage(id, data);
+    if (!updated) return res.status(404).json({ message: "Message not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/contact-messages/:id", requireAuth, requirePermission("contacts.manage"), async (req, res) => {
+    const deleted = await storage.deleteContactMessage(parseInt(req.params.id));
+    if (!deleted) return res.status(404).json({ message: "Message not found" });
+    res.json({ message: "Deleted" });
+  });
+
+  // ===== BLOG POSTS MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/posts", requireAuth, requirePermission("content.view"), async (_req, res) => {
+    const allPosts = await storage.getPosts();
+    res.json(allPosts);
+  });
+
+  app.post("/api/accounting/posts", requireAuth, requirePermission("content.create"), async (req, res) => {
+    const { title, slug, content, summary, coverImage, author, status } = req.body;
+    if (!title || !content || !summary) {
+      return res.status(400).json({ message: "Title, content, and summary are required" });
+    }
+    const postSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const post = await storage.createPost({ title, slug: postSlug, content, summary, coverImage: coverImage || null, author: author || "Admin", status: status || "draft" });
+    res.status(201).json(post);
+  });
+
+  app.patch("/api/accounting/posts/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { title, slug, content, summary, coverImage, author, status } = req.body;
+    const data: Record<string, unknown> = {};
+    if (title !== undefined) data.title = title;
+    if (slug !== undefined) data.slug = slug;
+    if (content !== undefined) data.content = content;
+    if (summary !== undefined) data.summary = summary;
+    if (coverImage !== undefined) data.coverImage = coverImage;
+    if (author !== undefined) data.author = author;
+    if (status !== undefined) data.status = status;
+    const updated = await storage.updatePost(id, data);
+    if (!updated) return res.status(404).json({ message: "Post not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/posts/:id", requireAuth, requirePermission("content.delete"), async (req, res) => {
+    const deleted = await storage.deletePost(parseInt(req.params.id));
+    if (!deleted) return res.status(404).json({ message: "Post not found" });
+    res.json({ message: "Deleted" });
+  });
+
+  // ===== CASE STUDIES MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/case-studies", requireAuth, requirePermission("content.view"), async (_req, res) => {
+    const studies = await storage.getCaseStudies();
+    res.json(studies);
+  });
+
+  app.post("/api/accounting/case-studies", requireAuth, requirePermission("content.create"), async (req, res) => {
+    const { title, client, category, description, image, results } = req.body;
+    if (!title || !client || !description || !image) {
+      return res.status(400).json({ message: "Title, client, description, and image are required" });
+    }
+    const study = await storage.createCaseStudy({ title, client, category: category || "Web Development", description, image, results: results || [] });
+    res.status(201).json(study);
+  });
+
+  app.patch("/api/accounting/case-studies/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { title, client, category, description, image, results } = req.body;
+    const data: Record<string, unknown> = {};
+    if (title !== undefined) data.title = title;
+    if (client !== undefined) data.client = client;
+    if (category !== undefined) data.category = category;
+    if (description !== undefined) data.description = description;
+    if (image !== undefined) data.image = image;
+    if (results !== undefined) data.results = results;
+    const updated = await storage.updateCaseStudy(id, data);
+    if (!updated) return res.status(404).json({ message: "Case study not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/case-studies/:id", requireAuth, requirePermission("content.delete"), async (req, res) => {
+    const deleted = await storage.deleteCaseStudy(parseInt(req.params.id));
+    if (!deleted) return res.status(404).json({ message: "Case study not found" });
+    res.json({ message: "Deleted" });
+  });
+
+  // ===== FAQ MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/faqs", requireAuth, requirePermission("content.view"), async (_req, res) => {
+    const items = await storage.getFaqItems(false);
+    res.json(items);
+  });
+
+  app.post("/api/accounting/faqs", requireAuth, requirePermission("content.create"), async (req, res) => {
+    const { question, answer, category, displayOrder, isActive } = req.body;
+    if (!question || !answer) {
+      return res.status(400).json({ message: "Question and answer are required" });
+    }
+    const item = await storage.createFaqItem({ question, answer, category: category || "General Questions", displayOrder: displayOrder ?? 0, isActive: isActive ?? true });
+    res.status(201).json(item);
+  });
+
+  app.patch("/api/accounting/faqs/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { question, answer, category, displayOrder, isActive } = req.body;
+    const data: Record<string, unknown> = {};
+    if (question !== undefined) data.question = question;
+    if (answer !== undefined) data.answer = answer;
+    if (category !== undefined) data.category = category;
+    if (displayOrder !== undefined) data.displayOrder = displayOrder;
+    if (isActive !== undefined) data.isActive = isActive;
+    const updated = await storage.updateFaqItem(id, data);
+    if (!updated) return res.status(404).json({ message: "FAQ item not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/faqs/:id", requireAuth, requirePermission("content.delete"), async (req, res) => {
+    const deleted = await storage.deleteFaqItem(parseInt(req.params.id));
+    if (!deleted) return res.status(404).json({ message: "FAQ item not found" });
+    res.json({ message: "Deleted" });
+  });
+
+  // ===== TESTIMONIALS MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/testimonials", requireAuth, requirePermission("content.view"), async (_req, res) => {
+    const items = await storage.getTestimonials(false);
+    res.json(items);
+  });
+
+  app.post("/api/accounting/testimonials", requireAuth, requirePermission("content.create"), async (req, res) => {
+    const { clientName, role, company, content, imageUrl, rating, isActive, displayOrder } = req.body;
+    if (!clientName || !role || !content) {
+      return res.status(400).json({ message: "Client name, role, and content are required" });
+    }
+    const item = await storage.createTestimonial({ clientName, role, company: company || null, content, imageUrl: imageUrl || null, rating: rating ?? 5, isActive: isActive ?? true, displayOrder: displayOrder ?? 0 });
+    res.status(201).json(item);
+  });
+
+  app.patch("/api/accounting/testimonials/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { clientName, role, company, content, imageUrl, rating, isActive, displayOrder } = req.body;
+    const data: Record<string, unknown> = {};
+    if (clientName !== undefined) data.clientName = clientName;
+    if (role !== undefined) data.role = role;
+    if (company !== undefined) data.company = company;
+    if (content !== undefined) data.content = content;
+    if (imageUrl !== undefined) data.imageUrl = imageUrl;
+    if (rating !== undefined) data.rating = rating;
+    if (isActive !== undefined) data.isActive = isActive;
+    if (displayOrder !== undefined) data.displayOrder = displayOrder;
+    const updated = await storage.updateTestimonial(id, data);
+    if (!updated) return res.status(404).json({ message: "Testimonial not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/testimonials/:id", requireAuth, requirePermission("content.delete"), async (req, res) => {
+    const deleted = await storage.deleteTestimonial(parseInt(req.params.id));
+    if (!deleted) return res.status(404).json({ message: "Testimonial not found" });
+    res.json({ message: "Deleted" });
+  });
+
+  // ===== SITE STATS MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/site-stats", requireAuth, requirePermission("content.view"), async (_req, res) => {
+    const items = await storage.getSiteStats();
+    res.json(items);
+  });
+
+  app.post("/api/accounting/site-stats", requireAuth, requirePermission("content.create"), async (req, res) => {
+    const { label, value, suffix, icon, displayOrder } = req.body;
+    if (!label || !value) {
+      return res.status(400).json({ message: "Label and value are required" });
+    }
+    const item = await storage.createSiteStat({ label, value, suffix: suffix || "", icon: icon || "Star", displayOrder: displayOrder ?? 0 });
+    res.status(201).json(item);
+  });
+
+  app.patch("/api/accounting/site-stats/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { label, value, suffix, icon, displayOrder } = req.body;
+    const data: Record<string, unknown> = {};
+    if (label !== undefined) data.label = label;
+    if (value !== undefined) data.value = value;
+    if (suffix !== undefined) data.suffix = suffix;
+    if (icon !== undefined) data.icon = icon;
+    if (displayOrder !== undefined) data.displayOrder = displayOrder;
+    const updated = await storage.updateSiteStat(id, data);
+    if (!updated) return res.status(404).json({ message: "Stat not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/site-stats/:id", requireAuth, requirePermission("content.delete"), async (req, res) => {
+    const deleted = await storage.deleteSiteStat(parseInt(req.params.id));
+    if (!deleted) return res.status(404).json({ message: "Stat not found" });
+    res.json({ message: "Deleted" });
   });
 
   // ===== JOB POSTINGS MANAGEMENT (Accounting) =====

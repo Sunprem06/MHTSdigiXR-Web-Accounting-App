@@ -4,17 +4,18 @@ import {
   employees, auditLogs, accountGroups, ledgerAccounts,
   financialYears, companySettings, vouchers, voucherEntries, auditNotes,
   parties, products, quotations, expenseClaims, roles,
-  jobPostings, jobApplications,
+  jobPostings, jobApplications, faqItems, testimonials, siteStats,
   type InsertContactMessage, type InsertPost, type InsertService, type InsertCaseStudy,
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
   type InsertFinancialYear, type InsertCompanySettings, type InsertVoucher, type InsertVoucherEntry,
   type InsertAuditNote, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
   type InsertDbRole, type InsertJobPosting, type InsertJobApplication,
+  type InsertFaqItem, type InsertTestimonial, type InsertSiteStat,
   type ContactMessage, type Post, type Service, type CaseStudy,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
   type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
   type Party, type Product, type Quotation, type ExpenseClaim, type DbRole,
-  type JobPosting, type JobApplication
+  type JobPosting, type JobApplication, type FaqItem, type Testimonial, type SiteStat
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -115,6 +116,38 @@ export interface IStorage {
   createJobApplication(application: InsertJobApplication): Promise<JobApplication>;
   updateJobApplication(id: number, data: Partial<JobApplication>): Promise<JobApplication | undefined>;
   deleteJobApplication(id: number): Promise<boolean>;
+
+  getContactMessages(): Promise<ContactMessage[]>;
+  getContactMessage(id: number): Promise<ContactMessage | undefined>;
+  updateContactMessage(id: number, data: Partial<ContactMessage>): Promise<ContactMessage | undefined>;
+  deleteContactMessage(id: number): Promise<boolean>;
+  getUnreadContactCount(): Promise<number>;
+
+  updatePost(id: number, data: Partial<Post>): Promise<Post | undefined>;
+  deletePost(id: number): Promise<boolean>;
+  getPostById(id: number): Promise<Post | undefined>;
+
+  getCaseStudy(id: number): Promise<CaseStudy | undefined>;
+  updateCaseStudy(id: number, data: Partial<CaseStudy>): Promise<CaseStudy | undefined>;
+  deleteCaseStudy(id: number): Promise<boolean>;
+
+  getFaqItems(activeOnly?: boolean): Promise<FaqItem[]>;
+  getFaqItem(id: number): Promise<FaqItem | undefined>;
+  createFaqItem(item: InsertFaqItem): Promise<FaqItem>;
+  updateFaqItem(id: number, data: Partial<FaqItem>): Promise<FaqItem | undefined>;
+  deleteFaqItem(id: number): Promise<boolean>;
+
+  getTestimonials(activeOnly?: boolean): Promise<Testimonial[]>;
+  getTestimonial(id: number): Promise<Testimonial | undefined>;
+  createTestimonial(t: InsertTestimonial): Promise<Testimonial>;
+  updateTestimonial(id: number, data: Partial<Testimonial>): Promise<Testimonial | undefined>;
+  deleteTestimonial(id: number): Promise<boolean>;
+
+  getSiteStats(): Promise<SiteStat[]>;
+  getSiteStat(id: number): Promise<SiteStat | undefined>;
+  createSiteStat(s: InsertSiteStat): Promise<SiteStat>;
+  updateSiteStat(id: number, data: Partial<SiteStat>): Promise<SiteStat | undefined>;
+  deleteSiteStat(id: number): Promise<boolean>;
 
   getDashboardStats(): Promise<{
     totalIncome: number;
@@ -874,6 +907,138 @@ export class DatabaseStorage implements IStorage {
 
   async deleteJobApplication(id: number): Promise<boolean> {
     const result = await db.delete(jobApplications).where(eq(jobApplications.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getContactMessages(): Promise<ContactMessage[]> {
+    return await db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt));
+  }
+
+  async getContactMessage(id: number): Promise<ContactMessage | undefined> {
+    const [msg] = await db.select().from(contactMessages).where(eq(contactMessages.id, id));
+    return msg;
+  }
+
+  async updateContactMessage(id: number, data: Partial<ContactMessage>): Promise<ContactMessage | undefined> {
+    const [updated] = await db.update(contactMessages).set(data).where(eq(contactMessages.id, id)).returning();
+    return updated;
+  }
+
+  async deleteContactMessage(id: number): Promise<boolean> {
+    const result = await db.delete(contactMessages).where(eq(contactMessages.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getUnreadContactCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(contactMessages).where(eq(contactMessages.isRead, false));
+    return result[0]?.count ?? 0;
+  }
+
+  async updatePost(id: number, data: Partial<Post>): Promise<Post | undefined> {
+    const [updated] = await db.update(posts).set(data).where(eq(posts.id, id)).returning();
+    return updated;
+  }
+
+  async deletePost(id: number): Promise<boolean> {
+    const result = await db.delete(posts).where(eq(posts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getPostById(id: number): Promise<Post | undefined> {
+    const [post] = await db.select().from(posts).where(eq(posts.id, id));
+    return post;
+  }
+
+  async getCaseStudy(id: number): Promise<CaseStudy | undefined> {
+    const [cs] = await db.select().from(caseStudies).where(eq(caseStudies.id, id));
+    return cs;
+  }
+
+  async updateCaseStudy(id: number, data: Partial<CaseStudy>): Promise<CaseStudy | undefined> {
+    const [updated] = await db.update(caseStudies).set(data).where(eq(caseStudies.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCaseStudy(id: number): Promise<boolean> {
+    const result = await db.delete(caseStudies).where(eq(caseStudies.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getFaqItems(activeOnly?: boolean): Promise<FaqItem[]> {
+    if (activeOnly) {
+      return await db.select().from(faqItems).where(eq(faqItems.isActive, true)).orderBy(faqItems.displayOrder);
+    }
+    return await db.select().from(faqItems).orderBy(faqItems.displayOrder);
+  }
+
+  async getFaqItem(id: number): Promise<FaqItem | undefined> {
+    const [item] = await db.select().from(faqItems).where(eq(faqItems.id, id));
+    return item;
+  }
+
+  async createFaqItem(item: InsertFaqItem): Promise<FaqItem> {
+    const [newItem] = await db.insert(faqItems).values(item).returning();
+    return newItem;
+  }
+
+  async updateFaqItem(id: number, data: Partial<FaqItem>): Promise<FaqItem | undefined> {
+    const [updated] = await db.update(faqItems).set(data).where(eq(faqItems.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFaqItem(id: number): Promise<boolean> {
+    const result = await db.delete(faqItems).where(eq(faqItems.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getTestimonials(activeOnly?: boolean): Promise<Testimonial[]> {
+    if (activeOnly) {
+      return await db.select().from(testimonials).where(eq(testimonials.isActive, true)).orderBy(testimonials.displayOrder);
+    }
+    return await db.select().from(testimonials).orderBy(testimonials.displayOrder);
+  }
+
+  async getTestimonial(id: number): Promise<Testimonial | undefined> {
+    const [t] = await db.select().from(testimonials).where(eq(testimonials.id, id));
+    return t;
+  }
+
+  async createTestimonial(t: InsertTestimonial): Promise<Testimonial> {
+    const [newT] = await db.insert(testimonials).values(t).returning();
+    return newT;
+  }
+
+  async updateTestimonial(id: number, data: Partial<Testimonial>): Promise<Testimonial | undefined> {
+    const [updated] = await db.update(testimonials).set(data).where(eq(testimonials.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTestimonial(id: number): Promise<boolean> {
+    const result = await db.delete(testimonials).where(eq(testimonials.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getSiteStats(): Promise<SiteStat[]> {
+    return await db.select().from(siteStats).orderBy(siteStats.displayOrder);
+  }
+
+  async getSiteStat(id: number): Promise<SiteStat | undefined> {
+    const [s] = await db.select().from(siteStats).where(eq(siteStats.id, id));
+    return s;
+  }
+
+  async createSiteStat(s: InsertSiteStat): Promise<SiteStat> {
+    const [newS] = await db.insert(siteStats).values(s).returning();
+    return newS;
+  }
+
+  async updateSiteStat(id: number, data: Partial<SiteStat>): Promise<SiteStat | undefined> {
+    const [updated] = await db.update(siteStats).set(data).where(eq(siteStats.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSiteStat(id: number): Promise<boolean> {
+    const result = await db.delete(siteStats).where(eq(siteStats.id, id)).returning();
     return result.length > 0;
   }
 }

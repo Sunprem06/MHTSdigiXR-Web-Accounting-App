@@ -12,6 +12,8 @@ export const posts = pgTable("posts", {
   content: text("content").notNull(),
   summary: text("summary").notNull(),
   coverImage: text("cover_image"),
+  author: text("author").default("Admin"),
+  status: text("status").default("published").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -21,6 +23,7 @@ export const contactMessages = pgTable("contact_messages", {
   email: text("email").notNull(),
   phone: text("phone"),
   message: text("message").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -38,9 +41,42 @@ export const caseStudies = pgTable("case_studies", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   client: text("client").notNull(),
+  category: text("category").default("Web Development"),
   description: text("description").notNull(),
   image: text("image").notNull(),
   results: text("results").array(),
+});
+
+export const faqItems = pgTable("faq_items", {
+  id: serial("id").primaryKey(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  category: text("category").notNull().default("General Questions"),
+  displayOrder: integer("display_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const testimonials = pgTable("testimonials", {
+  id: serial("id").primaryKey(),
+  clientName: text("client_name").notNull(),
+  role: text("role").notNull(),
+  company: text("company"),
+  content: text("content").notNull(),
+  imageUrl: text("image_url"),
+  rating: integer("rating").default(5),
+  isActive: boolean("is_active").default(true).notNull(),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const siteStats = pgTable("site_stats", {
+  id: serial("id").primaryKey(),
+  label: text("label").notNull(),
+  value: text("value").notNull(),
+  suffix: text("suffix").default(""),
+  icon: text("icon").default("Star"),
+  displayOrder: integer("display_order").default(0).notNull(),
 });
 
 export const roles = pgTable("roles", {
@@ -311,6 +347,9 @@ export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: t
 export const insertExpenseClaimSchema = createInsertSchema(expenseClaims).omit({ id: true, createdAt: true });
 export const insertJobPostingSchema = createInsertSchema(jobPostings).omit({ id: true, createdAt: true });
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({ id: true, createdAt: true });
+export const insertFaqItemSchema = createInsertSchema(faqItems).omit({ id: true, createdAt: true });
+export const insertTestimonialSchema = createInsertSchema(testimonials).omit({ id: true, createdAt: true });
+export const insertSiteStatSchema = createInsertSchema(siteStats).omit({ id: true });
 
 export type Post = typeof posts.$inferSelect;
 export type InsertPost = z.infer<typeof insertPostSchema>;
@@ -352,6 +391,12 @@ export type JobPosting = typeof jobPostings.$inferSelect;
 export type InsertJobPosting = z.infer<typeof insertJobPostingSchema>;
 export type JobApplication = typeof jobApplications.$inferSelect;
 export type InsertJobApplication = z.infer<typeof insertJobApplicationSchema>;
+export type FaqItem = typeof faqItems.$inferSelect;
+export type InsertFaqItem = z.infer<typeof insertFaqItemSchema>;
+export type Testimonial = typeof testimonials.$inferSelect;
+export type InsertTestimonial = z.infer<typeof insertTestimonialSchema>;
+export type SiteStat = typeof siteStats.$inferSelect;
+export type InsertSiteStat = z.infer<typeof insertSiteStatSchema>;
 
 export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer", "sales_person", "sales_manager"] as const;
 export type Role = typeof ROLES[number];
@@ -378,6 +423,8 @@ export const ALL_PERMISSIONS = [
   "vouchers.view", "vouchers.create", "vouchers.edit", "vouchers.approve",
   "expenses.view", "expenses.create", "expenses.approve",
   "jobs.view", "jobs.create", "jobs.edit", "jobs.delete",
+  "content.view", "content.create", "content.edit", "content.delete",
+  "contacts.view", "contacts.manage",
   "reports.view",
   "audit.view", "audit.notes",
   "employees.view", "employees.manage",
@@ -397,6 +444,8 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   vouchers: { label: "Vouchers", permissions: ["vouchers.view", "vouchers.create", "vouchers.edit", "vouchers.approve"] },
   expenses: { label: "Expenses", permissions: ["expenses.view", "expenses.create", "expenses.approve"] },
   jobs: { label: "Recruitment", permissions: ["jobs.view", "jobs.create", "jobs.edit", "jobs.delete"] },
+  content: { label: "Website Content", permissions: ["content.view", "content.create", "content.edit", "content.delete"] },
+  contacts: { label: "Contact Inbox", permissions: ["contacts.view", "contacts.manage"] },
   reports: { label: "Reports", permissions: ["reports.view"] },
   audit: { label: "Audit", permissions: ["audit.view", "audit.notes"] },
   employees: { label: "Employees", permissions: ["employees.view", "employees.manage"] },
@@ -407,7 +456,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   super_admin: [...ALL_PERMISSIONS],
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.")),
-  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "reports.view", "audit.view", "audit.notes"],
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes"],
   senior_accountant: [
     "dashboard.view",
     "ledgers.view", "ledgers.create", "ledgers.edit",

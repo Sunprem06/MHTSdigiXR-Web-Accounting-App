@@ -58,6 +58,12 @@ import SettingsPage from "@/pages/accounting/Settings";
 import RolesPage from "@/pages/accounting/Roles";
 import JobPostings from "@/pages/accounting/JobPostings";
 import JobApplicationsPage from "@/pages/accounting/JobApplications";
+import ContactInbox from "@/pages/accounting/ContactInbox";
+import BlogPosts from "@/pages/accounting/BlogPosts";
+import CaseStudiesManagement from "@/pages/accounting/CaseStudiesManagement";
+import FAQManagement from "@/pages/accounting/FAQManagement";
+import TestimonialsManagement from "@/pages/accounting/TestimonialsManagement";
+import SiteStatsManagement from "@/pages/accounting/SiteStatsManagement";
 
 function WebsiteRouter() {
   return (
@@ -171,6 +177,24 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/job-applications">
         {() => <ProtectedRoute requiredPermission="jobs.view"><JobApplicationsPage /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/contact-inbox">
+        {() => <ProtectedRoute requiredPermission="contacts.view"><ContactInbox /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/blog-posts">
+        {() => <ProtectedRoute requiredPermission="content.view"><BlogPosts /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/case-studies">
+        {() => <ProtectedRoute requiredPermission="content.view"><CaseStudiesManagement /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/faqs">
+        {() => <ProtectedRoute requiredPermission="content.view"><FAQManagement /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/testimonials">
+        {() => <ProtectedRoute requiredPermission="content.view"><TestimonialsManagement /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/site-stats">
+        {() => <ProtectedRoute requiredPermission="content.view"><SiteStatsManagement /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/audit-log">
         {() => <ProtectedRoute requiredPermission="audit.view"><AuditLogPage /></ProtectedRoute>}

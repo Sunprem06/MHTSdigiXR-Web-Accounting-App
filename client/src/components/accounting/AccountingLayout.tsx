@@ -1,12 +1,13 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, BookOpen, FileText, BarChart3, Users, Settings, LogOut,
   ChevronDown, ChevronRight, ShoppingCart, Package, CreditCard, Receipt,
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
-  Briefcase
+  Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -61,6 +62,17 @@ const navItems: NavItem[] = [
       { label: "Applications", path: "/accounting/job-applications", icon: UserCheck },
     ],
   },
+  {
+    label: "Website CMS", icon: Globe, requiredPermission: "content.view",
+    children: [
+      { label: "Blog Posts", path: "/accounting/blog-posts", icon: PenLine },
+      { label: "Case Studies", path: "/accounting/case-studies", icon: FolderOpen },
+      { label: "FAQs", path: "/accounting/faqs", icon: HelpCircle },
+      { label: "Testimonials", path: "/accounting/testimonials", icon: MessageSquare },
+      { label: "Site Stats", path: "/accounting/site-stats", icon: Activity },
+    ],
+  },
+  { label: "Contact Inbox", path: "/accounting/contact-inbox", icon: Mail, requiredPermission: "contacts.view" },
   { label: "Audit Log", path: "/accounting/audit-log", icon: Shield, requiredPermission: "audit.view" },
   { label: "Employees", path: "/accounting/employees", icon: Users, requiredPermission: "employees.manage" },
   { label: "Roles", path: "/accounting/roles", icon: KeyRound, requiredPermission: "roles.view" },
@@ -70,8 +82,15 @@ const navItems: NavItem[] = [
 export function AccountingLayout({ children }: AccountingLayoutProps) {
   const { user, logout, hasPermission } = useAuth();
   const [location] = useLocation();
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(["Vouchers", "Reports", "Recruitment"]);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(["Vouchers", "Reports", "Recruitment", "Website CMS"]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/accounting/contact-messages/unread-count"],
+    enabled: hasPermission("contacts.view"),
+    refetchInterval: 30000,
+  });
+  const unreadCount = unreadData?.count ?? 0;
 
   const toggleMenu = (label: string) => {
     setExpandedMenus(prev =>
@@ -168,7 +187,10 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
                 >
                   <item.icon className="w-4 h-4" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.label === "Contact Inbox" && unreadCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center" data-testid="badge-unread-count">{unreadCount}</span>
+                  )}
                 </div>
               </Link>
             )}

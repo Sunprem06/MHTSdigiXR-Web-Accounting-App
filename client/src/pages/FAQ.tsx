@@ -2,7 +2,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { ChevronDown, HelpCircle, ArrowRight, MessageSquare, Search, Code, Smartphone, BarChart3, Palette, Server, Video, Monitor } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useSiteSettings } from "@/hooks/use-site-settings";
+import type { FaqItem } from "@shared/schema";
 
 interface FAQItem {
   question: string;
@@ -319,11 +321,30 @@ function FAQAccordion({ item, isOpen, onClick }: { item: FAQItem; isOpen: boolea
   );
 }
 
+const CATEGORY_STYLES: Record<string, { icon: typeof HelpCircle; color: string }> = {
+  "General Questions": { icon: HelpCircle, color: "from-sky-500 to-sky-600" },
+  "Web Development": { icon: Code, color: "from-blue-500 to-blue-600" },
+  "Mobile App Development": { icon: Smartphone, color: "from-purple-500 to-purple-600" },
+  "Digital Marketing": { icon: BarChart3, color: "from-orange-500 to-orange-600" },
+  "UI/UX Design": { icon: Monitor, color: "from-pink-500 to-pink-600" },
+  "SEO Optimization": { icon: Search, color: "from-green-500 to-green-600" },
+  "SEO": { icon: Search, color: "from-green-500 to-green-600" },
+  "Design": { icon: Palette, color: "from-pink-500 to-pink-600" },
+  "Branding & Graphics": { icon: Palette, color: "from-red-500 to-red-600" },
+  "Domain & Hosting": { icon: Server, color: "from-cyan-500 to-cyan-600" },
+  "Video & Animation": { icon: Video, color: "from-yellow-500 to-yellow-600" },
+  "Pricing & Payment": { icon: HelpCircle, color: "from-sky-500 to-sky-600" },
+  "Pricing": { icon: HelpCircle, color: "from-sky-500 to-sky-600" },
+  "Support": { icon: MessageSquare, color: "from-teal-500 to-teal-600" },
+};
+
 export default function FAQ() {
   const siteSettings = useSiteSettings();
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
   const [activeCategory, setActiveCategory] = useState<string>("General Questions");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: apiFaqs = [] } = useQuery<FaqItem[]>({ queryKey: ["/api/faqs"] });
 
   const toggleItem = (categoryTitle: string, questionIndex: number) => {
     const key = `${categoryTitle}-${questionIndex}`;
@@ -332,13 +353,31 @@ export default function FAQ() {
 
   const quoteAnswer = `Getting a quote is easy! You can fill out our contact form, chat with Kayal (our AI assistant)${siteSettings.phone ? `, call us at ${siteSettings.phone}` : ''}${siteSettings.whatsappNumber ? `, or WhatsApp us at +${siteSettings.whatsappNumber.replace(/^(\d{2})/, '$1 ')}` : ''}. We typically respond within 2-4 hours and provide detailed proposals within 24-48 hours.`;
 
-  const resolvedCategories = FAQ_CATEGORIES.map(category => ({
-    ...category,
-    faqs: category.faqs.map(faq => ({
-      ...faq,
-      answer: faq.answer === "QUOTE_ANSWER_PLACEHOLDER" ? quoteAnswer : faq.answer,
-    })),
-  }));
+  const buildCategories = (): FAQCategory[] => {
+    if (apiFaqs.length > 0) {
+      const catMap = new Map<string, FAQItem[]>();
+      apiFaqs.forEach(faq => {
+        const cat = faq.category || "General Questions";
+        if (!catMap.has(cat)) catMap.set(cat, []);
+        catMap.get(cat)!.push({ question: faq.question, answer: faq.answer });
+      });
+      return Array.from(catMap.entries()).map(([title, faqs]) => ({
+        title,
+        icon: CATEGORY_STYLES[title]?.icon || HelpCircle,
+        color: CATEGORY_STYLES[title]?.color || "from-sky-500 to-sky-600",
+        faqs,
+      }));
+    }
+    return FAQ_CATEGORIES.map(category => ({
+      ...category,
+      faqs: category.faqs.map(faq => ({
+        ...faq,
+        answer: faq.answer === "QUOTE_ANSWER_PLACEHOLDER" ? quoteAnswer : faq.answer,
+      })),
+    }));
+  };
+
+  const resolvedCategories = buildCategories();
 
   const filteredCategories = searchQuery
     ? resolvedCategories.map(category => ({

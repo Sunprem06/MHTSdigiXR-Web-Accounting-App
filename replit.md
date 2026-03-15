@@ -6,6 +6,7 @@ This is a full-stack digital agency website for Maanagarram Hi Tech Solutions (b
 
 ## Recent Changes (Mar 2026)
 
+- **Website Content CMS**: Self-service content management for Super Admin/Admin. Blog Posts (create/edit/delete, draft/published status) at `/accounting/blog-posts`; Case Studies management at `/accounting/case-studies`; FAQ Management with categories at `/accounting/faqs`; Testimonials management at `/accounting/testimonials`; Site Stats management at `/accounting/site-stats`; Contact Inbox with read/unread tracking and unread badge at `/accounting/contact-inbox`. Public pages (Blog, FAQ, Home) pull from API with fallback to hardcoded data. New permissions: `content.view/create/edit/delete`, `contacts.view/manage`. Seed data auto-populates FAQs, testimonials, stats, and blog posts on first run. Sidebar "Website CMS" section with expandable sub-items.
 - **Careers & Recruitment Module**: Job Postings management (create/edit/delete/toggle open) at `/accounting/job-postings`; Job Applications tracking with status workflow (new → reviewing → shortlisted → interview → offered → hired/rejected) at `/accounting/job-applications`; Public Careers page fetches live job data from API with dynamic department tabs and inline apply modal; `jobs.view`, `jobs.create`, `jobs.edit`, `jobs.delete` permissions; Recruitment sidebar item in accounting layout; System role seed auto-updates existing roles with new permissions
 - **Database-Driven Roles & Permissions**: New `roles` DB table with slug, label, description, permissions (JSONB), isSystem flag. 9 system roles seeded on startup (Super Admin, Admin, Auditor, Senior Accountant, Accountant, Data Entry Operator, Viewer, Sales Person, Sales Manager). 39 granular permissions organized into 14 groups (dashboard, ledgers, parties, products, quotations, invoices, vouchers, expenses, reports, audit, employees, roles, settings, jobs). Employees table has optional `permissions` JSONB for per-user overrides. `hasPermission()` / `hasAnyPermission()` in useAuth hook. Sidebar nav items filtered by permission. New Roles Management page at /accounting/roles for Super Admin/Admin. Employee Add/Edit loads roles dynamically from API. ProtectedRoute supports `requiredPermission` prop.
 - **Quotation Approval Workflow**: Draft → Submit for Review → Approve/Reject flow; added assignedTo, reviewedBy, reviewedAt, submittedAt columns; Senior Accountant/Admin/Super Admin can approve or reject submitted quotations with optional rejection reason; data_entry users can create and submit their own quotations; "Assigned To" column in list; amber "Submitted" badge; workflow trail shown in QuotationView
@@ -112,7 +113,7 @@ Roles are stored in the `roles` DB table with granular permissions. 9 system rol
 | Sales Person | Quotations, parties, products (7 permissions) |
 | Sales Manager | Approve quotations, manage parties, reports (13 permissions) |
 
-Permissions are organized in 13 groups: dashboard, ledgers, parties, products, quotations, invoices, vouchers, expenses, reports, audit, employees, roles, settings.
+Permissions are organized in 15 groups: dashboard, ledgers, parties, products, quotations, invoices, vouchers, expenses, reports, audit, employees, roles, settings, content, contacts.
 
 ### Default Login
 - **Username**: superadmin

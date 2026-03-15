@@ -1,14 +1,17 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { ArrowRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { CaseStudy } from "@shared/schema";
 
-const PROJECTS = [
+const FALLBACK_PROJECTS = [
   {
     id: 1,
     title: "E-commerce Platform for Fashion Brand",
     client: "StyleVista",
     image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&q=80",
     category: "Web Development",
+    description: "",
     results: ["150% Increase in Sales", "3x Faster Load Time"]
   },
   {
@@ -17,6 +20,7 @@ const PROJECTS = [
     client: "MediCare Plus",
     image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&q=80",
     category: "Mobile App",
+    description: "",
     results: ["50k+ Downloads", "4.8 Star Rating"]
   },
   {
@@ -25,6 +29,7 @@ const PROJECTS = [
     client: "TechFlow Inc",
     image: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=600&q=80",
     category: "Branding",
+    description: "",
     results: ["Modern Identity", "Unified Brand Voice"]
   },
   {
@@ -33,11 +38,26 @@ const PROJECTS = [
     client: "Urban Properties",
     image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&q=80",
     category: "Digital Marketing",
+    description: "",
     results: ["#1 Ranking for Keywords", "200% More Leads"]
   }
 ];
 
 export default function CaseStudies() {
+  const { data: apiStudies = [] } = useQuery<CaseStudy[]>({ queryKey: ["/api/case-studies"] });
+
+  const projects = apiStudies.length > 0
+    ? apiStudies.map(s => ({
+        id: s.id,
+        title: s.title,
+        client: s.client,
+        image: s.image,
+        category: (s as any).category || "Web Development",
+        description: s.description,
+        results: (Array.isArray(s.results) ? s.results : []) as string[],
+      }))
+    : FALLBACK_PROJECTS;
+
   return (
     <div className="pt-24 pb-20">
       <section className="relative bg-slate-900 dark:bg-black py-20 mb-16 overflow-hidden">
@@ -63,7 +83,7 @@ export default function CaseStudies() {
 
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid md:grid-cols-2 gap-8">
-          {PROJECTS.map((project, index) => (
+          {projects.map((project, index) => (
             <motion.div
               key={project.id}
               initial={{ opacity: 0, y: 20 }}

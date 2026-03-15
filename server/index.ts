@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { seedSystemRoles } from "./seed-roles";
+import { seedContent } from "./seed-content";
 
 const app = express();
 const httpServer = createServer(app);
@@ -65,6 +66,7 @@ app.use((req, res, next) => {
 
 (async () => {
   await seedSystemRoles().catch(err => console.error("Role seed error:", err));
+  await seedContent().catch(err => console.error("Content seed error:", err));
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
