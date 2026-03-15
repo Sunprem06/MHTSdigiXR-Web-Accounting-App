@@ -1,0 +1,249 @@
+1
+
+added 487 packages, and audited 488 packages in 5s
+
+2
+
+
+3
+
+80 packages are looking for funding
+
+4
+
+run `npm fund` for details
+
+5
+
+
+6
+
+4 vulnerabilities (1 low, 1 moderate, 2 high)
+
+7
+
+
+8
+
+To address all issues, run:
+
+9
+
+npm audit fix
+
+10
+
+
+11
+
+Run `npm audit` for details.
+
+12
+
+
+13
+
+> rest-express@1.0.0 build
+
+14
+
+> tsx script/build.ts
+
+15
+
+
+16
+
+building client...
+
+17
+
+vite v7.3.0 building client environment for production...
+
+18
+
+transforming...
+
+19
+
+✓ 2254 modules transformed.
+
+20
+
+rendering chunks...
+
+21
+
+computing gzip size...
+
+22
+
+../dist/public/index.html 2.16 kB │ gzip: 0.86 kB
+
+23
+
+../dist/public/assets/MHTSdigiXR_logo_1080x1080_1773540695277-CqmIHqea.jpg 126.84 kB
+
+24
+
+../dist/public/assets/team-member-CcLSby93.png 1,601.51 kB
+
+25
+
+../dist/public/assets/index-BIj0kXh6.css 117.96 kB │ gzip: 18.27 kB
+
+26
+
+../dist/public/assets/index-UPbByi8p.js 1,060.60 kB │ gzip: 274.49 kB
+
+27
+
+
+28
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+
+29
+
+- Using dynamic import() to code-split the application
+
+30
+
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+
+31
+
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+32
+
+✓ built in 5.02s
+
+33
+
+building server...
+
+34
+
+▲ [WARNING] Duplicate member "createPasswordResetToken" in class body [duplicate-class-member]
+
+35
+
+
+36
+
+server/storage.ts:1192:8:
+
+37
+
+1192 │ async createPasswordResetToken(data: InsertPasswordResetToken)...
+
+38
+
+╵ ~~~~~~~~~~~~~~~~~~~~~~~~
+
+39
+
+
+40
+
+The original member "createPasswordResetToken" is here:
+
+41
+
+
+42
+
+server/storage.ts:717:8:
+
+43
+
+717 │ async createPasswordResetToken(token: InsertPasswordResetToken)...
+
+44
+
+╵ ~~~~~~~~~~~~~~~~~~~~~~~~
+
+45
+
+
+46
+
+▲ [WARNING] Duplicate member "getPasswordResetToken" in class body [duplicate-class-member]
+
+47
+
+
+48
+
+server/storage.ts:1197:8:
+
+49
+
+1197 │ async getPasswordResetToken(token: string): Promise {
+
+50
+
+╵ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+51
+
+
+52
+
+The original member "markPasswordResetTokenUsed" is here:
+
+53
+
+
+54
+
+server/storage.ts:727:8:
+
+55
+
+727 │ async markPasswordResetTokenUsed(id: number): Promise {
+
+56
+
+╵ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+57
+
+
+58
+
+▲ [WARNING] Duplicate member "consumePasswordResetToken" in class body [duplicate-class-member]
+
+59
+
+
+60
+
+server/storage.ts:1206:8:
+
+61
+
+1206 │ async consumePasswordResetToken(hashedToken: string): Promise<...
+
+62
+
+╵ ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+63
+
+
+64
+
+The original member "consumePasswordResetToken" is here:
+
+65
+
+
+66
+
+server/storage.ts:731:8:
+
+67
+
+731 │ async consumePasswordResetToken(hashedToken: string): Promise
