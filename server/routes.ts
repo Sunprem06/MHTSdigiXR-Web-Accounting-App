@@ -875,16 +875,24 @@ export async function registerRoutes(
   });
 
   app.put("/api/accounting/company-settings", requireAuth, requirePermission("settings.manage"), async (req, res) => {
-    const settings = await storage.upsertCompanySettings(req.body);
+    const data = { ...req.body };
+    if (req.user!.role !== "super_admin") {
+      delete data.aboutStory;
+      delete data.aboutVision;
+      delete data.aboutMission;
+      delete data.foundedYear;
+      delete data.aboutLocation;
+    }
+    const settings = await storage.upsertCompanySettings(data);
     res.json(settings);
   });
 
-  app.get("/api/accounting/legal-pages", requireAuth, requirePermission("settings.manage"), async (_req, res) => {
+  app.get("/api/accounting/legal-pages", requireAuth, requireRole("super_admin"), async (_req, res) => {
     const pages = await storage.getLegalPages();
     res.json(pages);
   });
 
-  app.patch("/api/accounting/legal-pages/:slug", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+  app.patch("/api/accounting/legal-pages/:slug", requireAuth, requireRole("super_admin"), async (req, res) => {
     const { title, content, effectiveDate } = req.body;
     if (title === undefined && content === undefined && effectiveDate === undefined) return res.status(400).json({ message: "No fields to update" });
     const updates: any = {};
