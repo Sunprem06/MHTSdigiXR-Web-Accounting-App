@@ -128,6 +128,10 @@ export default function LegalPage() {
                   );
                 }
 
+                if (i === 0 && trimmed === page.title) {
+                  return null;
+                }
+
                 if (i === 0) {
                   return (
                     <h1 key={i} className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
