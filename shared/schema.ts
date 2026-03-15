@@ -111,6 +111,7 @@ export const employees = pgTable("employees", {
   fullName: text("full_name").notNull(),
   role: text("role").notNull().default("viewer"),
   permissions: jsonb("permissions"),
+  phone: text("phone"),
   isActive: boolean("is_active").notNull().default(true),
   lastLogin: timestamp("last_login"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

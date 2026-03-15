@@ -298,7 +298,7 @@ export async function registerRoutes(
 
   app.post("/api/accounting/employees", requireAuth, requirePermission("employees.manage"), async (req, res) => {
     try {
-      const { username, email, password, fullName, role, permissions: userPermissions } = req.body;
+      const { username, email, password, fullName, role, permissions: userPermissions, phone } = req.body;
       if (req.user!.role !== "super_admin" && (role === "super_admin" || role === "admin")) {
         return res.status(403).json({ message: "Only Super Admin can create Super Admin or Admin accounts" });
       }
@@ -308,6 +308,7 @@ export async function registerRoutes(
       const employee = await storage.createEmployee({
         username, email, password: hashedPassword, fullName, role,
         permissions: validPerms || null,
+        phone: phone || null,
         isActive: true, createdBy: req.user!.id,
       });
       await storage.createAuditLog({
@@ -340,6 +341,7 @@ export async function registerRoutes(
     const data: any = {};
     if (req.body.fullName) data.fullName = req.body.fullName;
     if (req.body.email) data.email = req.body.email;
+    if (req.body.phone !== undefined) data.phone = req.body.phone || null;
     if (req.body.role) {
       if (req.user!.role !== "super_admin" && (req.body.role === "super_admin" || req.body.role === "admin")) {
         return res.status(403).json({ message: "Cannot assign this role" });
@@ -1551,12 +1553,18 @@ async function seedDatabase() {
     const hashedPassword = await bcrypt.hash("admin123", 10);
     await storage.createEmployee({
       username: "superadmin",
-      email: "admin@mhtsdigix.com",
+      email: "premchandar.mhtsl@gmail.com",
       password: hashedPassword,
       fullName: "Super Administrator",
       role: "super_admin",
+      phone: "+91 9940342155",
       isActive: true,
       createdBy: null,
+    });
+  } else if (existingAdmin.email !== "premchandar.mhtsl@gmail.com" || existingAdmin.phone !== "+91 9940342155") {
+    await storage.updateEmployee(existingAdmin.id, {
+      email: "premchandar.mhtsl@gmail.com",
+      phone: "+91 9940342155",
     });
   }
 

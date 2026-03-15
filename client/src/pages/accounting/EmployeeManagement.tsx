@@ -24,6 +24,7 @@ interface Employee {
   email: string;
   fullName: string;
   role: string;
+  phone: string | null;
   permissions: string[] | null;
   isActive: boolean;
   createdAt: string;
@@ -41,12 +42,14 @@ export default function EmployeeManagement() {
   const [newPassword, setNewPassword] = useState("");
   const [newFullName, setNewFullName] = useState("");
   const [newRole, setNewRole] = useState("viewer");
+  const [newPhone, setNewPhone] = useState("");
   const [newUseOverrides, setNewUseOverrides] = useState(false);
   const [newOverridePerms, setNewOverridePerms] = useState<string[]>([]);
 
   const [editFullName, setEditFullName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState("viewer");
+  const [editPhone, setEditPhone] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
   const [editPassword, setEditPassword] = useState("");
   const [editUseOverrides, setEditUseOverrides] = useState(false);
@@ -62,7 +65,7 @@ export default function EmployeeManagement() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; email: string; password: string; fullName: string; role: string; permissions?: string[] }) => {
+    mutationFn: async (data: { username: string; email: string; password: string; fullName: string; role: string; phone?: string; permissions?: string[] }) => {
       const res = await apiRequest("POST", "/api/accounting/employees", data);
       return res.json();
     },
@@ -104,6 +107,7 @@ export default function EmployeeManagement() {
     setNewPassword("");
     setNewFullName("");
     setNewRole("viewer");
+    setNewPhone("");
     setNewUseOverrides(false);
     setNewOverridePerms([]);
   };
@@ -115,6 +119,7 @@ export default function EmployeeManagement() {
       password: newPassword,
       fullName: newFullName,
       role: newRole,
+      ...(newPhone ? { phone: newPhone } : {}),
       ...(newUseOverrides ? { permissions: newOverridePerms } : {}),
     });
   };
@@ -126,6 +131,7 @@ export default function EmployeeManagement() {
       email: editEmail,
       role: editRole,
       isActive: editIsActive,
+      phone: editPhone || "",
     };
     if (editPassword) {
       data.password = editPassword;
@@ -139,6 +145,7 @@ export default function EmployeeManagement() {
     setEditFullName(emp.fullName);
     setEditEmail(emp.email);
     setEditRole(emp.role);
+    setEditPhone(emp.phone || "");
     setEditIsActive(emp.isActive);
     setEditPassword("");
     const hasOverrides = Array.isArray(emp.permissions) && emp.permissions.length > 0;
@@ -276,6 +283,10 @@ export default function EmployeeManagement() {
                 <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} data-testid="input-new-password" />
               </div>
               <div>
+                <Label>Phone</Label>
+                <Input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+91 9876543210" data-testid="input-new-phone" />
+              </div>
+              <div>
                 <Label>Role</Label>
                 <Select value={newRole} onValueChange={(v) => { setNewRole(v); setNewUseOverrides(false); setNewOverridePerms([]); }}>
                   <SelectTrigger data-testid="select-new-role">
@@ -362,6 +373,10 @@ export default function EmployeeManagement() {
               <div>
                 <Label>Email</Label>
                 <Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} data-testid="input-edit-email" />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input type="tel" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+91 9876543210" data-testid="input-edit-phone" />
               </div>
               <div>
                 <Label>Role</Label>
