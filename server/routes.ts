@@ -338,10 +338,11 @@ export async function registerRoutes(
   });
 
   // Quotations
-  app.get("/api/accounting/quotations", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant"), async (req, res) => {
+  app.get("/api/accounting/quotations", requireAuth, requireRole("super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
     const filters: any = {};
     if (req.query.status) filters.status = req.query.status;
     if (req.query.partyId) filters.partyId = parseInt(req.query.partyId as string);
+    if (req.user!.role === "data_entry") filters.createdBy = req.user!.id;
     const quotationList = await storage.getQuotations(filters);
     res.json(quotationList);
   });
@@ -357,8 +358,8 @@ export async function registerRoutes(
     res.json(quotation);
   });
 
-  app.post("/api/accounting/quotations", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant"), async (req, res) => {
-    const quotation = await storage.createQuotation({ ...req.body, createdBy: req.user!.id });
+  app.post("/api/accounting/quotations", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
+    const quotation = await storage.createQuotation({ ...req.body, createdBy: req.user!.id, assignedTo: req.body.assignedTo || req.user!.id });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "create", entity: "quotation",
       entityId: quotation.id, details: `Created quotation: ${quotation.quotationNumber}`,
@@ -388,6 +389,62 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json({ message: "Deleted successfully" });
+  });
+
+  app.post("/api/accounting/quotations/:id/submit", requireAuth, requireRole("super_admin", "admin", "senior_accountant", "accountant", "data_entry"), async (req, res) => {
+    const quotation = await storage.getQuotation(parseInt(req.params.id));
+    if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+    if (quotation.status !== "draft") return res.status(400).json({ message: "Only draft quotations can be submitted" });
+    const isAdmin = req.user!.role === "super_admin" || req.user!.role === "admin" || req.user!.role === "senior_accountant";
+    if (!isAdmin && quotation.createdBy !== req.user!.id) {
+      return res.status(403).json({ message: "You can only submit your own quotations" });
+    }
+    const updated = await storage.updateQuotation(quotation.id, {
+      status: "submitted",
+      submittedAt: new Date(),
+    } as any);
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "submit", entity: "quotation",
+      entityId: quotation.id, details: `Submitted quotation ${quotation.quotationNumber} for review`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/quotations/:id/approve", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+    const quotation = await storage.getQuotation(parseInt(req.params.id));
+    if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+    if (quotation.status !== "submitted") return res.status(400).json({ message: "Only submitted quotations can be approved" });
+    const updated = await storage.updateQuotation(quotation.id, {
+      status: "sent",
+      reviewedBy: req.user!.id,
+      reviewedAt: new Date(),
+    } as any);
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "approve", entity: "quotation",
+      entityId: quotation.id, details: `Approved quotation ${quotation.quotationNumber}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/quotations/:id/reject", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {
+    const quotation = await storage.getQuotation(parseInt(req.params.id));
+    if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+    if (quotation.status !== "submitted") return res.status(400).json({ message: "Only submitted quotations can be rejected" });
+    const reason = req.body?.reason || "";
+    const updated = await storage.updateQuotation(quotation.id, {
+      status: "rejected",
+      reviewedBy: req.user!.id,
+      reviewedAt: new Date(),
+      notes: reason ? `Rejected: ${reason}` : (quotation.notes ?? undefined),
+    } as any);
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "reject", entity: "quotation",
+      entityId: quotation.id, details: `Rejected quotation ${quotation.quotationNumber}${reason ? ": " + reason : ""}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
   });
 
   app.post("/api/accounting/quotations/:id/convert", requireAuth, requireRole("super_admin", "admin", "senior_accountant"), async (req, res) => {

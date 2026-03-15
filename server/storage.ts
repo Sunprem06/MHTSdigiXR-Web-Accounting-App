@@ -77,7 +77,7 @@ export interface IStorage {
   updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product | undefined>;
   getNextProductCode(category: string): Promise<string>;
 
-  getQuotations(filters?: { status?: string; partyId?: number }): Promise<Quotation[]>;
+  getQuotations(filters?: { status?: string; partyId?: number; createdBy?: number }): Promise<Quotation[]>;
   getQuotation(id: number): Promise<Quotation | undefined>;
   createQuotation(quotation: InsertQuotation): Promise<Quotation>;
   updateQuotation(id: number, data: Partial<InsertQuotation>): Promise<Quotation | undefined>;
@@ -446,10 +446,11 @@ export class DatabaseStorage implements IStorage {
     return `${prefix}-${String(num).padStart(3, "0")}`;
   }
 
-  async getQuotations(filters?: { status?: string; partyId?: number }): Promise<Quotation[]> {
+  async getQuotations(filters?: { status?: string; partyId?: number; createdBy?: number }): Promise<Quotation[]> {
     let conditions = [];
     if (filters?.status) conditions.push(eq(quotations.status, filters.status));
     if (filters?.partyId) conditions.push(eq(quotations.partyId, filters.partyId));
+    if (filters?.createdBy) conditions.push(eq(quotations.createdBy, filters.createdBy));
     if (conditions.length > 0) {
       return await db.select().from(quotations).where(and(...conditions)).orderBy(desc(quotations.date));
     }

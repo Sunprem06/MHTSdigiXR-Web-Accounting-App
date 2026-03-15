@@ -4,12 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useRoute } from "wouter";
-import type { Quotation, Party, Product, CompanySettings } from "@shared/schema";
+import type { Quotation, Party, Product, CompanySettings, Employee } from "@shared/schema";
 import { Loader2, Printer, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700",
+  submitted: "bg-amber-100 text-amber-700",
   sent: "bg-sky-100 text-sky-700",
   accepted: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-700",
@@ -29,6 +30,9 @@ export default function QuotationView() {
   const { data: parties } = useQuery<Party[]>({ queryKey: ["/api/accounting/parties"] });
   const { data: products } = useQuery<Product[]>({ queryKey: ["/api/accounting/products"] });
   const { data: company } = useQuery<CompanySettings>({ queryKey: ["/api/accounting/company-settings"] });
+  const { data: employees } = useQuery<Employee[]>({ queryKey: ["/api/accounting/employees"] });
+
+  const employeeMap = new Map(employees?.map(e => [e.id, e.fullName]) || []);
 
   if (isLoading) {
     return <AccountingLayout><div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-sky-500" /></div></AccountingLayout>;
@@ -95,6 +99,17 @@ export default function QuotationView() {
                 )}
               </div>
             </div>
+
+            {(quotation.submittedAt || quotation.reviewedAt) && (
+              <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700 rounded p-3 bg-slate-50 dark:bg-slate-800/30 print:hidden">
+                {quotation.submittedAt && (
+                  <span>Submitted: <span className="font-medium text-slate-700 dark:text-slate-300">{new Date(quotation.submittedAt).toLocaleDateString("en-IN")}</span></span>
+                )}
+                {quotation.reviewedAt && quotation.reviewedBy && (
+                  <span>Reviewed by: <span className="font-medium text-slate-700 dark:text-slate-300">{employeeMap.get(quotation.reviewedBy) || "—"}</span> on <span className="font-medium text-slate-700 dark:text-slate-300">{new Date(quotation.reviewedAt).toLocaleDateString("en-IN")}</span></span>
+                )}
+              </div>
+            )}
 
             {lineItems.length > 0 && (
               <table className="w-full text-sm border border-slate-200 dark:border-slate-700">

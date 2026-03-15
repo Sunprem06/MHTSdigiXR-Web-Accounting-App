@@ -6,6 +6,7 @@ This is a full-stack digital agency website for Maanagarram Hi Tech Solutions (b
 
 ## Recent Changes (Mar 2026)
 
+- **Quotation Approval Workflow**: Draft → Submit for Review → Approve/Reject flow; added assignedTo, reviewedBy, reviewedAt, submittedAt columns; Senior Accountant/Admin/Super Admin can approve or reject submitted quotations with optional rejection reason; data_entry users can create and submit their own quotations; "Assigned To" column in list; amber "Submitted" badge; workflow trail shown in QuotationView
 - **Quotation Fixes**: Fixed quotation number generation to use MAX instead of count(*) to prevent gaps after deletions; added Edit/Delete buttons restricted to Super Admin and Admin roles; added quotation View page with print support; quotation edit mode loads existing data via PATCH
 - **Invoices Tab**: New dedicated Invoices section in sidebar (between Products and Vouchers); Invoices list page showing all Sales vouchers; InvoiceEntry form for creating sales invoices with product line items, GST calculations, and auto-generated ledger entries; Invoice View back button updated to point to Invoices list
 - **Rebrand to MHTSdigiXR**: Updated brand name from MHTSdigiX to MHTSdigiXR across all pages, new butterfly logo, domain changed to mhtsdigixr.com, email changed to info@mhtsdigixr.com

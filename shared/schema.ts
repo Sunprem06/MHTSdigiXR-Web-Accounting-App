@@ -194,6 +194,10 @@ export const quotations = pgTable("quotations", {
   status: text("status").notNull().default("draft"),
   convertedVoucherId: integer("converted_voucher_id").references(() => vouchers.id),
   createdBy: integer("created_by").references(() => employees.id),
+  assignedTo: integer("assigned_to").references(() => employees.id),
+  reviewedBy: integer("reviewed_by").references(() => employees.id),
+  reviewedAt: timestamp("reviewed_at"),
+  submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -342,5 +346,5 @@ export type ExpenseStatus = typeof EXPENSE_STATUSES[number];
 
 export const GST_RATES = [0, 5, 12, 18, 28] as const;
 
-export const QUOTATION_STATUSES = ["draft", "sent", "accepted", "rejected", "expired", "converted"] as const;
+export const QUOTATION_STATUSES = ["draft", "submitted", "sent", "accepted", "rejected", "expired", "converted"] as const;
 export type QuotationStatus = typeof QUOTATION_STATUSES[number];
