@@ -6,6 +6,8 @@ This is a full-stack digital agency website for Maanagarram Hi Tech Solutions (b
 
 ## Recent Changes (Mar 2026)
 
+- **Quotation Fixes**: Fixed quotation number generation to use MAX instead of count(*) to prevent gaps after deletions; added Edit/Delete buttons restricted to Super Admin and Admin roles; added quotation View page with print support; quotation edit mode loads existing data via PATCH
+- **Invoices Tab**: New dedicated Invoices section in sidebar (between Products and Vouchers); Invoices list page showing all Sales vouchers; InvoiceEntry form for creating sales invoices with product line items, GST calculations, and auto-generated ledger entries; Invoice View back button updated to point to Invoices list
 - **Rebrand to MHTSdigiXR**: Updated brand name from MHTSdigiX to MHTSdigiXR across all pages, new butterfly logo, domain changed to mhtsdigixr.com, email changed to info@mhtsdigixr.com
 - **Navbar Login Link**: Added "Login" link with LogIn icon in navbar (desktop + mobile) pointing to /accounting/login, styled with sky blue outline
 - **Delete Functionality**: Super Admin and Admin can delete Products, Parties, and Expense Claims with audit logging

@@ -37,6 +37,10 @@ const navItems: NavItem[] = [
     roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
   },
   {
+    label: "Invoices", path: "/accounting/invoices", icon: Receipt,
+    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
+  },
+  {
     label: "Vouchers", icon: FileText,
     roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"],
     children: [

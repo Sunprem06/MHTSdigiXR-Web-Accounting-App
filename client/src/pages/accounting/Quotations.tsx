@@ -4,13 +4,13 @@ import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link, useLocation } from "wouter";
 import { QUOTATION_STATUSES } from "@shared/schema";
 import type { Quotation, Party } from "@shared/schema";
-import { Plus, Loader2, FileText, Eye, ArrowRight, Trash2, Search } from "lucide-react";
+import { Plus, Loader2, FileText, Eye, ArrowRight, Trash2, Search, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -24,9 +24,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function Quotations() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+
+  const isAdmin = user?.role === "super_admin" || user?.role === "admin";
 
   const { data: quotations, isLoading } = useQuery<Quotation[]>({
     queryKey: ["/api/accounting/quotations"],
@@ -139,12 +142,24 @@ export default function Quotations() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          <Link href={`/accounting/quotations/${q.id}/view`}>
+                            <Button size="icon" variant="ghost" className="text-sky-600 dark:text-sky-400" title="View" data-testid={`button-view-quotation-${q.id}`}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                          {isAdmin && q.status !== "converted" && (
+                            <Link href={`/accounting/quotations/${q.id}/edit`}>
+                              <Button size="icon" variant="ghost" className="text-amber-600 dark:text-amber-400" title="Edit" data-testid={`button-edit-quotation-${q.id}`}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          )}
                           {q.status !== "converted" && q.status !== "rejected" && (
                             <Button size="sm" variant="ghost" className="text-sky-600 dark:text-sky-400" onClick={() => { if (confirm("Convert this quotation to a Sales Invoice?")) convertMutation.mutate(q.id); }} disabled={convertMutation.isPending} data-testid={`button-convert-quotation-${q.id}`}>
                               <ArrowRight className="w-4 h-4 mr-1" />Invoice
                             </Button>
                           )}
-                          {(q.status === "draft") && (
+                          {isAdmin && (
                             <Button size="icon" variant="ghost" className="text-red-600 dark:text-red-400" onClick={() => { if (confirm("Delete this quotation?")) deleteMutation.mutate(q.id); }} disabled={deleteMutation.isPending} data-testid={`button-delete-quotation-${q.id}`}>
                               <Trash2 className="w-4 h-4" />
                             </Button>

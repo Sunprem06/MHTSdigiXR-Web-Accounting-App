@@ -367,8 +367,12 @@ export class DatabaseStorage implements IStorage {
       journal: "J", contra: "C", credit_note: "CN", debit_note: "DN",
     };
     const prefix = prefixMap[type] || type.charAt(0).toUpperCase();
-    const [result] = await db.select({ count: sql<number>`count(*)` }).from(vouchers).where(eq(vouchers.type, type));
-    const num = (result?.count || 0) + 1;
+    const prefixPattern = `${prefix}-%`;
+    const prefixLen = prefix.length + 1;
+    const [result] = await db.select({
+      maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(voucher_number FROM ${sql.raw(String(prefixLen + 1))}) AS INTEGER)), 0)`
+    }).from(vouchers).where(sql`voucher_number LIKE ${prefixPattern}`);
+    const num = (result?.maxNum || 0) + 1;
     return `${prefix}-${String(num).padStart(5, "0")}`;
   }
 
@@ -473,8 +477,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextQuotationNumber(): Promise<string> {
-    const [result] = await db.select({ count: sql<number>`count(*)` }).from(quotations);
-    const num = (result?.count || 0) + 1;
+    const [result] = await db.select({
+      maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(quotation_number FROM 5) AS INTEGER)), 0)`
+    }).from(quotations);
+    const num = (result?.maxNum || 0) + 1;
     return `QTN-${String(num).padStart(5, "0")}`;
   }
 

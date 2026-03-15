@@ -66,8 +66,8 @@ export default function InvoiceView() {
     <AccountingLayout>
       <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex items-center justify-between print:hidden">
-          <Link href="/accounting/vouchers">
-            <Button variant="outline" size="sm"><ArrowLeft className="w-4 h-4 mr-1" />Back</Button>
+          <Link href="/accounting/invoices">
+            <Button variant="outline" size="sm" data-testid="button-back-invoices"><ArrowLeft className="w-4 h-4 mr-1" />Back to Invoices</Button>
           </Link>
           <Button onClick={() => window.print()} className="bg-sky-600 hover:bg-sky-700 text-white" data-testid="button-print-invoice">
             <Printer className="w-4 h-4 mr-2" />Print Invoice

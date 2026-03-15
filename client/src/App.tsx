@@ -41,6 +41,9 @@ import Products from "@/pages/accounting/Products";
 import Parties from "@/pages/accounting/Parties";
 import Quotations from "@/pages/accounting/Quotations";
 import QuotationEntry from "@/pages/accounting/QuotationEntry";
+import QuotationView from "@/pages/accounting/QuotationView";
+import Invoices from "@/pages/accounting/Invoices";
+import InvoiceEntry from "@/pages/accounting/InvoiceEntry";
 import Expenses from "@/pages/accounting/Expenses";
 import InvoiceView from "@/pages/accounting/InvoiceView";
 import ReceiptView from "@/pages/accounting/ReceiptView";
@@ -117,6 +120,18 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/quotations/new">
         {() => <ProtectedRoute roles={["super_admin", "admin", "senior_accountant", "accountant"]}><QuotationEntry /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/quotations/:id/edit">
+        {() => <ProtectedRoute roles={["super_admin", "admin"]}><QuotationEntry /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/quotations/:id/view">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><QuotationView /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/invoices">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><Invoices /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/invoices/new">
+        {() => <ProtectedRoute roles={["super_admin", "admin", "senior_accountant", "accountant"]}><InvoiceEntry /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/expenses">
         {() => <ProtectedRoute><Expenses /></ProtectedRoute>}

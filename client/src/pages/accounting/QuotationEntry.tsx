@@ -9,9 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { GST_RATES, PARTY_TYPES } from "@shared/schema";
-import type { Party, Product } from "@shared/schema";
+import type { Party, Product, Quotation } from "@shared/schema";
 import { Plus, Trash2, Loader2, Save, UserPlus } from "lucide-react";
 
 const PARTY_TYPE_LABELS: Record<string, string> = {
@@ -39,6 +39,9 @@ interface LineItem {
 export default function QuotationEntry() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [, editParams] = useRoute("/accounting/quotations/:id/edit");
+  const editId = editParams?.id ? parseInt(editParams.id) : null;
+  const isEditMode = !!editId;
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [validUntil, setValidUntil] = useState("");
@@ -58,12 +61,45 @@ export default function QuotationEntry() {
 
   const { data: parties } = useQuery<Party[]>({ queryKey: ["/api/accounting/parties"] });
   const { data: products } = useQuery<Product[]>({ queryKey: ["/api/accounting/products"] });
-  const { data: nextNumber } = useQuery<{ quotationNumber: string }>({ queryKey: ["/api/accounting/quotations/next-number"] });
+  const { data: nextNumber } = useQuery<{ quotationNumber: string }>({
+    queryKey: ["/api/accounting/quotations/next-number"],
+    enabled: !isEditMode,
+  });
+
+  const { data: existingQuotation, isLoading: loadingExisting } = useQuery<Quotation>({
+    queryKey: ["/api/accounting/quotations", editId],
+    enabled: isEditMode,
+  });
 
   const [quotationNumber, setQuotationNumber] = useState("");
+  const [formLoaded, setFormLoaded] = useState(false);
+
   useEffect(() => {
-    if (nextNumber?.quotationNumber) setQuotationNumber(nextNumber.quotationNumber);
-  }, [nextNumber]);
+    if (!isEditMode && nextNumber?.quotationNumber) setQuotationNumber(nextNumber.quotationNumber);
+  }, [nextNumber, isEditMode]);
+
+  useEffect(() => {
+    if (isEditMode && existingQuotation && !formLoaded) {
+      setQuotationNumber(existingQuotation.quotationNumber);
+      setDate(existingQuotation.date);
+      setValidUntil(existingQuotation.validUntil || "");
+      setPartyId(String(existingQuotation.partyId));
+      setIsInterState(existingQuotation.isInterState || false);
+      setNotes(existingQuotation.notes || "");
+      setTermsAndConditions(existingQuotation.termsAndConditions || "");
+      const existingItems = existingQuotation.items as any[];
+      if (existingItems?.length) {
+        setItems(existingItems.map((item: any) => ({
+          productId: item.productId ? String(item.productId) : "",
+          description: item.description || "",
+          quantity: String(item.quantity || 1),
+          rate: String(item.rate || 0),
+          gstRate: String(item.gstRate || 18),
+        })));
+      }
+      setFormLoaded(true);
+    }
+  }, [isEditMode, existingQuotation, formLoaded]);
 
   const productMap = useMemo(() => new Map(products?.map(p => [String(p.id), p]) || []), [products]);
 
@@ -112,7 +148,7 @@ export default function QuotationEntry() {
     return { subtotal, cgstTotal, sgstTotal, igstTotal, grandTotal, lineCalcs };
   }, [items, isInterState]);
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: async () => {
       const body = {
         quotationNumber, date, validUntil: validUntil || null,
@@ -131,13 +167,17 @@ export default function QuotationEntry() {
         igstTotal: calculations.igstTotal.toFixed(2),
         grandTotal: calculations.grandTotal.toFixed(2),
         isInterState, notes, termsAndConditions,
-        status: "draft",
+        status: isEditMode ? existingQuotation?.status || "draft" : "draft",
       };
-      await apiRequest("POST", "/api/accounting/quotations", body);
+      if (isEditMode) {
+        await apiRequest("PATCH", `/api/accounting/quotations/${editId}`, body);
+      } else {
+        await apiRequest("POST", "/api/accounting/quotations", body);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting/quotations"] });
-      toast({ title: "Quotation created successfully" });
+      toast({ title: isEditMode ? "Quotation updated successfully" : "Quotation created successfully" });
       setLocation("/accounting/quotations");
     },
     onError: (err: Error) => {
@@ -164,12 +204,24 @@ export default function QuotationEntry() {
 
   const customers = parties?.filter(p => p.type === "customer" || p.type === "both") || [];
 
+  if (isEditMode && loadingExisting) {
+    return (
+      <AccountingLayout>
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-sky-500" /></div>
+      </AccountingLayout>
+    );
+  }
+
   return (
     <AccountingLayout>
       <div className="space-y-6 max-w-5xl">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-quotation-entry-title">New Quotation</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Create a new quotation / estimate</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-quotation-entry-title">
+            {isEditMode ? "Edit Quotation" : "New Quotation"}
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            {isEditMode ? `Editing ${quotationNumber}` : "Create a new quotation / estimate"}
+          </p>
         </div>
 
         <Card className="border-slate-200 dark:border-slate-700">
@@ -322,9 +374,9 @@ export default function QuotationEntry() {
 
         <div className="flex items-center justify-end gap-3">
           <Button variant="outline" onClick={() => setLocation("/accounting/quotations")} data-testid="button-cancel-quotation">Cancel</Button>
-          <Button onClick={() => createMutation.mutate()} disabled={!partyId || items.every(i => !i.rate) || createMutation.isPending} className="bg-sky-600 hover:bg-sky-700 text-white" data-testid="button-save-quotation">
-            {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-            Save Quotation
+          <Button onClick={() => saveMutation.mutate()} disabled={!partyId || items.every(i => !i.rate) || saveMutation.isPending} className="bg-sky-600 hover:bg-sky-700 text-white" data-testid="button-save-quotation">
+            {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+            {isEditMode ? "Update Quotation" : "Save Quotation"}
           </Button>
         </div>
       </div>
