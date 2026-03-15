@@ -248,6 +248,12 @@ export const auditNotes = pgTable("audit_notes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const JOB_POSTING_STATUSES = ["draft", "open", "closed"] as const;
+export type JobPostingStatus = typeof JOB_POSTING_STATUSES[number];
+
+export const JOB_APPLICATION_STATUSES = ["received", "reviewed", "shortlisted", "rejected", "hired"] as const;
+export type JobApplicationStatus = typeof JOB_APPLICATION_STATUSES[number];
+
 export const jobPostings = pgTable("job_postings", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -259,8 +265,10 @@ export const jobPostings = pgTable("job_postings", {
   requirements: text("requirements").array().notNull().default([]),
   responsibilities: text("responsibilities").array().notNull().default([]),
   salaryRange: text("salary_range"),
-  isOpen: boolean("is_open").notNull().default(true),
+  vacancies: integer("vacancies").notNull().default(1),
+  status: text("status").notNull().default("draft"),
   closingDate: date("closing_date"),
+  postedAt: timestamp("posted_at"),
   createdBy: integer("created_by").references(() => employees.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -271,9 +279,12 @@ export const jobApplications = pgTable("job_applications", {
   applicantName: text("applicant_name").notNull(),
   applicantEmail: text("applicant_email").notNull(),
   applicantPhone: text("applicant_phone"),
-  coverLetter: text("cover_letter"),
+  experience: text("experience"),
+  message: text("message"),
+  linkedinUrl: text("linkedin_url"),
+  portfolioUrl: text("portfolio_url"),
   resumeUrl: text("resume_url"),
-  status: text("status").notNull().default("new"),
+  status: text("status").notNull().default("received"),
   notes: text("notes"),
   reviewedBy: integer("reviewed_by").references(() => employees.id),
   reviewedAt: timestamp("reviewed_at"),

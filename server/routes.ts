@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { requireAuth, requirePermission } from "./auth";
+import { requireAuth, requirePermission, requireRole } from "./auth";
+import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 
 export async function registerRoutes(
@@ -871,7 +872,7 @@ export async function registerRoutes(
 
   // ===== PUBLIC JOB LISTINGS =====
   app.get("/api/jobs", async (_req, res) => {
-    const postings = await storage.getJobPostings({ isOpen: true });
+    const postings = await storage.getJobPostings({ status: "open" });
     const now = new Date().toISOString().split("T")[0];
     const activePostings = postings.filter(p => !p.closingDate || p.closingDate >= now);
     res.json(activePostings);
@@ -879,7 +880,7 @@ export async function registerRoutes(
 
   app.get("/api/jobs/:id", async (req, res) => {
     const posting = await storage.getJobPosting(parseInt(req.params.id));
-    if (!posting || !posting.isOpen) return res.status(404).json({ message: "Job posting not found" });
+    if (!posting || posting.status !== "open") return res.status(404).json({ message: "Job posting not found" });
     const now = new Date().toISOString().split("T")[0];
     if (posting.closingDate && posting.closingDate < now) return res.status(404).json({ message: "Job posting has expired" });
     res.json(posting);
@@ -889,10 +890,10 @@ export async function registerRoutes(
     try {
       const postingId = parseInt(req.params.id);
       const posting = await storage.getJobPosting(postingId);
-      if (!posting || !posting.isOpen) return res.status(404).json({ message: "Job posting not found or closed" });
+      if (!posting || posting.status !== "open") return res.status(404).json({ message: "Job posting not found or closed" });
       const now = new Date().toISOString().split("T")[0];
       if (posting.closingDate && posting.closingDate < now) return res.status(400).json({ message: "This job posting has expired" });
-      const { applicantName, applicantEmail, applicantPhone, coverLetter } = req.body;
+      const { applicantName, applicantEmail, applicantPhone, experience, message, linkedinUrl, portfolioUrl } = req.body;
       if (!applicantName || !applicantEmail) {
         return res.status(400).json({ message: "Name and email are required" });
       }
@@ -901,9 +902,12 @@ export async function registerRoutes(
         applicantName,
         applicantEmail,
         applicantPhone: applicantPhone || null,
-        coverLetter: coverLetter || null,
+        experience: experience || null,
+        message: message || null,
+        linkedinUrl: linkedinUrl || null,
+        portfolioUrl: portfolioUrl || null,
         resumeUrl: null,
-        status: "new",
+        status: "received",
         notes: null,
         reviewedBy: null,
         reviewedAt: null,
@@ -920,21 +924,38 @@ export async function registerRoutes(
   // ===== JOB POSTINGS MANAGEMENT (Accounting) =====
   app.get("/api/accounting/job-postings", requireAuth, requirePermission("jobs.view"), async (req, res) => {
     const postings = await storage.getJobPostings();
-    res.json(postings);
+    const postingsWithCounts = await Promise.all(postings.map(async (p) => ({
+      ...p,
+      applicationCount: await storage.countJobApplications(p.id),
+    })));
+    res.json(postingsWithCounts);
   });
 
   app.get("/api/accounting/job-postings/:id", requireAuth, requirePermission("jobs.view"), async (req, res) => {
     const posting = await storage.getJobPosting(parseInt(req.params.id));
     if (!posting) return res.status(404).json({ message: "Job posting not found" });
-    res.json(posting);
+    const applicationCount = await storage.countJobApplications(posting.id);
+    res.json({ ...posting, applicationCount });
   });
 
   app.post("/api/accounting/job-postings", requireAuth, requirePermission("jobs.create"), async (req, res) => {
-    const { title, department, location, type, description, requirements, salaryRange, closingDate, isOpen } = req.body;
+    const { title, department, location, type, experience, description, requirements, responsibilities, salaryRange, vacancies, closingDate } = req.body;
+    if (!title || !department || !location || !description || !experience) {
+      return res.status(400).json({ message: "Title, department, location, experience, and description are required" });
+    }
+    const validTypes = ["full_time", "part_time", "contract", "internship"];
     const posting = await storage.createJobPosting({
-      title, department, location, type, description,
-      requirements: requirements || null, salaryRange: salaryRange || null,
-      closingDate: closingDate || null, isOpen: isOpen !== false,
+      title, department, location,
+      type: validTypes.includes(type) ? type : "full_time",
+      experience,
+      description,
+      requirements: Array.isArray(requirements) ? requirements : [],
+      responsibilities: Array.isArray(responsibilities) ? responsibilities : [],
+      salaryRange: salaryRange || null,
+      vacancies: typeof vacancies === "number" && vacancies > 0 ? vacancies : 1,
+      status: "draft",
+      closingDate: closingDate || null,
+      postedAt: null,
       createdBy: req.user!.id,
     });
     await storage.createAuditLog({
@@ -946,18 +967,26 @@ export async function registerRoutes(
   });
 
   app.patch("/api/accounting/job-postings/:id", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
-    const { title, department, location, type, description, requirements, salaryRange, closingDate, isOpen } = req.body;
-    const allowedFields: Record<string, any> = {};
+    const existing = await storage.getJobPosting(parseInt(req.params.id));
+    if (!existing) return res.status(404).json({ message: "Job posting not found" });
+    if (existing.status !== "draft") {
+      return res.status(400).json({ message: "Only draft postings can be edited. Close the posting first to modify." });
+    }
+    const { title, department, location, type, experience, description, requirements, responsibilities, salaryRange, vacancies, closingDate } = req.body;
+    const validTypes = ["full_time", "part_time", "contract", "internship"];
+    const allowedFields: Partial<typeof existing> = {};
     if (title !== undefined) allowedFields.title = title;
     if (department !== undefined) allowedFields.department = department;
     if (location !== undefined) allowedFields.location = location;
-    if (type !== undefined) allowedFields.type = type;
+    if (type !== undefined && validTypes.includes(type)) allowedFields.type = type;
+    if (experience !== undefined) allowedFields.experience = experience;
     if (description !== undefined) allowedFields.description = description;
-    if (requirements !== undefined) allowedFields.requirements = requirements;
+    if (requirements !== undefined && Array.isArray(requirements)) allowedFields.requirements = requirements;
+    if (responsibilities !== undefined && Array.isArray(responsibilities)) allowedFields.responsibilities = responsibilities;
     if (salaryRange !== undefined) allowedFields.salaryRange = salaryRange;
+    if (vacancies !== undefined && typeof vacancies === "number") allowedFields.vacancies = vacancies;
     if (closingDate !== undefined) allowedFields.closingDate = closingDate;
-    if (isOpen !== undefined) allowedFields.isOpen = isOpen;
-    const updated = await storage.updateJobPosting(parseInt(req.params.id), allowedFields);
+    const updated = await storage.updateJobPosting(existing.id, allowedFields);
     if (!updated) return res.status(404).json({ message: "Job posting not found" });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "update", entity: "job_posting",
@@ -967,10 +996,49 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/accounting/job-postings/:id", requireAuth, requirePermission("jobs.delete"), async (req, res) => {
+  app.post("/api/accounting/job-postings/:id/publish", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
+    const posting = await storage.getJobPosting(parseInt(req.params.id));
+    if (!posting) return res.status(404).json({ message: "Job posting not found" });
+    if (posting.status === "open") return res.status(400).json({ message: "Posting is already published" });
+    const updated = await storage.updateJobPosting(posting.id, { status: "open", postedAt: new Date() });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "publish", entity: "job_posting",
+      entityId: posting.id, details: `Published job posting: ${posting.title}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/job-postings/:id/close", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
+    const posting = await storage.getJobPosting(parseInt(req.params.id));
+    if (!posting) return res.status(404).json({ message: "Job posting not found" });
+    if (posting.status === "closed") return res.status(400).json({ message: "Posting is already closed" });
+    const updated = await storage.updateJobPosting(posting.id, { status: "closed" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "close", entity: "job_posting",
+      entityId: posting.id, details: `Closed job posting: ${posting.title}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/job-postings/:id/reopen", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
+    const posting = await storage.getJobPosting(parseInt(req.params.id));
+    if (!posting) return res.status(404).json({ message: "Job posting not found" });
+    if (posting.status !== "closed") return res.status(400).json({ message: "Only closed postings can be reopened" });
+    const updated = await storage.updateJobPosting(posting.id, { status: "open", postedAt: new Date() });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "reopen", entity: "job_posting",
+      entityId: posting.id, details: `Reopened job posting: ${posting.title}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/job-postings/:id", requireAuth, requireRole("super_admin"), async (req, res) => {
     const id = parseInt(req.params.id);
-    const apps = await storage.getJobApplications({ jobPostingId: id });
-    if (apps.length > 0) {
+    const appCount = await storage.countJobApplications(id);
+    if (appCount > 0) {
       return res.status(400).json({ message: "Cannot delete job posting — it has applications. Close it instead." });
     }
     const deleted = await storage.deleteJobPosting(id);
@@ -985,26 +1053,26 @@ export async function registerRoutes(
 
   // ===== JOB APPLICATIONS MANAGEMENT (Accounting) =====
   app.get("/api/accounting/job-applications", requireAuth, requirePermission("jobs.view"), async (req, res) => {
-    const filters: any = {};
+    const filters: { jobPostingId?: number; status?: string } = {};
     if (req.query.jobPostingId) filters.jobPostingId = parseInt(req.query.jobPostingId as string);
-    if (req.query.status) filters.status = req.query.status;
+    if (req.query.status) filters.status = req.query.status as string;
     const apps = await storage.getJobApplications(filters);
     res.json(apps);
   });
 
   app.get("/api/accounting/job-applications/:id", requireAuth, requirePermission("jobs.view"), async (req, res) => {
-    const app = await storage.getJobApplication(parseInt(req.params.id));
-    if (!app) return res.status(404).json({ message: "Application not found" });
-    res.json(app);
+    const application = await storage.getJobApplication(parseInt(req.params.id));
+    if (!application) return res.status(404).json({ message: "Application not found" });
+    res.json(application);
   });
 
   app.patch("/api/accounting/job-applications/:id", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
     const id = parseInt(req.params.id);
-    const validStatuses = ["new", "reviewing", "shortlisted", "interview", "offered", "hired", "rejected"];
-    const data: Record<string, any> = {};
+    const validStatuses = ["received", "reviewed", "shortlisted", "rejected", "hired"] as const;
+    const data: Partial<JobApplication> = {};
     if (req.body.status && validStatuses.includes(req.body.status)) {
       data.status = req.body.status;
-      if (req.body.status !== "new") {
+      if (req.body.status !== "received") {
         data.reviewedBy = req.user!.id;
         data.reviewedAt = new Date();
       }
@@ -1020,7 +1088,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/accounting/job-applications/:id", requireAuth, requirePermission("jobs.delete"), async (req, res) => {
+  app.delete("/api/accounting/job-applications/:id", requireAuth, requireRole("super_admin"), async (req, res) => {
     const id = parseInt(req.params.id);
     const deleted = await storage.deleteJobApplication(id);
     if (!deleted) return res.status(404).json({ message: "Application not found" });

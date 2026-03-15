@@ -103,16 +103,17 @@ export interface IStorage {
   deleteProduct(id: number): Promise<boolean>;
   deleteParty(id: number): Promise<boolean>;
 
-  getJobPostings(filters?: { isOpen?: boolean }): Promise<JobPosting[]>;
+  getJobPostings(filters?: { status?: string }): Promise<JobPosting[]>;
   getJobPosting(id: number): Promise<JobPosting | undefined>;
   createJobPosting(posting: InsertJobPosting): Promise<JobPosting>;
-  updateJobPosting(id: number, data: Partial<InsertJobPosting>): Promise<JobPosting | undefined>;
+  updateJobPosting(id: number, data: Partial<JobPosting>): Promise<JobPosting | undefined>;
   deleteJobPosting(id: number): Promise<boolean>;
+  countJobApplications(jobPostingId: number): Promise<number>;
 
   getJobApplications(filters?: { jobPostingId?: number; status?: string }): Promise<JobApplication[]>;
   getJobApplication(id: number): Promise<JobApplication | undefined>;
   createJobApplication(application: InsertJobApplication): Promise<JobApplication>;
-  updateJobApplication(id: number, data: Partial<InsertJobApplication>): Promise<JobApplication | undefined>;
+  updateJobApplication(id: number, data: Partial<JobApplication>): Promise<JobApplication | undefined>;
   deleteJobApplication(id: number): Promise<boolean>;
 
   getDashboardStats(): Promise<{
@@ -814,9 +815,9 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getJobPostings(filters?: { isOpen?: boolean }): Promise<JobPosting[]> {
-    if (filters?.isOpen !== undefined) {
-      return await db.select().from(jobPostings).where(eq(jobPostings.isOpen, filters.isOpen)).orderBy(desc(jobPostings.createdAt));
+  async getJobPostings(filters?: { status?: string }): Promise<JobPosting[]> {
+    if (filters?.status) {
+      return await db.select().from(jobPostings).where(eq(jobPostings.status, filters.status)).orderBy(desc(jobPostings.createdAt));
     }
     return await db.select().from(jobPostings).orderBy(desc(jobPostings.createdAt));
   }
@@ -831,7 +832,7 @@ export class DatabaseStorage implements IStorage {
     return newPosting;
   }
 
-  async updateJobPosting(id: number, data: Partial<InsertJobPosting>): Promise<JobPosting | undefined> {
+  async updateJobPosting(id: number, data: Partial<JobPosting>): Promise<JobPosting | undefined> {
     const [updated] = await db.update(jobPostings).set(data).where(eq(jobPostings.id, id)).returning();
     return updated;
   }
@@ -841,8 +842,13 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
+  async countJobApplications(jobPostingId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(jobApplications).where(eq(jobApplications.jobPostingId, jobPostingId));
+    return result[0]?.count ?? 0;
+  }
+
   async getJobApplications(filters?: { jobPostingId?: number; status?: string }): Promise<JobApplication[]> {
-    let conditions = [];
+    const conditions = [];
     if (filters?.jobPostingId) conditions.push(eq(jobApplications.jobPostingId, filters.jobPostingId));
     if (filters?.status) conditions.push(eq(jobApplications.status, filters.status));
     if (conditions.length > 0) {
@@ -861,7 +867,7 @@ export class DatabaseStorage implements IStorage {
     return newApp;
   }
 
-  async updateJobApplication(id: number, data: Partial<InsertJobApplication>): Promise<JobApplication | undefined> {
+  async updateJobApplication(id: number, data: Partial<JobApplication>): Promise<JobApplication | undefined> {
     const [updated] = await db.update(jobApplications).set(data).where(eq(jobApplications.id, id)).returning();
     return updated;
   }

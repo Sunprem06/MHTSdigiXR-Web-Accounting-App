@@ -9,24 +9,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Phone, Trash2, FileText } from "lucide-react";
-import { Link } from "wouter";
+import { ArrowLeft, Mail, Phone, Trash2, FileText, ExternalLink } from "lucide-react";
+import { Link, useSearch } from "wouter";
 import type { JobPosting, JobApplication } from "@shared/schema";
 
 const STATUS_OPTIONS = [
-  { value: "new", label: "New", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
-  { value: "reviewing", label: "Reviewing", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  { value: "received", label: "Received", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { value: "reviewed", label: "Reviewed", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
   { value: "shortlisted", label: "Shortlisted", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
-  { value: "interview", label: "Interview", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
-  { value: "offered", label: "Offered", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400" },
-  { value: "hired", label: "Hired", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  { value: "hired", label: "Hired", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400" },
   { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
 ];
 
 export default function JobApplications() {
-  const { hasPermission } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [filterJob, setFilterJob] = useState<string>("all");
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const initialJobFilter = urlParams.get("jobPostingId") || "all";
+
+  const [filterJob, setFilterJob] = useState<string>(initialJobFilter);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [viewApp, setViewApp] = useState<JobApplication | null>(null);
   const [notes, setNotes] = useState("");
@@ -40,12 +42,13 @@ export default function JobApplications() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/accounting/job-applications/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: { status?: string; notes?: string } }) =>
+      apiRequest("PATCH", `/api/accounting/job-applications/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting/job-applications"] });
       toast({ title: "Application updated" });
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -55,7 +58,7 @@ export default function JobApplications() {
       setViewApp(null);
       toast({ title: "Application deleted" });
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const filtered = applications.filter(a => {
@@ -67,11 +70,11 @@ export default function JobApplications() {
   const getJobTitle = (jobPostingId: number) => postings.find(p => p.id === jobPostingId)?.title || `Job #${jobPostingId}`;
   const getStatusBadge = (status: string) => {
     const s = STATUS_OPTIONS.find(o => o.value === status);
-    return <Badge className={s?.color || ""}>{s?.label || status}</Badge>;
+    return <Badge className={s?.color || ""} data-testid={`badge-status-${status}`}>{s?.label || status}</Badge>;
   };
 
-  const canEdit = hasPermission("jobs.edit");
-  const canDelete = hasPermission("jobs.delete");
+  const canEdit = user?.role === "super_admin" || user?.role === "admin" || user?.role === "senior_accountant";
+  const isSuperAdmin = user?.role === "super_admin";
 
   return (
     <AccountingLayout>
@@ -119,7 +122,7 @@ export default function JobApplications() {
                 <tr>
                   <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">Applicant</th>
                   <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">Position</th>
-                  <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">Contact</th>
+                  <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">Experience</th>
                   <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">Applied</th>
                   <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">Status</th>
                   <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">Actions</th>
@@ -128,14 +131,15 @@ export default function JobApplications() {
               <tbody>
                 {filtered.map((app) => (
                   <tr key={app.id} className="border-t border-slate-100 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" onClick={() => { setViewApp(app); setNotes(app.notes || ""); }} data-testid={`row-app-${app.id}`}>
-                    <td className="p-3 font-medium text-slate-900 dark:text-white">{app.applicantName}</td>
-                    <td className="p-3 text-slate-600 dark:text-slate-400">{getJobTitle(app.jobPostingId)}</td>
                     <td className="p-3">
-                      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                      <div className="font-medium text-slate-900 dark:text-white">{app.applicantName}</div>
+                      <div className="text-xs text-slate-500 flex items-center gap-1">
                         <Mail className="w-3 h-3" /> {app.applicantEmail}
                       </div>
                     </td>
-                    <td className="p-3 text-slate-500 dark:text-slate-400">{new Date(app.createdAt).toLocaleDateString()}</td>
+                    <td className="p-3 text-slate-600 dark:text-slate-400">{getJobTitle(app.jobPostingId)}</td>
+                    <td className="p-3 text-slate-600 dark:text-slate-400 text-xs">{app.experience || "—"}</td>
+                    <td className="p-3 text-slate-500 dark:text-slate-400 text-xs">{new Date(app.createdAt).toLocaleDateString()}</td>
                     <td className="p-3">{getStatusBadge(app.status)}</td>
                     <td className="p-3">
                       {canEdit && (
@@ -183,12 +187,30 @@ export default function JobApplications() {
                     </div>
                   )}
                 </div>
-                {viewApp.coverLetter && (
+                {viewApp.experience && (
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Cover Letter</p>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap bg-slate-50 dark:bg-slate-800 rounded p-3">{viewApp.coverLetter}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Experience</p>
+                    <p className="text-sm text-slate-700 dark:text-slate-300">{viewApp.experience}</p>
                   </div>
                 )}
+                {viewApp.message && (
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Message</p>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap bg-slate-50 dark:bg-slate-800 rounded p-3">{viewApp.message}</p>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  {viewApp.linkedinUrl && (
+                    <a href={viewApp.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1" data-testid="link-linkedin">
+                      <ExternalLink className="w-3.5 h-3.5" /> LinkedIn
+                    </a>
+                  )}
+                  {viewApp.portfolioUrl && (
+                    <a href={viewApp.portfolioUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1" data-testid="link-portfolio">
+                      <ExternalLink className="w-3.5 h-3.5" /> Portfolio
+                    </a>
+                  )}
+                </div>
                 <div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Status</p>
                   {getStatusBadge(viewApp.status)}
@@ -200,7 +222,7 @@ export default function JobApplications() {
                     <Button size="sm" className="mt-2 bg-sky-500 hover:bg-sky-600" onClick={() => { updateMutation.mutate({ id: viewApp.id, data: { notes } }); setViewApp(null); }} data-testid="button-save-notes">Save Notes</Button>
                   </div>
                 )}
-                {canDelete && (
+                {isSuperAdmin && (
                   <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
                     <Button variant="destructive" size="sm" onClick={() => { if (confirm("Delete this application?")) deleteMutation.mutate(viewApp.id); }} data-testid="button-delete-app">
                       <Trash2 className="w-4 h-4 mr-2" /> Delete Application

@@ -37,7 +37,10 @@ const JOB_TYPE_LABELS: Record<string, string> = {
 
 function ApplyModal({ job, onClose }: { job: JobPosting; onClose: () => void }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ applicantName: "", applicantEmail: "", applicantPhone: "", coverLetter: "" });
+  const [form, setForm] = useState({
+    applicantName: "", applicantEmail: "", applicantPhone: "",
+    experience: "", message: "", linkedinUrl: "", portfolioUrl: "",
+  });
 
   const applyMutation = useMutation({
     mutationFn: (data: typeof form) => apiRequest("POST", `/api/jobs/${job.id}/apply`, data),
@@ -45,8 +48,10 @@ function ApplyModal({ job, onClose }: { job: JobPosting; onClose: () => void }) 
       toast({ title: "Application submitted!", description: "We'll review your application and get back to you." });
       onClose();
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
+
+  const inputClass = "w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -65,35 +70,38 @@ function ApplyModal({ job, onClose }: { job: JobPosting; onClose: () => void }) 
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
-            <input
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-              value={form.applicantName} onChange={e => setForm(f => ({ ...f, applicantName: e.target.value }))}
-              placeholder="Your full name" data-testid="input-apply-name"
-            />
+            <input className={inputClass} value={form.applicantName} onChange={e => setForm(f => ({ ...f, applicantName: e.target.value }))} placeholder="Your full name" data-testid="input-apply-name" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address *</label>
-            <input
-              type="email"
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-              value={form.applicantEmail} onChange={e => setForm(f => ({ ...f, applicantEmail: e.target.value }))}
-              placeholder="your@email.com" data-testid="input-apply-email"
-            />
+            <input type="email" className={inputClass} value={form.applicantEmail} onChange={e => setForm(f => ({ ...f, applicantEmail: e.target.value }))} placeholder="your@email.com" data-testid="input-apply-email" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
+              <input className={inputClass} value={form.applicantPhone} onChange={e => setForm(f => ({ ...f, applicantPhone: e.target.value }))} placeholder="+91 98765 43210" data-testid="input-apply-phone" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Experience</label>
+              <input className={inputClass} value={form.experience} onChange={e => setForm(f => ({ ...f, experience: e.target.value }))} placeholder="e.g. 3 years" data-testid="input-apply-experience" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">LinkedIn URL</label>
+              <input className={inputClass} value={form.linkedinUrl} onChange={e => setForm(f => ({ ...f, linkedinUrl: e.target.value }))} placeholder="https://linkedin.com/in/..." data-testid="input-apply-linkedin" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Portfolio URL</label>
+              <input className={inputClass} value={form.portfolioUrl} onChange={e => setForm(f => ({ ...f, portfolioUrl: e.target.value }))} placeholder="https://yourportfolio.com" data-testid="input-apply-portfolio" />
+            </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
-            <input
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-              value={form.applicantPhone} onChange={e => setForm(f => ({ ...f, applicantPhone: e.target.value }))}
-              placeholder="+91 98765 43210" data-testid="input-apply-phone"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Cover Letter</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Message</label>
             <textarea
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none resize-none"
-              rows={4} value={form.coverLetter} onChange={e => setForm(f => ({ ...f, coverLetter: e.target.value }))}
-              placeholder="Tell us why you'd be a great fit..." data-testid="input-apply-cover"
+              className={`${inputClass} resize-none`}
+              rows={4} value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+              placeholder="Tell us why you'd be a great fit..." data-testid="input-apply-message"
             />
           </div>
           <button
@@ -143,6 +151,16 @@ function JobCard({ job, isExpanded, onToggle, onApply }: { job: JobPosting; isEx
             <span className="flex items-center gap-1">
               <Briefcase className="w-4 h-4" /> {job.experience}
             </span>
+            {job.vacancies > 1 && (
+              <span className="flex items-center gap-1">
+                <Users className="w-4 h-4" /> {job.vacancies} vacancies
+              </span>
+            )}
+            {job.closingDate && (
+              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <Clock className="w-4 h-4" /> Closes {job.closingDate}
+              </span>
+            )}
           </div>
         </div>
         <ChevronDown className={`w-6 h-6 text-sky-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
