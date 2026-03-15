@@ -66,11 +66,16 @@ export default function EmployeeManagement() {
       const res = await apiRequest("POST", "/api/accounting/employees", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting/employees"] });
       setAddOpen(false);
       resetAddForm();
       toast({ title: "Employee created successfully" });
+      if (data.emailSent === true) {
+        setTimeout(() => toast({ title: "Welcome email sent", description: "Login credentials sent to the employee's email." }), 800);
+      } else if (data.emailSent === false) {
+        setTimeout(() => toast({ title: "Employee created (email not sent)", description: "SMTP is not configured — no welcome email was sent.", variant: "destructive" }), 800);
+      }
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });

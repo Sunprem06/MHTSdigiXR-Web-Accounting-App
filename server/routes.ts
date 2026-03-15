@@ -4,9 +4,28 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
 import { requireAuth, requirePermission, requireRole } from "./auth";
 import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
+
+async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
+  try {
+    const smtp = await storage.getSmtpSettings();
+    if (!smtp) return false;
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure ?? true,
+      auth: { user: smtp.username, pass: smtp.password },
+    });
+    await transporter.sendMail({ from: `"${smtp.fromName}" <${smtp.fromEmail}>`, to, subject, text });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -130,6 +149,39 @@ export async function registerRoutes(
     const page = await storage.getLegalPageBySlug(req.params.slug);
     if (!page) return res.status(404).json({ message: "Page not found" });
     res.json(page);
+  });
+
+  // ===== PUBLIC AUTH ROUTES (no login required) =====
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+    const smtp = await storage.getSmtpSettings();
+    if (!smtp) return res.status(503).json({ message: "Password reset is not configured. Contact your administrator." });
+    const employee = await storage.getEmployeeByEmail(email);
+    if (!employee) return res.json({ message: "If this email is registered, a reset link will be sent." });
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await storage.createPasswordResetToken({ token, employeeId: employee.id, expiresAt, used: false });
+    const baseUrl = req.protocol + "://" + req.get("host");
+    const resetUrl = `${baseUrl}/accounting/reset-password?token=${token}`;
+    const text = `Hello ${employee.fullName},\n\nA password reset was requested for your MHTSdigiXR account.\n\nClick the link below to reset your password (valid for 1 hour):\n${resetUrl}\n\nIf you did not request this, please ignore this email.\n\nMHTSdigiXR Team`;
+    await sendEmail(email, "Password Reset — MHTSdigiXR", text);
+    res.json({ message: "If this email is registered, a reset link will be sent." });
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ message: "Token and password are required" });
+    if (password.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
+    const record = await storage.getPasswordResetToken(token);
+    if (!record) return res.status(400).json({ message: "Invalid or expired reset link" });
+    if (record.used) return res.status(400).json({ message: "This reset link has already been used" });
+    if (new Date() > new Date(record.expiresAt)) return res.status(400).json({ message: "This reset link has expired" });
+    const hashed = await bcrypt.hash(password, 10);
+    await storage.updateEmployee(record.employeeId, { password: hashed } as any);
+    await storage.markPasswordResetTokenUsed(record.id);
+    res.json({ message: "Password reset successfully. You can now log in." });
   });
 
   // ===== ACCOUNTING API ROUTES (Protected) =====
@@ -264,7 +316,10 @@ export async function registerRoutes(
         ipAddress: req.ip || null,
       });
       const { password: _, ...safe } = employee;
-      res.status(201).json(safe);
+      const baseUrl = req.protocol + "://" + req.get("host");
+      const welcomeText = `Hello ${fullName},\n\nYour MHTSdigiXR account has been created.\n\nUsername: ${username}\nPassword: ${password}\nRole: ${role}\nLogin: ${baseUrl}/accounting/login\n\nPlease change your password after first login.\n\nMHTSdigiXR Team`;
+      const emailSent = await sendEmail(email, "Welcome to MHTSdigiXR — Your Account Details", welcomeText);
+      res.status(201).json({ ...safe, emailSent });
     } catch (err: any) {
       if (err.code === "23505") {
         return res.status(400).json({ message: "Username or email already exists" });
@@ -903,6 +958,37 @@ export async function registerRoutes(
     const page = await storage.updateLegalPage(req.params.slug, updates);
     if (!page) return res.status(404).json({ message: "Legal page not found" });
     res.json(page);
+  });
+
+  // SMTP Settings
+  app.get("/api/accounting/smtp-settings", requireAuth, requireRole("super_admin"), async (_req, res) => {
+    const smtp = await storage.getSmtpSettings();
+    if (!smtp) return res.json(null);
+    const { password: _, ...safe } = smtp;
+    res.json(safe);
+  });
+
+  app.put("/api/accounting/smtp-settings", requireAuth, requireRole("super_admin"), async (req, res) => {
+    const { host, port, secure, username, password, fromName, fromEmail } = req.body;
+    if (!host || !port || !username || !password || !fromName || !fromEmail) {
+      return res.status(400).json({ message: "All SMTP fields are required" });
+    }
+    const saved = await storage.upsertSmtpSettings({ host, port: parseInt(port), secure: !!secure, username, password, fromName, fromEmail });
+    const { password: _, ...safe } = saved;
+    res.json(safe);
+  });
+
+  app.post("/api/accounting/smtp-settings/test", requireAuth, requireRole("super_admin"), async (req, res) => {
+    const { testEmail } = req.body;
+    if (!testEmail) return res.status(400).json({ message: "Test email address is required" });
+    const smtp = await storage.getSmtpSettings();
+    if (!smtp) return res.status(400).json({ message: "SMTP settings not configured yet" });
+    const sent = await sendEmail(testEmail, "Test Email — MHTSdigiXR", `This is a test email from MHTSdigiXR.\n\nIf you received this, your SMTP settings are working correctly.`);
+    if (sent) {
+      res.json({ message: `Test email sent to ${testEmail}` });
+    } else {
+      res.status(500).json({ message: "Failed to send test email. Check your SMTP settings." });
+    }
   });
 
   // Audit Logs

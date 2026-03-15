@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil } from "lucide-react";
+import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface CompanySettings {
   id?: number;
@@ -89,6 +90,15 @@ export default function Settings() {
   const [legalContent, setLegalContent] = useState("");
   const [legalEffectiveDate, setLegalEffectiveDate] = useState("");
 
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("465");
+  const [smtpSecure, setSmtpSecure] = useState(true);
+  const [smtpUsername, setSmtpUsername] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpFromName, setSmtpFromName] = useState("");
+  const [smtpFromEmail, setSmtpFromEmail] = useState("");
+  const [smtpTestEmail, setSmtpTestEmail] = useState("");
+
   const [fyOpen, setFyOpen] = useState(false);
   const [fyName, setFyName] = useState("");
   const [fyStart, setFyStart] = useState("");
@@ -105,6 +115,36 @@ export default function Settings() {
   const { data: legalPagesData, isLoading: legalLoading } = useQuery<LegalPageData[]>({
     queryKey: ["/api/accounting/legal-pages"],
     enabled: isSuperAdmin,
+  });
+
+  interface SmtpData { host: string; port: number; secure: boolean | null; username: string; fromName: string; fromEmail: string; }
+  const { data: smtpData } = useQuery<SmtpData | null>({
+    queryKey: ["/api/accounting/smtp-settings"],
+    enabled: isSuperAdmin,
+  });
+
+  const saveSmtpMutation = useMutation({
+    mutationFn: async (data: object) => {
+      const res = await apiRequest("PUT", "/api/accounting/smtp-settings", data);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/smtp-settings"] });
+      setSmtpPassword("");
+      toast({ title: "Email settings saved" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const testSmtpMutation = useMutation({
+    mutationFn: async (testEmail: string) => {
+      const res = await apiRequest("POST", "/api/accounting/smtp-settings/test", { testEmail });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (data: any) => toast({ title: "Test email sent", description: data.message }),
+    onError: (e: Error) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   useEffect(() => {
@@ -231,6 +271,17 @@ export default function Settings() {
       data: { title: legalTitle, content: legalContent, effectiveDate: legalEffectiveDate },
     });
   };
+
+  useEffect(() => {
+    if (smtpData) {
+      setSmtpHost(smtpData.host || "");
+      setSmtpPort(String(smtpData.port || 465));
+      setSmtpSecure(smtpData.secure ?? true);
+      setSmtpUsername(smtpData.username || "");
+      setSmtpFromName(smtpData.fromName || "");
+      setSmtpFromEmail(smtpData.fromEmail || "");
+    }
+  }, [smtpData]);
 
   return (
     <AccountingLayout>
@@ -467,6 +518,77 @@ export default function Settings() {
                   </TableBody>
                 </Table>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isSuperAdmin && (
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-sky-500" />
+                <CardTitle>Email / SMTP Settings</CardTitle>
+              </div>
+              <CardDescription>Configure outgoing email for password resets and welcome emails. Used with Hostinger Mail or any SMTP provider.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 max-w-lg">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 sm:col-span-1">
+                    <Label>SMTP Host</Label>
+                    <Input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.hostinger.com" data-testid="input-smtp-host" />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <Label>Port</Label>
+                    <Input value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} placeholder="465" data-testid="input-smtp-port" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={smtpSecure} onCheckedChange={setSmtpSecure} id="smtp-secure" data-testid="switch-smtp-secure" />
+                  <Label htmlFor="smtp-secure" className="cursor-pointer">Use SSL/TLS (recommended for port 465)</Label>
+                </div>
+                <div>
+                  <Label>Email Username (full email address)</Label>
+                  <Input type="email" value={smtpUsername} onChange={(e) => setSmtpUsername(e.target.value)} placeholder="info@mhtsdigixr.com" data-testid="input-smtp-username" />
+                </div>
+                <div>
+                  <Label>Email Password</Label>
+                  <Input type="password" value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} placeholder={smtpData ? "Enter new password to update" : "Your email account password"} data-testid="input-smtp-password" />
+                </div>
+                <div>
+                  <Label>Sender Name</Label>
+                  <Input value={smtpFromName} onChange={(e) => setSmtpFromName(e.target.value)} placeholder="MHTSdigiXR" data-testid="input-smtp-from-name" />
+                </div>
+                <div>
+                  <Label>Sender Email</Label>
+                  <Input type="email" value={smtpFromEmail} onChange={(e) => setSmtpFromEmail(e.target.value)} placeholder="info@mhtsdigixr.com" data-testid="input-smtp-from-email" />
+                </div>
+                <Button
+                  onClick={() => saveSmtpMutation.mutate({ host: smtpHost, port: smtpPort, secure: smtpSecure, username: smtpUsername, password: smtpPassword, fromName: smtpFromName, fromEmail: smtpFromEmail })}
+                  disabled={saveSmtpMutation.isPending || !smtpHost || !smtpPort || !smtpUsername || !smtpPassword || !smtpFromName || !smtpFromEmail}
+                  data-testid="button-save-smtp"
+                >
+                  {saveSmtpMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                  Save Email Settings
+                </Button>
+                {smtpData && (
+                  <div className="border-t pt-4 space-y-2">
+                    <Label>Send Test Email</Label>
+                    <div className="flex gap-2">
+                      <Input type="email" value={smtpTestEmail} onChange={(e) => setSmtpTestEmail(e.target.value)} placeholder="your@email.com" className="flex-1" data-testid="input-smtp-test-email" />
+                      <Button
+                        variant="outline"
+                        onClick={() => testSmtpMutation.mutate(smtpTestEmail)}
+                        disabled={testSmtpMutation.isPending || !smtpTestEmail}
+                        data-testid="button-test-smtp"
+                      >
+                        {testSmtpMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-slate-500">Enter any email address and click Send to verify your SMTP configuration is working.</p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}

@@ -583,3 +583,30 @@ export const GST_RATES = [0, 5, 12, 18, 28] as const;
 
 export const QUOTATION_STATUSES = ["draft", "submitted", "sent", "accepted", "rejected", "expired", "converted"] as const;
 export type QuotationStatus = typeof QUOTATION_STATUSES[number];
+
+export const smtpSettings = pgTable("smtp_settings", {
+  id: serial("id").primaryKey(),
+  host: text("host").notNull(),
+  port: integer("port").notNull().default(465),
+  secure: boolean("secure").default(true),
+  username: text("username").notNull(),
+  password: text("password").notNull(),
+  fromName: text("from_name").notNull(),
+  fromEmail: text("from_email").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SmtpSettings = typeof smtpSettings.$inferSelect;
+export type InsertSmtpSettings = typeof smtpSettings.$inferInsert;
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  employeeId: integer("employee_id").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;

@@ -5,6 +5,7 @@ import {
   financialYears, companySettings, vouchers, voucherEntries, auditNotes,
   parties, products, quotations, expenseClaims, roles,
   jobPostings, jobApplications, faqItems, testimonials, siteStats,
+  smtpSettings, passwordResetTokens,
   type InsertContactMessage, type InsertPost, type InsertService, type InsertCaseStudy,
   type InsertPricingPlan, type InsertLegalPage,
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
@@ -12,11 +13,13 @@ import {
   type InsertAuditNote, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
   type InsertDbRole, type InsertJobPosting, type InsertJobApplication,
   type InsertFaqItem, type InsertTestimonial, type InsertSiteStat,
+  type InsertSmtpSettings, type InsertPasswordResetToken,
   type ContactMessage, type Post, type Service, type CaseStudy, type PricingPlan, type LegalPage,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
   type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
   type Party, type Product, type Quotation, type ExpenseClaim, type DbRole,
-  type JobPosting, type JobApplication, type FaqItem, type Testimonial, type SiteStat
+  type JobPosting, type JobApplication, type FaqItem, type Testimonial, type SiteStat,
+  type SmtpSettings, type PasswordResetToken
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -162,6 +165,14 @@ export interface IStorage {
   createSiteStat(s: InsertSiteStat): Promise<SiteStat>;
   updateSiteStat(id: number, data: Partial<SiteStat>): Promise<SiteStat | undefined>;
   deleteSiteStat(id: number): Promise<boolean>;
+
+  getSmtpSettings(): Promise<SmtpSettings | undefined>;
+  upsertSmtpSettings(data: InsertSmtpSettings): Promise<SmtpSettings>;
+
+  createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(id: number): Promise<void>;
+  getEmployeeByEmail(email: string): Promise<Employee | undefined>;
 
   getDashboardStats(): Promise<{
     totalIncome: number;
@@ -1117,6 +1128,40 @@ export class DatabaseStorage implements IStorage {
   async deleteSiteStat(id: number): Promise<boolean> {
     const result = await db.delete(siteStats).where(eq(siteStats.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getSmtpSettings(): Promise<SmtpSettings | undefined> {
+    const [row] = await db.select().from(smtpSettings).limit(1);
+    return row;
+  }
+
+  async upsertSmtpSettings(data: InsertSmtpSettings): Promise<SmtpSettings> {
+    const existing = await this.getSmtpSettings();
+    if (existing) {
+      const [updated] = await db.update(smtpSettings).set({ ...data, updatedAt: new Date() }).where(eq(smtpSettings.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(smtpSettings).values(data).returning();
+    return created;
+  }
+
+  async createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [row] = await db.insert(passwordResetTokens).values(data).returning();
+    return row;
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [row] = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.token, token));
+    return row;
+  }
+
+  async markPasswordResetTokenUsed(id: number): Promise<void> {
+    await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, id));
+  }
+
+  async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
+    const [row] = await db.select().from(employees).where(eq(employees.email, email));
+    return row;
   }
 }
 
