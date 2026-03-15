@@ -21,7 +21,6 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const [error, setError] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     if (!success) return;

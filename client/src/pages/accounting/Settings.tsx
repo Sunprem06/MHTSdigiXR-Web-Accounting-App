@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send } from "lucide-react";
+import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send, ChevronDown, ChevronRight } from "lucide-react";
 
 interface CompanySettings {
   id?: number;
@@ -104,13 +104,12 @@ export default function Settings() {
   const [fyStart, setFyStart] = useState("");
   const [fyEnd, setFyEnd] = useState("");
 
-  const [smtpHost, setSmtpHost] = useState("");
-  const [smtpPort, setSmtpPort] = useState("587");
-  const [smtpUsername, setSmtpUsername] = useState("");
-  const [smtpPassword, setSmtpPassword] = useState("");
-  const [smtpFromName, setSmtpFromName] = useState("");
-  const [smtpFromEmail, setSmtpFromEmail] = useState("");
-  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleSection = (key: string) => setCollapsed(prev => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
 
   const { data: settings, isLoading: settingsLoading } = useQuery<CompanySettings>({
     queryKey: ["/api/accounting/company-settings"],
@@ -331,10 +330,11 @@ export default function Settings() {
         </h1>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 cursor-pointer" onClick={() => toggleSection("company")}>
             <CardTitle>Company Information</CardTitle>
+            {collapsed.has("company") ? <ChevronRight className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
           </CardHeader>
-          <CardContent>
+          {!collapsed.has("company") && <CardContent>
             {settingsLoading ? (
               <div className="flex items-center justify-center py-8" data-testid="loading-settings">
                 <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
@@ -373,14 +373,17 @@ export default function Settings() {
                 )}
               </div>
             )}
-          </CardContent>
+          </CardContent>}
         </Card>
 
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Globe className="w-5 h-5 text-sky-500" />
-              <CardTitle>Website & Contact Settings</CardTitle>
+          <CardHeader className="cursor-pointer" onClick={() => toggleSection("website")}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-sky-500" />
+                <CardTitle>Website & Contact Settings</CardTitle>
+              </div>
+              {collapsed.has("website") ? <ChevronRight className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
             </div>
             <CardDescription>
               {isSuperAdmin
@@ -388,9 +391,9 @@ export default function Settings() {
                 : "These settings are read-only. Only Super Admin can edit website settings."}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          {!collapsed.has("website") && <CardContent>
             {settingsLoading ? (
-              <div className="flex items-center justify-center py-8">
+              <div className="flex items-center justify-center py-8" data-testid="loading-website-settings">
                 <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
               </div>
             ) : (
@@ -457,23 +460,26 @@ export default function Settings() {
                 )}
               </div>
             )}
-          </CardContent>
+          </CardContent>}
         </Card>
 
         {isSuperAdmin && (
           <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-sky-500" />
-                <CardTitle>About Page Content</CardTitle>
+            <CardHeader className="cursor-pointer" onClick={() => toggleSection("about")}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-sky-500" />
+                  <CardTitle>About Page Content</CardTitle>
+                </div>
+                {collapsed.has("about") ? <ChevronRight className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
               </div>
               <CardDescription>
                 Manage the text displayed on the public About page. Changes appear immediately.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            {!collapsed.has("about") && <CardContent>
               {settingsLoading ? (
-                <div className="flex items-center justify-center py-8">
+                <div className="flex items-center justify-center py-8" data-testid="loading-about-settings">
                   <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
                 </div>
               ) : (
@@ -504,22 +510,25 @@ export default function Settings() {
                   </Button>
                 </div>
               )}
-            </CardContent>
+            </CardContent>}
           </Card>
         )}
 
         {isSuperAdmin && (
           <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-sky-500" />
-                <CardTitle>Legal Pages</CardTitle>
+            <CardHeader className="cursor-pointer" onClick={() => toggleSection("legal")}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-sky-500" />
+                  <CardTitle>Legal Pages</CardTitle>
+                </div>
+                {collapsed.has("legal") ? <ChevronRight className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
               </div>
               <CardDescription>
                 Edit the Privacy Policy, Terms of Service, and Refund Policy displayed on the public website.
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
+            {!collapsed.has("legal") && <CardContent className="p-0">
               {legalLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
@@ -558,20 +567,23 @@ export default function Settings() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
+            </CardContent>}
           </Card>
         )}
 
         {isSuperAdmin && (
           <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Mail className="w-5 h-5 text-sky-500" />
-                <CardTitle>Email / SMTP Settings</CardTitle>
+            <CardHeader className="cursor-pointer" onClick={() => toggleSection("smtp")}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-sky-500" />
+                  <CardTitle>Email / SMTP Settings</CardTitle>
+                </div>
+                {collapsed.has("smtp") ? <ChevronRight className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
               </div>
               <CardDescription>Configure outgoing email for password resets and welcome emails. Used with Hostinger Mail or any SMTP provider.</CardDescription>
             </CardHeader>
-            <CardContent>
+            {!collapsed.has("smtp") && <CardContent>
               <div className="space-y-4 max-w-lg">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2 sm:col-span-1">
@@ -629,21 +641,24 @@ export default function Settings() {
                   </div>
                 )}
               </div>
-            </CardContent>
+            </CardContent>}
           </Card>
         )}
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 cursor-pointer" onClick={() => toggleSection("financial")}>
             <CardTitle>Financial Years</CardTitle>
-            {canManageSettings && (
-              <Button onClick={() => setFyOpen(true)} data-testid="button-add-financial-year">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Year
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {canManageSettings && (
+                <Button onClick={(e) => { e.stopPropagation(); setFyOpen(true); }} data-testid="button-add-financial-year">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Year
+                </Button>
+              )}
+              {collapsed.has("financial") ? <ChevronRight className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+            </div>
           </CardHeader>
-          <CardContent className="p-0">
+          {!collapsed.has("financial") && <CardContent className="p-0">
             {fyLoading ? (
               <div className="flex items-center justify-center py-8" data-testid="loading-financial-years">
                 <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
@@ -678,7 +693,7 @@ export default function Settings() {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
+          </CardContent>}
         </Card>
 
         <Dialog open={legalDialogOpen} onOpenChange={setLegalDialogOpen}>
@@ -725,119 +740,6 @@ export default function Settings() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="w-5 h-5" />
-              Email / SMTP Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {smtpLoading ? (
-              <div className="flex items-center justify-center py-8" data-testid="loading-smtp">
-                <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
-              </div>
-            ) : (
-              <div className="space-y-4 max-w-lg">
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Configure SMTP settings to enable password reset emails. These credentials are used to send emails from the system.
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>SMTP Host</Label>
-                    <Input
-                      value={smtpHost}
-                      onChange={(e) => setSmtpHost(e.target.value)}
-                      placeholder="e.g., smtp.gmail.com"
-                      data-testid="input-smtp-host"
-                    />
-                  </div>
-                  <div>
-                    <Label>Port</Label>
-                    <Input
-                      value={smtpPort}
-                      onChange={(e) => setSmtpPort(e.target.value)}
-                      placeholder="587"
-                      type="number"
-                      data-testid="input-smtp-port"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Username</Label>
-                  <Input
-                    value={smtpUsername}
-                    onChange={(e) => setSmtpUsername(e.target.value)}
-                    placeholder="your-email@gmail.com"
-                    data-testid="input-smtp-username"
-                  />
-                </div>
-                <div>
-                  <Label>Password</Label>
-                  <Input
-                    type="password"
-                    value={smtpPassword}
-                    onChange={(e) => setSmtpPassword(e.target.value)}
-                    placeholder={smtpData ? "Enter new password to change" : "App password or SMTP password"}
-                    data-testid="input-smtp-password"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>From Name</Label>
-                    <Input
-                      value={smtpFromName}
-                      onChange={(e) => setSmtpFromName(e.target.value)}
-                      placeholder="MHTSdigiXR Accounting"
-                      data-testid="input-smtp-from-name"
-                    />
-                  </div>
-                  <div>
-                    <Label>From Email</Label>
-                    <Input
-                      type="email"
-                      value={smtpFromEmail}
-                      onChange={(e) => setSmtpFromEmail(e.target.value)}
-                      placeholder="noreply@example.com"
-                      data-testid="input-smtp-from-email"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={smtpSecure}
-                    onCheckedChange={setSmtpSecure}
-                    data-testid="switch-smtp-secure"
-                  />
-                  <Label className="cursor-pointer">Use TLS/SSL (port 465)</Label>
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleSmtpSave}
-                    disabled={saveSmtpMutation.isPending || !smtpHost || !smtpUsername || (!smtpPassword && !smtpData) || !smtpFromName || !smtpFromEmail}
-                    data-testid="button-save-smtp"
-                  >
-                    {saveSmtpMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save SMTP Settings
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const email = prompt("Enter email address to send test to:", user?.email || "");
-                      if (email) testSmtpMutation.mutate(email);
-                    }}
-                    disabled={testSmtpMutation.isPending || !smtpData}
-                    data-testid="button-test-smtp"
-                  >
-                    {testSmtpMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                    Send Test Email
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         <Dialog open={fyOpen} onOpenChange={setFyOpen}>
           <DialogContent data-testid="dialog-add-financial-year">

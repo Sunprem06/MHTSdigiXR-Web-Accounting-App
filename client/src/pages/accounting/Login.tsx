@@ -166,14 +166,25 @@ export default function AccountingLogin() {
             >
               {isLoggingIn ? "Signing in..." : "Sign In"}
             </Button>
-            <div className="text-center">
-              <a
-                href="/accounting/forgot-password"
-                className="text-sm text-sky-500 hover:text-sky-600 hover:underline"
-                data-testid="link-forgot-password"
-              >
-                Forgot Password?
-              </a>
+            <div className="text-center space-y-2">
+              <div>
+                <a
+                  href="/accounting/forgot-password"
+                  className="text-sm text-sky-500 hover:text-sky-600 hover:underline"
+                  data-testid="link-forgot-password"
+                >
+                  Forgot Password?
+                </a>
+              </div>
+              <div>
+                <a
+                  href="/"
+                  className="text-sm text-sky-500 hover:text-sky-600 hover:underline"
+                  data-testid="link-back-to-website"
+                >
+                  ← Back to Website
+                </a>
+              </div>
             </div>
           </form>
         </CardContent>

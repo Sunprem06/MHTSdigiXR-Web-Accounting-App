@@ -1520,6 +1520,8 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json({ message: "Deleted successfully" });
+  });
+
   // SMTP Settings (Super Admin only)
   app.get("/api/accounting/smtp-settings", requireAuth, requireRole("super_admin"), async (req, res) => {
     const settings = await storage.getSmtpSettings();
