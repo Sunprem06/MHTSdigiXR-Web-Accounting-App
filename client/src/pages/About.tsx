@@ -22,13 +22,13 @@ export default function About() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 text-sm font-semibold mb-6">
               <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
-              About MHTSdigiX
+              About MHTSdigiXR
             </div>
             <h1 className="text-4xl md:text-6xl font-bold mb-6 text-slate-900 dark:text-white">
               Your Extended <span className="text-gradient">Digital Team</span>
             </h1>
             <p className="text-lg text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
-              Maanagarram Hi Tech Solutions (MHTSdigiX) was founded in December 2022 with a vision to empower businesses through digital transformation. We genuinely feel like an extended marketing and technology arm for every brand we associate with.
+              Maanagarram Hi Tech Solutions (MHTSdigiXR) was founded in December 2022 with a vision to empower businesses through digital transformation. We genuinely feel like an extended marketing and technology arm for every brand we associate with.
             </p>
             <p className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
               Based in Chennai, India, we serve clients globally, providing bespoke solutions that drive growth and efficiency. Our approach combines technical expertise with creative innovation to solve complex business challenges.
@@ -86,11 +86,11 @@ export default function About() {
               <div className="lg:col-span-2">
                 <img 
                   src={teamMemberImage}
-                  alt="MHTSdigiX Team Representative" 
+                  alt="MHTSdigiXR Team Representative" 
                   className="rounded-2xl shadow-2xl mx-auto w-full max-w-xs object-cover"
                 />
                 <div className="text-center mt-6">
-                  <p className="text-white font-bold text-lg">The MHTSdigiX Team</p>
+                  <p className="text-white font-bold text-lg">The MHTSdigiXR Team</p>
                   <p className="text-slate-400">Chennai, India</p>
                 </div>
               </div>

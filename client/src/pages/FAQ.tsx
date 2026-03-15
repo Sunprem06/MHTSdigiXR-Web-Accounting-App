@@ -22,11 +22,11 @@ const FAQ_CATEGORIES: FAQCategory[] = [
     color: "from-sky-500 to-sky-600",
     faqs: [
       {
-        question: "What services does MHTSdigiX offer?",
-        answer: "MHTSdigiX offers comprehensive digital solutions including Web Development, Mobile App Development, Digital Marketing, UI/UX Design, SEO Optimization, Branding & Graphics, Domain & Hosting, and Video & Animation services. We provide end-to-end solutions to help businesses establish and grow their digital presence."
+        question: "What services does MHTSdigiXR offer?",
+        answer: "MHTSdigiXR offers comprehensive digital solutions including Web Development, Mobile App Development, Digital Marketing, UI/UX Design, SEO Optimization, Branding & Graphics, Domain & Hosting, and Video & Animation services. We provide end-to-end solutions to help businesses establish and grow their digital presence."
       },
       {
-        question: "How long has MHTSdigiX been in business?",
+        question: "How long has MHTSdigiXR been in business?",
         answer: "Maanagarram Hi Tech Solutions has been serving clients since 2015, with over 10+ years of combined expertise in digital marketing and web development. We have successfully delivered 500+ projects across various industries."
       },
       {
@@ -34,7 +34,7 @@ const FAQ_CATEGORIES: FAQCategory[] = [
         answer: "Yes, we serve clients globally! While we are based in Chennai, India, we have successfully completed projects for clients across USA, UK, UAE, Australia, and other countries. We use modern collaboration tools to ensure seamless communication regardless of timezone."
       },
       {
-        question: "What makes MHTSdigiX different from other agencies?",
+        question: "What makes MHTSdigiXR different from other agencies?",
         answer: "We combine creativity with data-driven strategies to deliver measurable results. Our differentiators include: 24/7 customer support, transparent pricing with no hidden costs, dedicated project managers, 100% money-back guarantee, and a focus on ROI-driven solutions."
       },
       {

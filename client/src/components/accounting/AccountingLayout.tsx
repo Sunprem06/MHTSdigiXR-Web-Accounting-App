@@ -125,7 +125,7 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
   const sidebar = (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-        <h1 className="font-bold text-lg text-slate-900 dark:text-white">MHTSdigiX</h1>
+        <h1 className="font-bold text-lg text-slate-900 dark:text-white">MHTSdigiXR</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400">Accounting System</p>
       </div>
 
@@ -224,7 +224,7 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
           <button onClick={() => setSidebarOpen(true)} className="text-slate-600 dark:text-slate-300" data-testid="button-mobile-menu">
             <Menu className="w-6 h-6" />
           </button>
-          <h1 className="font-bold text-slate-900 dark:text-white">MHTSdigiX Accounting</h1>
+          <h1 className="font-bold text-slate-900 dark:text-white">MHTSdigiXR Accounting</h1>
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           {children}

@@ -7,7 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 const WHATSAPP_NUMBER = "917358105995";
 
 // System prompt for Kayal - the AI assistant
-const SYSTEM_CONTEXT = `You are Kayal, the friendly and knowledgeable AI assistant for MHTSdigiX (Maanagarram Hi Tech Solutions), a premier digital agency in Chennai, India.
+const SYSTEM_CONTEXT = `You are Kayal, the friendly and knowledgeable AI assistant for MHTSdigiXR (Maanagarram Hi Tech Solutions), a premier digital agency in Chennai, India.
 
 You are an expert in:
 - SERVICE SUPPORT: Helping customers understand our services, features, and capabilities
@@ -32,10 +32,10 @@ Pricing Packages:
 
 Contact Information:
 - WhatsApp: +91 7358105995
-- Email: sales@maanagaram.com
+- Email: info@mhtsdigixr.com
 - Phone: +91 4447740195
 - Address: 4056, 5th Main Road, Ayyapakam, Chennai, Tamil Nadu - 600077
-- Website: www.maanagaram.com
+- Website: www.mhtsdigixr.com
 
 Your personality:
 - Warm, friendly, and professional
@@ -51,7 +51,7 @@ Always guide customers towards the right service for their needs and encourage t
 export function FloatingActions() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([
-    { role: 'assistant', content: 'Hi there! I\'m Kayal, your digital solutions expert at MHTSdigiX. How can I help you today? Whether you need help with web development, mobile apps, digital marketing, or any technical questions - I\'m here to assist!' }
+    { role: 'assistant', content: 'Hi there! I\'m Kayal, your digital solutions expert at MHTSdigiXR. How can I help you today? Whether you need help with web development, mobile apps, digital marketing, or any technical questions - I\'m here to assist!' }
   ]);
   const [input, setInput] = useState("");
   const [streamingResponse, setStreamingResponse] = useState("");

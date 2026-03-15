@@ -90,7 +90,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white mb-1">Email Address</h3>
-                  <p className="text-slate-600 dark:text-slate-300">sales@maanagaram.com</p>
+                  <p className="text-slate-600 dark:text-slate-300">info@mhtsdigixr.com</p>
                   <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">We reply within 24 hours</p>
                 </div>
               </div>

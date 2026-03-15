@@ -1,11 +1,13 @@
-# Maanagarram Hi Tech Solutions (MHTSdigiX)
+# Maanagarram Hi Tech Solutions (MHTSdigiXR)
 
 ## Overview
 
-This is a full-stack digital agency website for Maanagarram Hi Tech Solutions, a company providing end-to-end digital services including web development, mobile apps, SEO, branding, and AI integrations. The application features a React frontend with a modern design system, Express backend with PostgreSQL database, integrated AI chat capabilities via Replit AI Integrations, and a full TallyPrime-inspired accounting system with role-based access control.
+This is a full-stack digital agency website for Maanagarram Hi Tech Solutions (brand: MHTSdigiXR), a company providing end-to-end digital services including web development, mobile apps, SEO, branding, and AI integrations. The application features a React frontend with a modern design system, Express backend with PostgreSQL database, integrated AI chat capabilities via Replit AI Integrations, and a full TallyPrime-inspired accounting system with role-based access control.
 
 ## Recent Changes (Mar 2026)
 
+- **Rebrand to MHTSdigiXR**: Updated brand name from MHTSdigiX to MHTSdigiXR across all pages, new butterfly logo, domain changed to mhtsdigixr.com, email changed to info@mhtsdigixr.com
+- **Navbar Login Link**: Added "Login" link with LogIn icon in navbar (desktop + mobile) pointing to /accounting/login, styled with sky blue outline
 - **Delete Functionality**: Super Admin and Admin can delete Products, Parties, and Expense Claims with audit logging
 - **Voucher Product Mode**: Sales/Purchase vouchers support optional product/service line items with auto-generated double-entry ledger entries (GST-aware)
 - **Quick Add Party**: Quotation entry has inline dialog to create new customer without navigating away

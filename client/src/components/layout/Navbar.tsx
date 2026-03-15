@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, X, Phone, Globe, Sun, Moon } from "lucide-react";
+import { Menu, X, Phone, Globe, Sun, Moon, LogIn } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import logoImage from "@assets/MHTS_DigiX-Logo_300x300_1770302687256.jpg";
+import logoImage from "@assets/MHTSdigiXR_logo_1080x1080_1773540695277.jpg";
 
 const links = [
   { href: "/", label: "Home" },
@@ -53,12 +53,12 @@ export function Navbar() {
           <Link href="/" className="flex items-center gap-2 group">
             <img 
               src={logoImage} 
-              alt="MHTSdigiX Logo" 
+              alt="MHTSdigiXR Logo" 
               className="w-12 h-12 rounded-xl shadow-lg group-hover:scale-105 transition-transform object-cover"
             />
             <div className="flex flex-col">
               <span className={`font-display font-extrabold text-lg leading-tight ${scrolled ? 'text-slate-900 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
-                MHTSdigiX
+                MHTSdigiXR
               </span>
               <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 tracking-wide">
                 Maanagarram Hi Tech Solutions
@@ -81,6 +81,14 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <Link
+              href="/accounting/login"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-sky-500 text-sky-600 dark:text-sky-400 text-sm font-semibold hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-all"
+              data-testid="link-accounting-login"
+            >
+              <LogIn className="w-4 h-4" />
+              Login
+            </Link>
             <button
               onClick={toggleDarkMode}
               data-testid="button-theme-toggle"
@@ -131,6 +139,15 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              <Link
+                href="/accounting/login"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-2 text-lg font-medium p-2 rounded-lg text-sky-600 dark:text-sky-400"
+                data-testid="link-accounting-login-mobile"
+              >
+                <LogIn className="w-5 h-5" />
+                Login
+              </Link>
               <hr className="border-slate-100 dark:border-slate-800" />
               <div className="flex flex-col gap-3 p-2">
                 <button

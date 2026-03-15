@@ -73,7 +73,7 @@ export default function AccountingLogin() {
           <div className="mx-auto w-16 h-16 bg-sky-100 dark:bg-sky-900/30 rounded-full flex items-center justify-center mb-2">
             <Lock className="w-8 h-8 text-sky-500" />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white">MHTSdigiX Accounting</CardTitle>
+          <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white">MHTSdigiXR Accounting</CardTitle>
           <CardDescription className="text-slate-500 dark:text-slate-400">Sign in with your employee credentials</CardDescription>
         </CardHeader>
         <CardContent>

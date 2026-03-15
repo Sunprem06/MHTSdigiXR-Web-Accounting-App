@@ -8,7 +8,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { FloatingActions } from "@/components/widgets/FloatingActions";
 import { ProtectedRoute } from "@/components/accounting/ProtectedRoute";
-import logoImage from "@assets/MHTS_DigiX-Logo_300x300_1770302687256.jpg";
+import logoImage from "@assets/MHTSdigiXR_logo_1080x1080_1773540695277.jpg";
 
 function ScrollToTop() {
   const [location] = useLocation();

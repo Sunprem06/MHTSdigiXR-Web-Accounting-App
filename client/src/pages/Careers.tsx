@@ -233,7 +233,7 @@ function JobCard({ job, isExpanded, onToggle }: { job: JobPosition; isExpanded: 
           </div>
 
           <a
-            href="mailto:careers@maanagaram.com?subject=Application for {job.title}"
+            href="mailto:careers@mhtsdigixr.com?subject=Application for {job.title}"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all"
             data-testid={`button-apply-${job.id}`}
           >
@@ -414,7 +414,7 @@ export default function Careers() {
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <a 
-                href="mailto:careers@maanagaram.com?subject=General Application"
+                href="mailto:careers@mhtsdigixr.com?subject=General Application"
                 className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg"
                 data-testid="button-send-resume"
               >

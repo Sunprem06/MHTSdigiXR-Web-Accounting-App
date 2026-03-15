@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from "lucide-react";
-import logoImage from "@assets/MHTS_DigiX-Logo_300x300_1770302687256.jpg";
+import logoImage from "@assets/MHTSdigiXR_logo_1080x1080_1773540695277.jpg";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -14,11 +14,11 @@ export function Footer() {
             <div className="flex items-center gap-2 mb-6">
               <img 
                 src={logoImage} 
-                alt="MHTSdigiX Logo" 
+                alt="MHTSdigiXR Logo" 
                 className="w-10 h-10 rounded-lg object-cover"
               />
               <div className="flex flex-col">
-                <span className="font-display font-extrabold text-lg text-white">MHTSdigiX</span>
+                <span className="font-display font-extrabold text-lg text-white">MHTSdigiXR</span>
                 <span className="text-[10px] font-medium text-slate-400 tracking-wide">Maanagarram Hi Tech Solutions</span>
               </div>
             </div>
@@ -81,7 +81,7 @@ export function Footer() {
               </li>
               <li className="flex gap-3 items-center">
                 <Mail className="w-5 h-5 text-sky-500 shrink-0" />
-                <a href="mailto:sales@maanagaram.com" className="text-sm hover:text-white transition-colors">sales@maanagaram.com</a>
+                <a href="mailto:info@mhtsdigixr.com" className="text-sm hover:text-white transition-colors">info@mhtsdigixr.com</a>
               </li>
             </ul>
           </div>
