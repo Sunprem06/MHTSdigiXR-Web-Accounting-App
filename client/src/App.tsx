@@ -37,6 +37,7 @@ import NotFound from "@/pages/not-found";
 import AccountingLogin from "@/pages/accounting/Login";
 import ForgotPassword from "@/pages/accounting/ForgotPassword";
 import ResetPassword from "@/pages/accounting/ResetPassword";
+import ForceChangePassword from "@/pages/accounting/ForceChangePassword";
 import AccountingDashboard from "@/pages/accounting/Dashboard";
 import Ledgers from "@/pages/accounting/Ledgers";
 import VoucherList from "@/pages/accounting/VoucherList";
@@ -116,6 +117,7 @@ function AccountingRouter() {
   return (
     <Switch>
       <Route path="/accounting/login" component={AccountingLogin} />
+      <Route path="/accounting/force-change-password" component={ForceChangePassword} />
       <Route path="/accounting/forgot-password" component={ForgotPassword} />
       <Route path="/accounting/reset-password" component={ResetPassword} />
       <Route path="/accounting">

@@ -8,7 +8,7 @@ import {
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
   Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen,
-  Layers, DollarSign, Lock, Eye, EyeOff, Loader2
+  Layers, DollarSign, Lock, Eye, EyeOff, Loader2, AlertTriangle
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -89,7 +89,7 @@ const navItems: NavItem[] = [
 ];
 
 export function AccountingLayout({ children }: AccountingLayoutProps) {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, passwordExpiryDays } = useAuth();
   const [location] = useLocation();
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["Vouchers", "Reports", "Recruitment", "Website CMS"]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -100,6 +100,7 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const { toast } = useToast();
 
   const changePasswordMutation = useMutation({
@@ -309,6 +310,19 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
             </button>
             <h1 className="font-bold text-slate-900 dark:text-white">MHTSdigiXR Accounting</h1>
           </header>
+          {!bannerDismissed && passwordExpiryDays !== null && passwordExpiryDays <= 7 && passwordExpiryDays > 0 && (
+            <div className="mx-4 md:mx-6 mt-4 flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-300 text-sm" data-testid="password-expiry-banner">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <span className="flex-1">
+                Your password expires in {passwordExpiryDays} {passwordExpiryDays === 1 ? "day" : "days"}. Please{" "}
+                <Link href="/accounting/settings" className="underline font-medium" data-testid="link-change-password">change your password</Link>{" "}
+                soon.
+              </span>
+              <button onClick={() => setBannerDismissed(true)} className="text-amber-500 hover:text-amber-700 dark:hover:text-amber-200" data-testid="button-dismiss-banner">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <main className="flex-1 overflow-y-auto p-4 md:p-6">
             {children}
           </main>

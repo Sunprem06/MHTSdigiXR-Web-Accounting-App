@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -59,9 +59,13 @@ export default function AccountingLogin() {
     }
 
     try {
-      await login({ username, password });
+      const data = await login({ username, password });
+      if (data?.passwordExpired && data?.challengeToken) {
+        setLocation(`/accounting/force-change-password?token=${encodeURIComponent(data.challengeToken)}`);
+        return;
+      }
       setLocation("/accounting");
-    } catch (err) {
+    } catch {
       refreshCaptcha();
     }
   };
@@ -174,11 +178,6 @@ export default function AccountingLogin() {
           </form>
         </CardContent>
       </Card>
-      <div className="text-center mt-4">
-        <a href="/" className="text-sm text-sky-500 hover:text-sky-600 hover:underline" data-testid="link-back-to-website">
-          ← Back to Website
-        </a>
-      </div>
     </div>
   );
 }

@@ -114,6 +114,7 @@ export const employees = pgTable("employees", {
   phone: text("phone"),
   isActive: boolean("is_active").notNull().default(true),
   lastLogin: timestamp("last_login"),
+  passwordChangedAt: timestamp("password_changed_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: integer("created_by"),
 });
@@ -382,7 +383,7 @@ export const insertContactMessageSchema = createInsertSchema(contactMessages).om
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true });
 export const insertCaseStudySchema = createInsertSchema(caseStudies).omit({ id: true });
 export const insertRoleSchema = createInsertSchema(roles).omit({ id: true, createdAt: true });
-export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, lastLogin: true });
+export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, lastLogin: true, passwordChangedAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 export const insertAccountGroupSchema = createInsertSchema(accountGroups).omit({ id: true });
 export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit({ id: true, createdAt: true });

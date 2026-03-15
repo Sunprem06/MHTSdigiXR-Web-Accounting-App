@@ -179,7 +179,7 @@ export async function registerRoutes(
     if (record.used) return res.status(400).json({ message: "This reset link has already been used" });
     if (new Date() > new Date(record.expiresAt)) return res.status(400).json({ message: "This reset link has expired" });
     const hashed = await bcrypt.hash(password, 10);
-    await storage.updateEmployee(record.employeeId, { password: hashed } as any);
+    await storage.updateEmployeePassword(record.employeeId, hashed);
     await storage.markPasswordResetTokenUsed(record.id);
     res.json({ message: "Password reset successfully. You can now log in." });
   });
@@ -349,7 +349,10 @@ export async function registerRoutes(
       data.role = req.body.role;
     }
     if (typeof req.body.isActive === "boolean") data.isActive = req.body.isActive;
-    if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
+    if (req.body.password) {
+      data.password = await bcrypt.hash(req.body.password, 10);
+      data.passwordChangedAt = new Date();
+    }
     if (req.body.permissions !== undefined) {
       const { ALL_PERMISSIONS: AP } = await import("@shared/schema");
       data.permissions = Array.isArray(req.body.permissions)

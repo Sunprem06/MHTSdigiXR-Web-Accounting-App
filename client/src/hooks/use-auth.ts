@@ -10,6 +10,7 @@ interface AuthUser {
   role: string;
   permissions: Permission[];
   isActive: boolean;
+  passwordChangedAt: string | null;
 }
 
 export function useAuth() {
@@ -50,6 +51,14 @@ export function useAuth() {
     return ps.some(p => perms.includes(p));
   };
 
+  const passwordExpiryDays = (() => {
+    if (!user?.passwordChangedAt) return null;
+    const changedAt = new Date(user.passwordChangedAt).getTime();
+    const expiresAt = changedAt + 45 * 24 * 60 * 60 * 1000;
+    const daysLeft = Math.ceil((expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
+    return daysLeft;
+  })();
+
   const canWrite = hasAnyPermission("vouchers.create", "quotations.create", "invoices.create", "expenses.create");
   const canManageLedgers = hasPermission("ledgers.create");
   const canApprove = hasAnyPermission("vouchers.approve", "quotations.approve", "expenses.approve");
@@ -71,6 +80,7 @@ export function useAuth() {
     isLoggingIn: loginMutation.isPending,
     hasPermission,
     hasAnyPermission,
+    passwordExpiryDays,
     canWrite,
     canManageLedgers,
     canApprove,

@@ -54,6 +54,8 @@ export interface IStorage {
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: number, data: Partial<InsertEmployee>): Promise<Employee | undefined>;
   updateEmployeeLastLogin(id: number): Promise<void>;
+  updateEmployeePasswordChangedAt(id: number): Promise<void>;
+  updateEmployeePassword(id: number, hashedPassword: string): Promise<void>;
 
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(filters?: { employeeId?: number; action?: string; startDate?: string; endDate?: string }): Promise<AuditLog[]>;
@@ -324,6 +326,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateEmployeeLastLogin(id: number): Promise<void> {
     await db.update(employees).set({ lastLogin: new Date() }).where(eq(employees.id, id));
+  }
+
+  async updateEmployeePasswordChangedAt(id: number): Promise<void> {
+    await db.update(employees).set({ passwordChangedAt: new Date() }).where(eq(employees.id, id));
+  }
+
+  async updateEmployeePassword(id: number, hashedPassword: string): Promise<void> {
+    await db.update(employees).set({ password: hashedPassword, passwordChangedAt: new Date() }).where(eq(employees.id, id));
   }
 
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
