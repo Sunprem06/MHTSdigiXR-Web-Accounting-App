@@ -2,6 +2,7 @@ import { motion, useInView } from "framer-motion";
 import { Link } from "wouter";
 import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Star, Users, Award, TrendingUp, Quote, Trophy, Target, Lightbulb, CheckCircle2, Zap, Shield, Clock } from "lucide-react";
 import { useServices } from "@/hooks/use-services";
+import { useSiteSettings } from "@/hooks/use-site-settings";
 import { useRef, useEffect, useState } from "react";
 
 const FEATURES = [
@@ -124,6 +125,7 @@ function AnimatedCounter({ value, suffix }: { value: number; suffix: string }) {
 
 export default function Home() {
   const { data: services } = useServices();
+  const s = useSiteSettings();
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
 
   useEffect(() => {
@@ -433,7 +435,7 @@ export default function Home() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-4 dark:text-white">What are my options?</h2>
             <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
-              At MHTSdigiXR, we become an extended digital arm for your brand. Choose how you want to work with us.
+              At {s.brandName}, we become an extended digital arm for your brand. Choose how you want to work with us.
             </p>
           </div>
 
@@ -606,7 +608,7 @@ export default function Home() {
               </div>
             </div>
             <div className="order-1 lg:order-2">
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 dark:text-white">Why Choose <br /><span className="text-gradient">MHTSdigiXR?</span></h2>
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 dark:text-white">Why Choose <br /><span className="text-gradient">{s.brandName}?</span></h2>
               <p className="text-slate-600 dark:text-slate-300 mb-6 text-lg">
                 We are more than just a tech company; we are your growth partners. Our young and dynamic team is obsessed with quality and innovation.
               </p>
@@ -653,7 +655,7 @@ export default function Home() {
           >
             <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">Ready to Dominate Online?</h2>
             <p className="text-slate-300 text-lg max-w-2xl mx-auto mb-10">
-              Join 50+ brands who have transformed their digital presence with MHTSdigiXR. Let's build something extraordinary together.
+              Join 50+ brands who have transformed their digital presence with {s.brandName}. Let's build something extraordinary together.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>

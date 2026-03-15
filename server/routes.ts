@@ -992,13 +992,6 @@ async function seedDatabase() {
   }
 
   // Seed default company settings + backfill new website fields on existing rows
-  const SITE_DEFAULTS: Record<string, string> = {
-    brandName: "MHTSdigiXR",
-    tagline: "Empowering businesses with cutting-edge digital solutions.",
-    whatsappNumber: "917358105995",
-    careersEmail: "careers@mhtsdigixr.com",
-    websiteUrl: "www.mhtsdigixr.com",
-  };
   const existingSettings = await storage.getCompanySettings();
   if (!existingSettings) {
     await storage.upsertCompanySettings({
@@ -1008,7 +1001,11 @@ async function seedDatabase() {
       phone: "+91 4447740195",
       email: "info@mhtsdigixr.com",
       state: "Tamil Nadu",
-      ...SITE_DEFAULTS,
+      brandName: "MHTSdigiXR",
+      tagline: "Empowering businesses with cutting-edge digital solutions.",
+      whatsappNumber: "917358105995",
+      careersEmail: "careers@mhtsdigixr.com",
+      websiteUrl: "www.mhtsdigixr.com",
       linkedinUrl: "",
       twitterUrl: "",
       instagramUrl: "",
@@ -1016,14 +1013,23 @@ async function seedDatabase() {
       copyrightText: "",
     });
   } else {
-    const updates: Record<string, string> = {};
-    for (const [key, defaultVal] of Object.entries(SITE_DEFAULTS)) {
-      if (!(existingSettings as any)[key]) {
-        updates[key] = defaultVal;
-      }
-    }
-    if (Object.keys(updates).length > 0) {
-      await storage.upsertCompanySettings({ ...existingSettings, ...updates });
+    const needsUpdate =
+      !existingSettings.brandName ||
+      !existingSettings.tagline ||
+      !existingSettings.whatsappNumber ||
+      !existingSettings.careersEmail ||
+      !existingSettings.websiteUrl ||
+      !existingSettings.email;
+    if (needsUpdate) {
+      await storage.upsertCompanySettings({
+        ...existingSettings,
+        brandName: existingSettings.brandName || "MHTSdigiXR",
+        tagline: existingSettings.tagline || "Empowering businesses with cutting-edge digital solutions.",
+        whatsappNumber: existingSettings.whatsappNumber || "917358105995",
+        careersEmail: existingSettings.careersEmail || "careers@mhtsdigixr.com",
+        websiteUrl: existingSettings.websiteUrl || "www.mhtsdigixr.com",
+        email: existingSettings.email || "info@mhtsdigixr.com",
+      });
     }
   }
 
