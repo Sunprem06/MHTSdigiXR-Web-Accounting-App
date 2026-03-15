@@ -714,34 +714,6 @@ export class DatabaseStorage implements IStorage {
     return employee;
   }
 
-  async createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken> {
-    const [newToken] = await db.insert(passwordResetTokens).values(token).returning();
-    return newToken;
-  }
-
-  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
-    const [result] = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.token, token));
-    return result;
-  }
-
-  async markPasswordResetTokenUsed(id: number): Promise<void> {
-    await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, id));
-  }
-
-  async consumePasswordResetToken(hashedToken: string): Promise<PasswordResetToken | null> {
-    const [result] = await db.update(passwordResetTokens)
-      .set({ used: true })
-      .where(
-        and(
-          eq(passwordResetTokens.token, hashedToken),
-          eq(passwordResetTokens.used, false),
-          gte(passwordResetTokens.expiresAt, new Date())
-        )
-      )
-      .returning();
-    return result || null;
-  }
-
   async getDashboardStats() {
     const allVouchers = await db.select().from(vouchers).where(eq(vouchers.status, "approved"));
 
