@@ -43,7 +43,7 @@ const STEPS = [
     title: "6. Support",
     desc: "Ongoing maintenance and support to keep your digital solution updated and secure.",
     image: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&q=80",
-    color: "from-teal-500 to-teal-600"
+    color: "from-sky-500 to-sky-600"
   }
 ];
 

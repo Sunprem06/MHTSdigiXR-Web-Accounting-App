@@ -281,13 +281,13 @@ export default function Home() {
               {/* Network dots and lines */}
               <svg className="absolute inset-0 w-full h-full opacity-40" viewBox="0 0 400 400">
                 <circle cx="80" cy="80" r="2" fill="#0EA5E9" />
-                <circle cx="320" cy="60" r="2" fill="#10B981" />
+                <circle cx="320" cy="60" r="2" fill="#0EA5E9" />
                 <circle cx="200" cy="200" r="3" fill="#0EA5E9" />
-                <circle cx="60" cy="320" r="2" fill="#10B981" />
+                <circle cx="60" cy="320" r="2" fill="#0EA5E9" />
                 <circle cx="340" cy="300" r="2" fill="#0EA5E9" />
                 <line x1="80" y1="80" x2="200" y2="200" stroke="#0EA5E9" strokeWidth="0.5" opacity="0.5" />
-                <line x1="320" y1="60" x2="200" y2="200" stroke="#10B981" strokeWidth="0.5" opacity="0.5" />
-                <line x1="60" y1="320" x2="200" y2="200" stroke="#10B981" strokeWidth="0.5" opacity="0.5" />
+                <line x1="320" y1="60" x2="200" y2="200" stroke="#0EA5E9" strokeWidth="0.5" opacity="0.5" />
+                <line x1="60" y1="320" x2="200" y2="200" stroke="#0EA5E9" strokeWidth="0.5" opacity="0.5" />
                 <line x1="340" y1="300" x2="200" y2="200" stroke="#0EA5E9" strokeWidth="0.5" opacity="0.5" />
               </svg>
             </motion.div>
