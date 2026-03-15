@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Menu, X, Phone, Globe, Sun, Moon, LogIn } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logoImage from "@assets/MHTSdigiXR_logo_1080x1080_1773540695277.jpg";
+import { useSiteSettings } from "@/hooks/use-site-settings";
 
 const links = [
   { href: "/", label: "Home" },
@@ -15,6 +16,7 @@ const links = [
 ];
 
 export function Navbar() {
+  const s = useSiteSettings();
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -58,10 +60,10 @@ export function Navbar() {
             />
             <div className="flex flex-col">
               <span className={`font-display font-extrabold text-lg leading-tight ${scrolled ? 'text-slate-900 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
-                MHTSdigiXR
+                {s.brandName}
               </span>
               <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 tracking-wide">
-                Maanagarram Hi Tech Solutions
+                {s.companyName}
               </span>
             </div>
           </Link>
@@ -96,13 +98,15 @@ export function Navbar() {
             >
               {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            <a
-              href="tel:+914447740195"
-              className="px-5 py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-md hover:shadow-xl flex items-center gap-2"
-            >
-              <Phone className="w-4 h-4" />
-              <span>Call Now</span>
-            </a>
+            {s.phone && (
+              <a
+                href={`tel:${s.phone}`}
+                className="px-5 py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-md hover:shadow-xl flex items-center gap-2"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Call Now</span>
+              </a>
+            )}
           </div>
 
           {/* Mobile Toggle */}
@@ -158,14 +162,18 @@ export function Navbar() {
                   {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                   <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
                 </button>
-                <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-                  <Globe className="w-4 h-4" />
-                  <span>Ayyapakam, Chennai</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-                  <Phone className="w-4 h-4" />
-                  <span>+91 44 4774 0195</span>
-                </div>
+                {s.address && (
+                  <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                    <Globe className="w-4 h-4" />
+                    <span>{s.address}</span>
+                  </div>
+                )}
+                {s.phone && (
+                  <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                    <Phone className="w-4 h-4" />
+                    <span>{s.phone}</span>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>

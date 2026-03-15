@@ -152,16 +152,6 @@ export default function Settings() {
     });
   };
 
-  if (!canManageSettings) {
-    return (
-      <AccountingLayout>
-        <div className="flex items-center justify-center py-20" data-testid="access-denied-settings">
-          <p className="text-slate-500 dark:text-slate-400">You do not have permission to manage settings.</p>
-        </div>
-      </AccountingLayout>
-    );
-  }
-
   return (
     <AccountingLayout>
       <div className="space-y-6">
@@ -182,32 +172,34 @@ export default function Settings() {
               <div className="space-y-4 max-w-lg">
                 <div>
                   <Label>Company Name</Label>
-                  <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} data-testid="input-company-name" />
+                  <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} disabled={!canManageSettings} data-testid="input-company-name" />
                 </div>
                 <div>
                   <Label>Address</Label>
-                  <Input value={address} onChange={(e) => setAddress(e.target.value)} data-testid="input-address" />
+                  <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!canManageSettings} data-testid="input-address" />
                 </div>
                 <div>
                   <Label>GSTIN</Label>
-                  <Input value={gstin} onChange={(e) => setGstin(e.target.value)} data-testid="input-gstin" />
+                  <Input value={gstin} onChange={(e) => setGstin(e.target.value)} disabled={!canManageSettings} data-testid="input-gstin" />
                 </div>
                 <div>
                   <Label>Phone</Label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} data-testid="input-phone" />
+                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!canManageSettings} data-testid="input-phone" />
                 </div>
                 <div>
                   <Label>Email</Label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="input-email" />
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!canManageSettings} data-testid="input-email" />
                 </div>
-                <Button
-                  onClick={handleSave}
-                  disabled={saveMutation.isPending || !companyName}
-                  data-testid="button-save-settings"
-                >
-                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                  Save Settings
-                </Button>
+                {canManageSettings && (
+                  <Button
+                    onClick={handleSave}
+                    disabled={saveMutation.isPending || !companyName}
+                    data-testid="button-save-settings"
+                  >
+                    {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Save Settings
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>
@@ -300,10 +292,12 @@ export default function Settings() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle>Financial Years</CardTitle>
-            <Button onClick={() => setFyOpen(true)} data-testid="button-add-financial-year">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Year
-            </Button>
+            {canManageSettings && (
+              <Button onClick={() => setFyOpen(true)} data-testid="button-add-financial-year">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Year
+              </Button>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             {fyLoading ? (

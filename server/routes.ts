@@ -822,7 +822,7 @@ export async function registerRoutes(
   });
 
   // Company Settings
-  app.get("/api/accounting/company-settings", requireAuth, requirePermission("settings.view"), async (req, res) => {
+  app.get("/api/accounting/company-settings", requireAuth, async (req, res) => {
     const settings = await storage.getCompanySettings();
     res.json(settings || {});
   });
@@ -977,11 +977,21 @@ async function seedDatabase() {
   if (!settings) {
     await storage.upsertCompanySettings({
       companyName: "Maanagarram Hi Tech Solutions",
-      address: "Chennai, Tamil Nadu, India",
+      address: "4056, 5th Main Road, Ayyapakam, Chennai, Tamil Nadu, India - 600077",
       gstin: "",
       phone: "+91 4447740195",
-      email: "info@mhtsdigix.com",
+      email: "info@mhtsdigixr.com",
       state: "Tamil Nadu",
+      brandName: "MHTSdigiXR",
+      tagline: "Empowering businesses with cutting-edge digital solutions.",
+      whatsappNumber: "917358105995",
+      careersEmail: "careers@mhtsdigixr.com",
+      websiteUrl: "www.mhtsdigixr.com",
+      linkedinUrl: "",
+      twitterUrl: "",
+      instagramUrl: "",
+      facebookUrl: "",
+      copyrightText: "",
     });
   }
 

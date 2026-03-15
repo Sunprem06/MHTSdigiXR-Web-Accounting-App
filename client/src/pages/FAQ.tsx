@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { ChevronDown, HelpCircle, ArrowRight, MessageSquare, Search, Code, Smartphone, BarChart3, Palette, Server, Video, Monitor } from "lucide-react";
+import { useSiteSettings } from "@/hooks/use-site-settings";
 
 interface FAQItem {
   question: string;
@@ -39,7 +40,7 @@ const FAQ_CATEGORIES: FAQCategory[] = [
       },
       {
         question: "How can I get a quote for my project?",
-        answer: "Getting a quote is easy! You can fill out our contact form, chat with Kayal (our AI assistant), call us at +91 4447740195, or WhatsApp us at +91 7358105995. We typically respond within 2-4 hours and provide detailed proposals within 24-48 hours."
+        answer: "QUOTE_ANSWER_PLACEHOLDER"
       }
     ]
   },
@@ -319,6 +320,7 @@ function FAQAccordion({ item, isOpen, onClick }: { item: FAQItem; isOpen: boolea
 }
 
 export default function FAQ() {
+  const siteSettings = useSiteSettings();
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
   const [activeCategory, setActiveCategory] = useState<string>("General Questions");
   const [searchQuery, setSearchQuery] = useState("");
@@ -328,8 +330,18 @@ export default function FAQ() {
     setOpenItems(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const quoteAnswer = `Getting a quote is easy! You can fill out our contact form, chat with Kayal (our AI assistant)${siteSettings.phone ? `, call us at ${siteSettings.phone}` : ''}${siteSettings.whatsappNumber ? `, or WhatsApp us at +${siteSettings.whatsappNumber.replace(/^(\d{2})/, '$1 ')}` : ''}. We typically respond within 2-4 hours and provide detailed proposals within 24-48 hours.`;
+
+  const resolvedCategories = FAQ_CATEGORIES.map(category => ({
+    ...category,
+    faqs: category.faqs.map(faq => ({
+      ...faq,
+      answer: faq.answer === "QUOTE_ANSWER_PLACEHOLDER" ? quoteAnswer : faq.answer,
+    })),
+  }));
+
   const filteredCategories = searchQuery
-    ? FAQ_CATEGORIES.map(category => ({
+    ? resolvedCategories.map(category => ({
         ...category,
         faqs: category.faqs.filter(
           faq =>
@@ -337,7 +349,7 @@ export default function FAQ() {
             faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
         )
       })).filter(category => category.faqs.length > 0)
-    : FAQ_CATEGORIES;
+    : resolvedCategories;
 
   const activeData = filteredCategories.find(c => c.title === activeCategory) || filteredCategories[0];
 
