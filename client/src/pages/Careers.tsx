@@ -292,7 +292,7 @@ export default function Careers() {
         {/* Why Join Us */}
         <section className="mb-20">
           <div className="text-center mb-12">
-            <p className="text-sky-600 dark:text-sky-400 font-semibold text-sm tracking-wider mb-3">WHY JOIN MHTSDIGIX</p>
+            <p className="text-sky-600 dark:text-sky-400 font-semibold text-sm tracking-wider mb-3">WHY JOIN MHTSDIGIXR</p>
             <h2 className="text-3xl md:text-5xl font-bold dark:text-white">
               Where Talent <span className="text-sky-500 italic">Thrives</span>
             </h2>
