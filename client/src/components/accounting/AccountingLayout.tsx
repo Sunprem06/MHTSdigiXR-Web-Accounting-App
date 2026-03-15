@@ -55,7 +55,12 @@ const navItems: NavItem[] = [
       { label: "GST Summary", path: "/accounting/reports/gst-summary", icon: IndianRupee },
     ],
   },
-  { label: "Recruitment", path: "/accounting/job-postings", icon: Briefcase, requiredPermission: "jobs.view" },
+  { label: "Recruitment", path: "/accounting/job-postings", icon: Briefcase, requiredPermission: "jobs.view",
+    children: [
+      { label: "Job Postings", path: "/accounting/job-postings", icon: Briefcase },
+      { label: "Applications", path: "/accounting/job-applications", icon: UserCheck },
+    ],
+  },
   { label: "Audit Log", path: "/accounting/audit-log", icon: Shield, requiredPermission: "audit.view" },
   { label: "Employees", path: "/accounting/employees", icon: Users, requiredPermission: "employees.manage" },
   { label: "Roles", path: "/accounting/roles", icon: KeyRound, requiredPermission: "roles.view" },
@@ -65,7 +70,7 @@ const navItems: NavItem[] = [
 export function AccountingLayout({ children }: AccountingLayoutProps) {
   const { user, logout, hasPermission } = useAuth();
   const [location] = useLocation();
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(["Vouchers", "Reports"]);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(["Vouchers", "Reports", "Recruitment"]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleMenu = (label: string) => {
@@ -99,7 +104,6 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
     }
     if (location === pathBase) return true;
     if (location.startsWith(pathBase + "/") && !window.location.search) return true;
-    if (pathBase === "/accounting/job-postings" && location === "/accounting/job-applications") return true;
     return false;
   };
 
