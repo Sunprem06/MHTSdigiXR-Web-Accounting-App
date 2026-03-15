@@ -171,6 +171,41 @@ export function setupAuth(app: Express) {
     }
     res.json(req.user);
   });
+
+  app.post("/api/auth/change-password", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters" });
+    }
+    try {
+      const employee = await storage.getEmployeeById(req.user!.id);
+      if (!employee) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const isValid = await bcrypt.compare(currentPassword, employee.password);
+      if (!isValid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+      const hashed = await bcrypt.hash(newPassword, 10);
+      await storage.updateEmployee(employee.id, { password: hashed });
+      await storage.createAuditLog({
+        employeeId: req.user!.id,
+        action: "change_password",
+        entity: "auth",
+        details: "User changed their own password",
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+      });
+      res.json({ message: "Password changed successfully" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {

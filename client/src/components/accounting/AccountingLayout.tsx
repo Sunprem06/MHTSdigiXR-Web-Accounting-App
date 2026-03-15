@@ -1,17 +1,23 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   LayoutDashboard, BookOpen, FileText, BarChart3, Users, Settings, LogOut,
   ChevronDown, ChevronRight, ShoppingCart, Package, CreditCard, Receipt,
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
   Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen,
-  Layers, DollarSign
+  Layers, DollarSign, Lock, Eye, EyeOff, Loader2
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface AccountingLayoutProps {
   children: React.ReactNode;
@@ -87,6 +93,52 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
   const [location] = useLocation();
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["Vouchers", "Reports", "Recruitment", "Website CMS"]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const { toast } = useToast();
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const res = await apiRequest("POST", "/api/auth/change-password", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Password changed successfully" });
+      setChangePasswordOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordError("");
+    },
+    onError: (error: Error) => {
+      const msg = error.message.includes(": ") ? error.message.split(": ").slice(1).join(": ") : error.message;
+      try {
+        const parsed = JSON.parse(msg);
+        setPasswordError(parsed.message || "Failed to change password");
+      } catch {
+        setPasswordError(msg || "Failed to change password");
+      }
+    },
+  });
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    if (newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+    changePasswordMutation.mutate({ currentPassword, newPassword });
+  };
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/accounting/contact-messages/unread-count"],
@@ -137,8 +189,20 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
       </div>
 
       <div className="p-3 mx-3 mt-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg border border-sky-100 dark:border-sky-800" data-testid="user-profile-badge">
-        <p className="font-semibold text-sm text-slate-900 dark:text-white truncate">{user?.fullName}</p>
-        <p className="text-xs text-sky-600 dark:text-sky-400">{ROLE_LABELS[user?.role || ""] || user?.role}</p>
+        <div className="flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm text-slate-900 dark:text-white truncate">{user?.fullName}</p>
+            <p className="text-xs text-sky-600 dark:text-sky-400">{ROLE_LABELS[user?.role || ""] || user?.role}</p>
+          </div>
+          <button
+            onClick={() => setChangePasswordOpen(true)}
+            className="p-1.5 rounded-md text-slate-500 hover:text-sky-600 hover:bg-sky-100 dark:text-slate-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/30 transition-colors"
+            title="Change Password"
+            data-testid="button-change-password"
+          >
+            <Lock className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
@@ -223,31 +287,126 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
   );
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
-      <aside className="hidden lg:flex w-64 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700">
-        {sidebar}
-      </aside>
+    <>
+      <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
+        <aside className="hidden lg:flex w-64 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700">
+          {sidebar}
+        </aside>
 
-      {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white dark:bg-slate-900 shadow-xl">
-            {sidebar}
-          </aside>
+        {sidebarOpen && (
+          <div className="lg:hidden fixed inset-0 z-50">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+            <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white dark:bg-slate-900 shadow-xl">
+              {sidebar}
+            </aside>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <header className="lg:hidden flex items-center gap-3 p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+            <button onClick={() => setSidebarOpen(true)} className="text-slate-600 dark:text-slate-300" data-testid="button-mobile-menu">
+              <Menu className="w-6 h-6" />
+            </button>
+            <h1 className="font-bold text-slate-900 dark:text-white">MHTSdigiXR Accounting</h1>
+          </header>
+          <main className="flex-1 overflow-y-auto p-4 md:p-6">
+            {children}
+          </main>
         </div>
-      )}
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="lg:hidden flex items-center gap-3 p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
-          <button onClick={() => setSidebarOpen(true)} className="text-slate-600 dark:text-slate-300" data-testid="button-mobile-menu">
-            <Menu className="w-6 h-6" />
-          </button>
-          <h1 className="font-bold text-slate-900 dark:text-white">MHTSdigiXR Accounting</h1>
-        </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {children}
-        </main>
       </div>
-    </div>
+
+      <Dialog open={changePasswordOpen} onOpenChange={(open) => {
+        setChangePasswordOpen(open);
+        if (!open) {
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+          setPasswordError("");
+          setShowCurrentPassword(false);
+          setShowNewPassword(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-change-password">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Current Password</Label>
+              <div className="relative">
+                <Input
+                  id="currentPassword"
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  data-testid="input-current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  data-testid="button-toggle-current-password"
+                >
+                  {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  data-testid="input-new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  data-testid="button-toggle-new-password"
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+                data-testid="input-confirm-password"
+              />
+            </div>
+            {passwordError && (
+              <p className="text-sm text-red-600 dark:text-red-400" data-testid="text-password-error">{passwordError}</p>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={changePasswordMutation.isPending}
+              data-testid="button-submit-change-password"
+            >
+              {changePasswordMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Changing...
+                </>
+              ) : (
+                "Change Password"
+              )}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
