@@ -201,7 +201,15 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
         ))}
       </nav>
 
-      <div className="p-3 border-t border-slate-200 dark:border-slate-700">
+      <div className="p-3 border-t border-slate-200 dark:border-slate-700 space-y-1">
+        <a
+          href="/"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          data-testid="link-visit-website"
+        >
+          <Globe className="w-4 h-4" />
+          Visit Website
+        </a>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
