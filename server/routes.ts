@@ -94,7 +94,8 @@ export async function registerRoutes(
       try {
         const smtp = await storage.getSmtpSettings();
         if (smtp) {
-          const adminEmail = smtp.fromEmail;
+          const companySettings = await storage.getCompanySettings();
+          const adminEmail = companySettings?.email || smtp.fromEmail;
           const body = `New contact form submission:\n\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\nService: ${input.service || "Not specified"}\n\nMessage:\n${input.message}\n\n---\nView all messages in the Contact Inbox at /accounting/contact-inbox`;
           await sendEmail(adminEmail, "New Contact Message — MHTSdigiXR", body);
         }
