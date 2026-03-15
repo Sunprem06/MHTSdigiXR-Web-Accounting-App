@@ -256,7 +256,7 @@ export default function Quotations() {
                               title="Submit for Review"
                               data-testid={`button-submit-quotation-${q.id}`}
                             >
-                              <Send className="w-3.5 h-3.5 mr-1" />Submit
+                              <Send className="w-3.5 h-3.5 mr-1" />Submit for Review
                             </Button>
                           )}
 
