@@ -64,7 +64,7 @@ export async function registerRoutes(
   // ===== ACCOUNTING API ROUTES (Protected) =====
 
   // Dashboard
-  app.get("/api/accounting/dashboard", requireAuth, async (req, res) => {
+  app.get("/api/accounting/dashboard", requireAuth, requirePermission("dashboard.view"), async (req, res) => {
     const stats = await storage.getDashboardStats();
     res.json(stats);
   });
@@ -159,7 +159,7 @@ export async function registerRoutes(
   });
 
   // Employees
-  app.get("/api/accounting/employees/directory", requireAuth, async (req, res) => {
+  app.get("/api/accounting/employees/directory", requireAuth, requirePermission("employees.view"), async (req, res) => {
     const allEmployees = await storage.getEmployees();
     res.json(allEmployees.filter(e => e.isActive).map(e => ({ id: e.id, fullName: e.fullName, role: e.role })));
   });
@@ -307,12 +307,12 @@ export async function registerRoutes(
   });
 
   // Parties (Customers/Vendors)
-  app.get("/api/accounting/parties", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/parties", requireAuth, requirePermission("parties.view"), async (req, res) => {
     const partyList = await storage.getParties(req.query.type as string);
     res.json(partyList);
   });
 
-  app.get("/api/accounting/parties/:id", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/parties/:id", requireAuth, requirePermission("parties.view"), async (req, res) => {
     const party = await storage.getParty(parseInt(req.params.id));
     if (!party) return res.status(404).json({ message: "Party not found" });
     res.json(party);
@@ -384,18 +384,18 @@ export async function registerRoutes(
   });
 
   // Products/Services
-  app.get("/api/accounting/products", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/products", requireAuth, requirePermission("products.view"), async (req, res) => {
     const productList = await storage.getProducts();
     res.json(productList);
   });
 
-  app.get("/api/accounting/products/:id", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/products/:id", requireAuth, requirePermission("products.view"), async (req, res) => {
     const product = await storage.getProduct(parseInt(req.params.id));
     if (!product) return res.status(404).json({ message: "Product not found" });
     res.json(product);
   });
 
-  app.get("/api/accounting/products/next-code/:category", requireAuth, async (req, res) => {
+  app.get("/api/accounting/products/next-code/:category", requireAuth, requirePermission("products.create"), async (req, res) => {
     const code = await storage.getNextProductCode(req.params.category);
     res.json({ productCode: code });
   });
@@ -450,12 +450,12 @@ export async function registerRoutes(
     res.json(quotationList);
   });
 
-  app.get("/api/accounting/quotations/next-number", requireAuth, async (req, res) => {
+  app.get("/api/accounting/quotations/next-number", requireAuth, requirePermission("quotations.create"), async (req, res) => {
     const number = await storage.getNextQuotationNumber();
     res.json({ quotationNumber: number });
   });
 
-  app.get("/api/accounting/quotations/:id", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/quotations/:id", requireAuth, requirePermission("quotations.view"), async (req, res) => {
     const quotation = await storage.getQuotation(parseInt(req.params.id));
     if (!quotation) return res.status(404).json({ message: "Quotation not found" });
     res.json(quotation);
@@ -589,7 +589,7 @@ export async function registerRoutes(
   });
 
   // Expense Claims
-  app.get("/api/accounting/expenses", requireAuth, async (req, res) => {
+  app.get("/api/accounting/expenses", requireAuth, requirePermission("expenses.view"), async (req, res) => {
     const filters: any = {};
     if (req.query.status) filters.status = req.query.status;
     if (!req.user!.permissions?.includes("expenses.approve")) {
@@ -601,12 +601,12 @@ export async function registerRoutes(
     res.json(claims);
   });
 
-  app.get("/api/accounting/expenses/next-number", requireAuth, async (req, res) => {
+  app.get("/api/accounting/expenses/next-number", requireAuth, requirePermission("expenses.create"), async (req, res) => {
     const number = await storage.getNextClaimNumber();
     res.json({ claimNumber: number });
   });
 
-  app.get("/api/accounting/expenses/:id", requireAuth, async (req, res) => {
+  app.get("/api/accounting/expenses/:id", requireAuth, requirePermission("expenses.view"), async (req, res) => {
     const claim = await storage.getExpenseClaim(parseInt(req.params.id));
     if (!claim) return res.status(404).json({ message: "Expense claim not found" });
     if (!req.user!.permissions?.includes("expenses.approve") && claim.employeeId !== req.user!.id) {
@@ -615,7 +615,7 @@ export async function registerRoutes(
     res.json(claim);
   });
 
-  app.post("/api/accounting/expenses", requireAuth, async (req, res) => {
+  app.post("/api/accounting/expenses", requireAuth, requirePermission("expenses.create"), async (req, res) => {
     const claimNumber = await storage.getNextClaimNumber();
     const claim = await storage.createExpenseClaim({
       ...req.body,
@@ -683,7 +683,7 @@ export async function registerRoutes(
     res.json(voucherList);
   });
 
-  app.get("/api/accounting/vouchers/next-number/:type", requireAuth, async (req, res) => {
+  app.get("/api/accounting/vouchers/next-number/:type", requireAuth, requirePermission("vouchers.create"), async (req, res) => {
     const number = await storage.getNextVoucherNumber(req.params.type);
     res.json({ voucherNumber: number });
   });
@@ -755,27 +755,27 @@ export async function registerRoutes(
   });
 
   // Reports
-  app.get("/api/accounting/reports/trial-balance", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/reports/trial-balance", requireAuth, requirePermission("reports.view"), async (req, res) => {
     const data = await storage.getTrialBalance(req.query.asOnDate as string);
     res.json(data);
   });
 
-  app.get("/api/accounting/reports/profit-loss", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/reports/profit-loss", requireAuth, requirePermission("reports.view"), async (req, res) => {
     const data = await storage.getProfitAndLoss(req.query.startDate as string, req.query.endDate as string);
     res.json(data);
   });
 
-  app.get("/api/accounting/reports/balance-sheet", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/reports/balance-sheet", requireAuth, requirePermission("reports.view"), async (req, res) => {
     const data = await storage.getBalanceSheet();
     res.json(data);
   });
 
-  app.get("/api/accounting/reports/day-book", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/reports/day-book", requireAuth, requirePermission("reports.view"), async (req, res) => {
     const data = await storage.getDayBook(req.query.startDate as string, req.query.endDate as string, req.query.type as string);
     res.json(data);
   });
 
-  app.get("/api/accounting/reports/gst-summary", requireAuth, requirePermission("ledgers.view"), async (req, res) => {
+  app.get("/api/accounting/reports/gst-summary", requireAuth, requirePermission("reports.view"), async (req, res) => {
     const data = await storage.getGstSummary(req.query.startDate as string, req.query.endDate as string);
     res.json(data);
   });

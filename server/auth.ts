@@ -38,10 +38,9 @@ async function resolvePermissions(employee: { role: string; permissions: unknown
     const fallback = SYSTEM_ROLE_PERMISSIONS[employee.role];
     if (fallback) rolePerms.push(...fallback);
   }
-  const userOverrides = Array.isArray(employee.permissions) ? (employee.permissions as Permission[]) : [];
-  if (userOverrides.length > 0) {
-    const merged = new Set([...rolePerms, ...userOverrides]);
-    return [...merged];
+  const userOverrides = Array.isArray(employee.permissions) ? (employee.permissions as Permission[]) : null;
+  if (userOverrides !== null) {
+    return [...new Set(userOverrides)];
   }
   return rolePerms;
 }

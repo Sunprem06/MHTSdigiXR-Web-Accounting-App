@@ -62,7 +62,7 @@ export default function EmployeeManagement() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; email: string; password: string; fullName: string; role: string }) => {
+    mutationFn: async (data: { username: string; email: string; password: string; fullName: string; role: string; permissions?: string[] }) => {
       const res = await apiRequest("POST", "/api/accounting/employees", data);
       return res.json();
     },
@@ -111,7 +111,7 @@ export default function EmployeeManagement() {
       fullName: newFullName,
       role: newRole,
       ...(newUseOverrides ? { permissions: newOverridePerms } : {}),
-    } as any);
+    });
   };
 
   const handleEdit = () => {
@@ -143,11 +143,14 @@ export default function EmployeeManagement() {
     setEditOpen(true);
   };
 
-  const rolePermsForEdit = useMemo(() => {
-    const r = dbRoles?.find(role => role.slug === editRole);
+  const getRolePerms = (roleSlug: string) => {
+    const r = dbRoles?.find(role => role.slug === roleSlug);
     if (r) return r.permissions as string[];
-    return (SYSTEM_ROLE_PERMISSIONS as Record<string, string[]>)[editRole] || [];
-  }, [editRole, dbRoles]);
+    return (SYSTEM_ROLE_PERMISSIONS as Record<string, string[]>)[roleSlug] || [];
+  };
+
+  const rolePermsForNew = useMemo(() => getRolePerms(newRole), [newRole, dbRoles]);
+  const rolePermsForEdit = useMemo(() => getRolePerms(editRole), [editRole, dbRoles]);
 
   const togglePerm = (perms: string[], setPerms: (p: string[]) => void, perm: string) => {
     setPerms(perms.includes(perm) ? perms.filter(p => p !== perm) : [...perms, perm]);
@@ -269,7 +272,7 @@ export default function EmployeeManagement() {
               </div>
               <div>
                 <Label>Role</Label>
-                <Select value={newRole} onValueChange={setNewRole}>
+                <Select value={newRole} onValueChange={(v) => { setNewRole(v); setNewUseOverrides(false); setNewOverridePerms([]); }}>
                   <SelectTrigger data-testid="select-new-role">
                     <SelectValue />
                   </SelectTrigger>
@@ -281,6 +284,48 @@ export default function EmployeeManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="rounded border p-3 bg-slate-50 dark:bg-slate-900" data-testid="card-role-info-add">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Role Permissions ({rolePermsForNew.length})
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {rolePermsForNew.map(p => (
+                    <Badge key={p} variant="outline" className="text-[10px]">{p}</Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="border-t pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-medium">Custom Permission Overrides</Label>
+                  <Switch checked={newUseOverrides} onCheckedChange={setNewUseOverrides} data-testid="switch-add-overrides" />
+                </div>
+                {!newUseOverrides && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Using default permissions from role. Enable to replace with custom permissions.</p>
+                )}
+                {newUseOverrides && (
+                  <div className="max-h-48 overflow-y-auto space-y-3 border rounded p-2 bg-slate-50 dark:bg-slate-900" data-testid="section-add-override-permissions">
+                    {Object.entries(PERMISSION_GROUPS).map(([key, group]) => (
+                      <div key={key}>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{group.label}</p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {group.permissions.map((perm) => (
+                            <label key={perm} className="flex items-center gap-1.5 text-xs">
+                              <Checkbox
+                                checked={newOverridePerms.includes(perm)}
+                                onCheckedChange={() => togglePerm(newOverridePerms, setNewOverridePerms, perm)}
+                                data-testid={`checkbox-add-override-${perm}`}
+                              />
+                              <span className={`${rolePermsForNew.includes(perm) ? "text-sky-600 dark:text-sky-400" : "text-slate-600 dark:text-slate-400"}`}>
+                                {perm.split(".")[1]}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
@@ -315,7 +360,7 @@ export default function EmployeeManagement() {
               </div>
               <div>
                 <Label>Role</Label>
-                <Select value={editRole} onValueChange={setEditRole}>
+                <Select value={editRole} onValueChange={(v) => { setEditRole(v); setEditUseOverrides(false); setEditOverridePerms([]); }}>
                   <SelectTrigger data-testid="select-edit-role">
                     <SelectValue />
                   </SelectTrigger>
@@ -327,6 +372,16 @@ export default function EmployeeManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="rounded border p-3 bg-slate-50 dark:bg-slate-900" data-testid="card-role-info-edit">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Role Permissions ({rolePermsForEdit.length})
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {rolePermsForEdit.map(p => (
+                    <Badge key={p} variant="outline" className="text-[10px]">{p}</Badge>
+                  ))}
+                </div>
               </div>
               <div className="flex items-center justify-between gap-4">
                 <Label>Active</Label>
@@ -346,7 +401,7 @@ export default function EmployeeManagement() {
                   <Switch checked={editUseOverrides} onCheckedChange={setEditUseOverrides} data-testid="switch-edit-overrides" />
                 </div>
                 {!editUseOverrides && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Using default permissions from role. Enable to set custom permissions for this user.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Using default permissions from role. Enable to replace with custom permissions for this user.</p>
                 )}
                 {editUseOverrides && (
                   <div className="mt-2">
