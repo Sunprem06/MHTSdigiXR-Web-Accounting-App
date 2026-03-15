@@ -869,6 +869,169 @@ export async function registerRoutes(
     res.status(201).json(note);
   });
 
+  // ===== PUBLIC JOB LISTINGS =====
+  app.get("/api/jobs", async (_req, res) => {
+    const postings = await storage.getJobPostings({ isOpen: true });
+    const now = new Date().toISOString().split("T")[0];
+    const activePostings = postings.filter(p => !p.closingDate || p.closingDate >= now);
+    res.json(activePostings);
+  });
+
+  app.get("/api/jobs/:id", async (req, res) => {
+    const posting = await storage.getJobPosting(parseInt(req.params.id));
+    if (!posting || !posting.isOpen) return res.status(404).json({ message: "Job posting not found" });
+    const now = new Date().toISOString().split("T")[0];
+    if (posting.closingDate && posting.closingDate < now) return res.status(404).json({ message: "Job posting has expired" });
+    res.json(posting);
+  });
+
+  app.post("/api/jobs/:id/apply", async (req, res) => {
+    try {
+      const postingId = parseInt(req.params.id);
+      const posting = await storage.getJobPosting(postingId);
+      if (!posting || !posting.isOpen) return res.status(404).json({ message: "Job posting not found or closed" });
+      const now = new Date().toISOString().split("T")[0];
+      if (posting.closingDate && posting.closingDate < now) return res.status(400).json({ message: "This job posting has expired" });
+      const { applicantName, applicantEmail, applicantPhone, coverLetter } = req.body;
+      if (!applicantName || !applicantEmail) {
+        return res.status(400).json({ message: "Name and email are required" });
+      }
+      const application = await storage.createJobApplication({
+        jobPostingId: postingId,
+        applicantName,
+        applicantEmail,
+        applicantPhone: applicantPhone || null,
+        coverLetter: coverLetter || null,
+        resumeUrl: null,
+        status: "new",
+        notes: null,
+        reviewedBy: null,
+        reviewedAt: null,
+      });
+      res.status(201).json({ message: "Application submitted successfully", id: application.id });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  // ===== JOB POSTINGS MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/job-postings", requireAuth, requirePermission("jobs.view"), async (req, res) => {
+    const postings = await storage.getJobPostings();
+    res.json(postings);
+  });
+
+  app.get("/api/accounting/job-postings/:id", requireAuth, requirePermission("jobs.view"), async (req, res) => {
+    const posting = await storage.getJobPosting(parseInt(req.params.id));
+    if (!posting) return res.status(404).json({ message: "Job posting not found" });
+    res.json(posting);
+  });
+
+  app.post("/api/accounting/job-postings", requireAuth, requirePermission("jobs.create"), async (req, res) => {
+    const { title, department, location, type, description, requirements, salaryRange, closingDate, isOpen } = req.body;
+    const posting = await storage.createJobPosting({
+      title, department, location, type, description,
+      requirements: requirements || null, salaryRange: salaryRange || null,
+      closingDate: closingDate || null, isOpen: isOpen !== false,
+      createdBy: req.user!.id,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "job_posting",
+      entityId: posting.id, details: `Created job posting: ${posting.title}`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(posting);
+  });
+
+  app.patch("/api/accounting/job-postings/:id", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
+    const { title, department, location, type, description, requirements, salaryRange, closingDate, isOpen } = req.body;
+    const allowedFields: Record<string, any> = {};
+    if (title !== undefined) allowedFields.title = title;
+    if (department !== undefined) allowedFields.department = department;
+    if (location !== undefined) allowedFields.location = location;
+    if (type !== undefined) allowedFields.type = type;
+    if (description !== undefined) allowedFields.description = description;
+    if (requirements !== undefined) allowedFields.requirements = requirements;
+    if (salaryRange !== undefined) allowedFields.salaryRange = salaryRange;
+    if (closingDate !== undefined) allowedFields.closingDate = closingDate;
+    if (isOpen !== undefined) allowedFields.isOpen = isOpen;
+    const updated = await storage.updateJobPosting(parseInt(req.params.id), allowedFields);
+    if (!updated) return res.status(404).json({ message: "Job posting not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "job_posting",
+      entityId: updated.id, details: `Updated job posting: ${updated.title}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/job-postings/:id", requireAuth, requirePermission("jobs.delete"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const apps = await storage.getJobApplications({ jobPostingId: id });
+    if (apps.length > 0) {
+      return res.status(400).json({ message: "Cannot delete job posting — it has applications. Close it instead." });
+    }
+    const deleted = await storage.deleteJobPosting(id);
+    if (!deleted) return res.status(404).json({ message: "Job posting not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "job_posting",
+      entityId: id, details: `Deleted job posting`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
+  // ===== JOB APPLICATIONS MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/job-applications", requireAuth, requirePermission("jobs.view"), async (req, res) => {
+    const filters: any = {};
+    if (req.query.jobPostingId) filters.jobPostingId = parseInt(req.query.jobPostingId as string);
+    if (req.query.status) filters.status = req.query.status;
+    const apps = await storage.getJobApplications(filters);
+    res.json(apps);
+  });
+
+  app.get("/api/accounting/job-applications/:id", requireAuth, requirePermission("jobs.view"), async (req, res) => {
+    const app = await storage.getJobApplication(parseInt(req.params.id));
+    if (!app) return res.status(404).json({ message: "Application not found" });
+    res.json(app);
+  });
+
+  app.patch("/api/accounting/job-applications/:id", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const validStatuses = ["new", "reviewing", "shortlisted", "interview", "offered", "hired", "rejected"];
+    const data: Record<string, any> = {};
+    if (req.body.status && validStatuses.includes(req.body.status)) {
+      data.status = req.body.status;
+      if (req.body.status !== "new") {
+        data.reviewedBy = req.user!.id;
+        data.reviewedAt = new Date();
+      }
+    }
+    if (req.body.notes !== undefined) data.notes = req.body.notes;
+    const updated = await storage.updateJobApplication(id, data);
+    if (!updated) return res.status(404).json({ message: "Application not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "job_application",
+      entityId: id, details: `Updated application status to ${updated.status}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/job-applications/:id", requireAuth, requirePermission("jobs.delete"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteJobApplication(id);
+    if (!deleted) return res.status(404).json({ message: "Application not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "job_application",
+      entityId: id, details: `Deleted job application`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
   // Seed data
   await seedDatabase();
 

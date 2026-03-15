@@ -26,6 +26,16 @@ export async function seedSystemRoles() {
         permissions,
         isSystem: true,
       });
+    } else if (existing[0].isSystem) {
+      const current = existing[0].permissions as string[];
+      const isSame = permissions.length === current.length && permissions.every(p => current.includes(p));
+      if (!isSame) {
+        await db.update(roles).set({
+          permissions,
+          label: ROLE_LABELS[slug] || existing[0].label,
+          description: SYSTEM_ROLE_DESCRIPTIONS[slug] || existing[0].description,
+        }).where(eq(roles.slug, slug));
+      }
     }
   }
 }

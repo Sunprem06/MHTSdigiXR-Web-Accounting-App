@@ -5,7 +5,8 @@ import {
   LayoutDashboard, BookOpen, FileText, BarChart3, Users, Settings, LogOut,
   ChevronDown, ChevronRight, ShoppingCart, Package, CreditCard, Receipt,
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
-  Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound
+  Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
+  Briefcase
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
       { label: "GST Summary", path: "/accounting/reports/gst-summary", icon: IndianRupee },
     ],
   },
+  { label: "Recruitment", path: "/accounting/job-postings", icon: Briefcase, requiredPermission: "jobs.view" },
   { label: "Audit Log", path: "/accounting/audit-log", icon: Shield, requiredPermission: "audit.view" },
   { label: "Employees", path: "/accounting/employees", icon: Users, requiredPermission: "employees.manage" },
   { label: "Roles", path: "/accounting/roles", icon: KeyRound, requiredPermission: "roles.view" },
@@ -95,7 +97,10 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
       }
       return true;
     }
-    return location === pathBase || (location.startsWith(pathBase + "/") && !window.location.search);
+    if (location === pathBase) return true;
+    if (location.startsWith(pathBase + "/") && !window.location.search) return true;
+    if (pathBase === "/accounting/job-postings" && location === "/accounting/job-applications") return true;
+    return false;
   };
 
   const sidebar = (

@@ -248,6 +248,38 @@ export const auditNotes = pgTable("audit_notes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const jobPostings = pgTable("job_postings", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  department: text("department").notNull(),
+  location: text("location").notNull(),
+  type: text("type").notNull().default("full_time"),
+  experience: text("experience").notNull(),
+  description: text("description").notNull(),
+  requirements: text("requirements").array().notNull().default([]),
+  responsibilities: text("responsibilities").array().notNull().default([]),
+  salaryRange: text("salary_range"),
+  isOpen: boolean("is_open").notNull().default(true),
+  closingDate: date("closing_date"),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const jobApplications = pgTable("job_applications", {
+  id: serial("id").primaryKey(),
+  jobPostingId: integer("job_posting_id").references(() => jobPostings.id).notNull(),
+  applicantName: text("applicant_name").notNull(),
+  applicantEmail: text("applicant_email").notNull(),
+  applicantPhone: text("applicant_phone"),
+  coverLetter: text("cover_letter"),
+  resumeUrl: text("resume_url"),
+  status: text("status").notNull().default("new"),
+  notes: text("notes"),
+  reviewedBy: integer("reviewed_by").references(() => employees.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertPostSchema = createInsertSchema(posts).omit({ id: true, createdAt: true });
 export const insertContactMessageSchema = createInsertSchema(contactMessages).omit({ id: true, createdAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true });
@@ -266,6 +298,8 @@ export const insertPartySchema = createInsertSchema(parties).omit({ id: true, cr
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, createdAt: true });
 export const insertExpenseClaimSchema = createInsertSchema(expenseClaims).omit({ id: true, createdAt: true });
+export const insertJobPostingSchema = createInsertSchema(jobPostings).omit({ id: true, createdAt: true });
+export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({ id: true, createdAt: true });
 
 export type Post = typeof posts.$inferSelect;
 export type InsertPost = z.infer<typeof insertPostSchema>;
@@ -303,6 +337,10 @@ export type Quotation = typeof quotations.$inferSelect;
 export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
 export type ExpenseClaim = typeof expenseClaims.$inferSelect;
 export type InsertExpenseClaim = z.infer<typeof insertExpenseClaimSchema>;
+export type JobPosting = typeof jobPostings.$inferSelect;
+export type InsertJobPosting = z.infer<typeof insertJobPostingSchema>;
+export type JobApplication = typeof jobApplications.$inferSelect;
+export type InsertJobApplication = z.infer<typeof insertJobApplicationSchema>;
 
 export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer", "sales_person", "sales_manager"] as const;
 export type Role = typeof ROLES[number];
@@ -328,6 +366,7 @@ export const ALL_PERMISSIONS = [
   "invoices.view", "invoices.create",
   "vouchers.view", "vouchers.create", "vouchers.edit", "vouchers.approve",
   "expenses.view", "expenses.create", "expenses.approve",
+  "jobs.view", "jobs.create", "jobs.edit", "jobs.delete",
   "reports.view",
   "audit.view", "audit.notes",
   "employees.view", "employees.manage",
@@ -346,6 +385,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   invoices: { label: "Invoices", permissions: ["invoices.view", "invoices.create"] },
   vouchers: { label: "Vouchers", permissions: ["vouchers.view", "vouchers.create", "vouchers.edit", "vouchers.approve"] },
   expenses: { label: "Expenses", permissions: ["expenses.view", "expenses.create", "expenses.approve"] },
+  jobs: { label: "Recruitment", permissions: ["jobs.view", "jobs.create", "jobs.edit", "jobs.delete"] },
   reports: { label: "Reports", permissions: ["reports.view"] },
   audit: { label: "Audit", permissions: ["audit.view", "audit.notes"] },
   employees: { label: "Employees", permissions: ["employees.view", "employees.manage"] },
@@ -356,7 +396,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   super_admin: [...ALL_PERMISSIONS],
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.")),
-  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "reports.view", "audit.view", "audit.notes"],
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "jobs.view", "reports.view", "audit.view", "audit.notes"],
   senior_accountant: [
     "dashboard.view",
     "ledgers.view", "ledgers.create", "ledgers.edit",

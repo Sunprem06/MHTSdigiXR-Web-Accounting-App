@@ -56,6 +56,8 @@ import EmployeeManagement from "@/pages/accounting/EmployeeManagement";
 import AuditLogPage from "@/pages/accounting/AuditLog";
 import SettingsPage from "@/pages/accounting/Settings";
 import RolesPage from "@/pages/accounting/Roles";
+import JobPostings from "@/pages/accounting/JobPostings";
+import JobApplicationsPage from "@/pages/accounting/JobApplications";
 
 function WebsiteRouter() {
   return (
@@ -163,6 +165,12 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/roles">
         {() => <ProtectedRoute requiredPermission="roles.view"><RolesPage /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/job-postings">
+        {() => <ProtectedRoute requiredPermission="jobs.view"><JobPostings /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/job-applications">
+        {() => <ProtectedRoute requiredPermission="jobs.view"><JobApplicationsPage /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/audit-log">
         {() => <ProtectedRoute requiredPermission="audit.view"><AuditLogPage /></ProtectedRoute>}

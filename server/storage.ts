@@ -4,15 +4,17 @@ import {
   employees, auditLogs, accountGroups, ledgerAccounts,
   financialYears, companySettings, vouchers, voucherEntries, auditNotes,
   parties, products, quotations, expenseClaims, roles,
+  jobPostings, jobApplications,
   type InsertContactMessage, type InsertPost, type InsertService, type InsertCaseStudy,
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
   type InsertFinancialYear, type InsertCompanySettings, type InsertVoucher, type InsertVoucherEntry,
   type InsertAuditNote, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
-  type InsertDbRole,
+  type InsertDbRole, type InsertJobPosting, type InsertJobApplication,
   type ContactMessage, type Post, type Service, type CaseStudy,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
   type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
-  type Party, type Product, type Quotation, type ExpenseClaim, type DbRole
+  type Party, type Product, type Quotation, type ExpenseClaim, type DbRole,
+  type JobPosting, type JobApplication
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -100,6 +102,18 @@ export interface IStorage {
 
   deleteProduct(id: number): Promise<boolean>;
   deleteParty(id: number): Promise<boolean>;
+
+  getJobPostings(filters?: { isOpen?: boolean }): Promise<JobPosting[]>;
+  getJobPosting(id: number): Promise<JobPosting | undefined>;
+  createJobPosting(posting: InsertJobPosting): Promise<JobPosting>;
+  updateJobPosting(id: number, data: Partial<InsertJobPosting>): Promise<JobPosting | undefined>;
+  deleteJobPosting(id: number): Promise<boolean>;
+
+  getJobApplications(filters?: { jobPostingId?: number; status?: string }): Promise<JobApplication[]>;
+  getJobApplication(id: number): Promise<JobApplication | undefined>;
+  createJobApplication(application: InsertJobApplication): Promise<JobApplication>;
+  updateJobApplication(id: number, data: Partial<InsertJobApplication>): Promise<JobApplication | undefined>;
+  deleteJobApplication(id: number): Promise<boolean>;
 
   getDashboardStats(): Promise<{
     totalIncome: number;
@@ -798,6 +812,63 @@ export class DatabaseStorage implements IStorage {
       inputTax,
       netLiability: outputTax.total - inputTax.total,
     };
+  }
+
+  async getJobPostings(filters?: { isOpen?: boolean }): Promise<JobPosting[]> {
+    if (filters?.isOpen !== undefined) {
+      return await db.select().from(jobPostings).where(eq(jobPostings.isOpen, filters.isOpen)).orderBy(desc(jobPostings.createdAt));
+    }
+    return await db.select().from(jobPostings).orderBy(desc(jobPostings.createdAt));
+  }
+
+  async getJobPosting(id: number): Promise<JobPosting | undefined> {
+    const [posting] = await db.select().from(jobPostings).where(eq(jobPostings.id, id));
+    return posting;
+  }
+
+  async createJobPosting(posting: InsertJobPosting): Promise<JobPosting> {
+    const [newPosting] = await db.insert(jobPostings).values(posting).returning();
+    return newPosting;
+  }
+
+  async updateJobPosting(id: number, data: Partial<InsertJobPosting>): Promise<JobPosting | undefined> {
+    const [updated] = await db.update(jobPostings).set(data).where(eq(jobPostings.id, id)).returning();
+    return updated;
+  }
+
+  async deleteJobPosting(id: number): Promise<boolean> {
+    const result = await db.delete(jobPostings).where(eq(jobPostings.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getJobApplications(filters?: { jobPostingId?: number; status?: string }): Promise<JobApplication[]> {
+    let conditions = [];
+    if (filters?.jobPostingId) conditions.push(eq(jobApplications.jobPostingId, filters.jobPostingId));
+    if (filters?.status) conditions.push(eq(jobApplications.status, filters.status));
+    if (conditions.length > 0) {
+      return await db.select().from(jobApplications).where(and(...conditions)).orderBy(desc(jobApplications.createdAt));
+    }
+    return await db.select().from(jobApplications).orderBy(desc(jobApplications.createdAt));
+  }
+
+  async getJobApplication(id: number): Promise<JobApplication | undefined> {
+    const [app] = await db.select().from(jobApplications).where(eq(jobApplications.id, id));
+    return app;
+  }
+
+  async createJobApplication(application: InsertJobApplication): Promise<JobApplication> {
+    const [newApp] = await db.insert(jobApplications).values(application).returning();
+    return newApp;
+  }
+
+  async updateJobApplication(id: number, data: Partial<InsertJobApplication>): Promise<JobApplication | undefined> {
+    const [updated] = await db.update(jobApplications).set(data).where(eq(jobApplications.id, id)).returning();
+    return updated;
+  }
+
+  async deleteJobApplication(id: number): Promise<boolean> {
+    const result = await db.delete(jobApplications).where(eq(jobApplications.id, id)).returning();
+    return result.length > 0;
   }
 }
 
