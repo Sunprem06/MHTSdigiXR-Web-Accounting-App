@@ -29,7 +29,7 @@ Pricing Packages:
 - Enterprise Package: Custom pricing (Full digital transformation)
 
 Contact Information:
-- WhatsApp: +${s.whatsappNumber ? s.whatsappNumber.replace(/^(\d{2})/, '$1 ') : '91 7358105995'}
+- WhatsApp: ${s.whatsappNumber ? `+${s.whatsappNumber.replace(/^(\d{2})/, '$1 ')}` : 'Not available'}
 - Email: ${s.email}
 - Phone: ${s.phone}
 - Address: ${s.address}

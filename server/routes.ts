@@ -62,23 +62,19 @@ export async function registerRoutes(
   });
 
   // ===== PUBLIC SITE SETTINGS ENDPOINT =====
-  const REQUIRED_SITE_DEFAULTS = {
-    brandName: "MHTSdigiXR",
-    companyName: "Maanagarram Hi Tech Solutions",
-    phone: "+91 4447740195",
-    email: "info@mhtsdigixr.com",
-    address: "4056, 5th Main Road, Ayyapakam, Chennai, Tamil Nadu, India - 600077",
-    whatsappNumber: "917358105995",
-    careersEmail: "careers@mhtsdigixr.com",
-    websiteUrl: "www.mhtsdigixr.com",
-  };
-
   app.get("/api/site-settings", async (_req, res) => {
     const settings = await storage.getCompanySettings();
     if (!settings) {
       return res.json({
-        ...REQUIRED_SITE_DEFAULTS,
+        brandName: "MHTSdigiXR",
+        companyName: "Maanagarram Hi Tech Solutions",
         tagline: "",
+        phone: "",
+        email: "",
+        address: "",
+        whatsappNumber: "",
+        careersEmail: "",
+        websiteUrl: "",
         linkedinUrl: "",
         twitterUrl: "",
         instagramUrl: "",
@@ -87,15 +83,15 @@ export async function registerRoutes(
       });
     }
     res.json({
-      brandName: settings.brandName || REQUIRED_SITE_DEFAULTS.brandName,
-      companyName: settings.companyName || REQUIRED_SITE_DEFAULTS.companyName,
+      brandName: settings.brandName || "MHTSdigiXR",
+      companyName: settings.companyName || "Maanagarram Hi Tech Solutions",
       tagline: settings.tagline ?? "",
-      phone: settings.phone || REQUIRED_SITE_DEFAULTS.phone,
-      email: settings.email || REQUIRED_SITE_DEFAULTS.email,
-      address: settings.address || REQUIRED_SITE_DEFAULTS.address,
-      whatsappNumber: settings.whatsappNumber || REQUIRED_SITE_DEFAULTS.whatsappNumber,
-      careersEmail: settings.careersEmail || REQUIRED_SITE_DEFAULTS.careersEmail,
-      websiteUrl: settings.websiteUrl || REQUIRED_SITE_DEFAULTS.websiteUrl,
+      phone: settings.phone ?? "",
+      email: settings.email ?? "",
+      address: settings.address ?? "",
+      whatsappNumber: settings.whatsappNumber ?? "",
+      careersEmail: settings.careersEmail ?? "",
+      websiteUrl: settings.websiteUrl ?? "",
       linkedinUrl: settings.linkedinUrl ?? "",
       twitterUrl: settings.twitterUrl ?? "",
       instagramUrl: settings.instagramUrl ?? "",
@@ -991,7 +987,7 @@ async function seedDatabase() {
     }
   }
 
-  // Seed default company settings + backfill new website fields on existing rows
+  // Seed default company settings (only on first create, never overwrites existing values)
   const existingSettings = await storage.getCompanySettings();
   if (!existingSettings) {
     await storage.upsertCompanySettings({
@@ -1012,25 +1008,6 @@ async function seedDatabase() {
       facebookUrl: "",
       copyrightText: "",
     });
-  } else {
-    const needsUpdate =
-      !existingSettings.brandName ||
-      !existingSettings.tagline ||
-      !existingSettings.whatsappNumber ||
-      !existingSettings.careersEmail ||
-      !existingSettings.websiteUrl ||
-      !existingSettings.email;
-    if (needsUpdate) {
-      await storage.upsertCompanySettings({
-        ...existingSettings,
-        brandName: existingSettings.brandName || "MHTSdigiXR",
-        tagline: existingSettings.tagline || "Empowering businesses with cutting-edge digital solutions.",
-        whatsappNumber: existingSettings.whatsappNumber || "917358105995",
-        careersEmail: existingSettings.careersEmail || "careers@mhtsdigixr.com",
-        websiteUrl: existingSettings.websiteUrl || "www.mhtsdigixr.com",
-        email: existingSettings.email || "info@mhtsdigixr.com",
-      });
-    }
   }
 
   // Seed default financial year
