@@ -147,7 +147,7 @@ export default function Quotations() {
                               <Eye className="w-4 h-4" />
                             </Button>
                           </Link>
-                          {isAdmin && q.status !== "converted" && (
+                          {isAdmin && (
                             <Link href={`/accounting/quotations/${q.id}/edit`}>
                               <Button size="icon" variant="ghost" className="text-amber-600 dark:text-amber-400" title="Edit" data-testid={`button-edit-quotation-${q.id}`}>
                                 <Pencil className="w-4 h-4" />

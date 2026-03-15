@@ -87,9 +87,9 @@ export default function QuotationEntry() {
       setIsInterState(existingQuotation.isInterState || false);
       setNotes(existingQuotation.notes || "");
       setTermsAndConditions(existingQuotation.termsAndConditions || "");
-      const existingItems = existingQuotation.items as any[];
+      const existingItems = existingQuotation.items as Array<{ productId?: number; description?: string; quantity?: number; rate?: number; gstRate?: number }>;
       if (existingItems?.length) {
-        setItems(existingItems.map((item: any) => ({
+        setItems(existingItems.map((item) => ({
           productId: item.productId ? String(item.productId) : "",
           description: item.description || "",
           quantity: String(item.quantity || 1),

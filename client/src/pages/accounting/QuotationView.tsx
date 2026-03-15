@@ -40,7 +40,7 @@ export default function QuotationView() {
 
   const party = parties?.find(p => p.id === quotation.partyId);
   const productMap = new Map(products?.map(p => [p.id, p]) || []);
-  const lineItems = (quotation.items as any[]) || [];
+  const lineItems = (quotation.items as Array<{ productId?: number; description: string; quantity: number; rate: string; gstRate: string; amount: string }>) || [];
   const subtotal = parseFloat(quotation.subtotal);
   const cgst = parseFloat(quotation.cgstTotal || "0");
   const sgst = parseFloat(quotation.sgstTotal || "0");
@@ -109,7 +109,7 @@ export default function QuotationView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {lineItems.map((item: any, idx: number) => {
+                  {lineItems.map((item, idx) => {
                     const product = item.productId ? productMap.get(item.productId) : null;
                     return (
                       <tr key={idx} className="border-b border-slate-100 dark:border-slate-800">

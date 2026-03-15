@@ -176,9 +176,9 @@ export default function InvoiceEntry() {
           credit: (parseFloat(e.credit) || 0).toFixed(2),
         }));
 
-      const body: any = {
+      const body = {
         voucherNumber, date,
-        type: "sales",
+        type: "sales" as const,
         narration,
         totalAmount: totalDebit.toFixed(2),
         status,
@@ -189,6 +189,7 @@ export default function InvoiceEntry() {
         sgstAmount: productCalcs.sgst.toFixed(2),
         igstAmount: productCalcs.igst.toFixed(2),
         isInterState,
+        useProducts: true,
       };
 
       await apiRequest("POST", "/api/accounting/vouchers", body);
