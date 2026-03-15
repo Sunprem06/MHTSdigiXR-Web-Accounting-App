@@ -233,7 +233,7 @@ export default function Careers() {
     : dbJobs.filter(j => j.department === filterDepartment);
 
   return (
-    <div className="pt-24 pb-20">
+    <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
       {/* Hero Section */}
       <section className="relative bg-slate-900 dark:bg-black py-20 mb-16 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-sky-900/30" />

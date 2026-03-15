@@ -7,7 +7,8 @@ import {
   ChevronDown, ChevronRight, ShoppingCart, Package, CreditCard, Receipt,
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
-  Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen
+  Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen,
+  Layers, DollarSign
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -65,6 +66,8 @@ const navItems: NavItem[] = [
   {
     label: "Website CMS", icon: Globe, requiredPermission: "content.view",
     children: [
+      { label: "Services", path: "/accounting/services-management", icon: Layers },
+      { label: "Pricing Plans", path: "/accounting/pricing-plans", icon: DollarSign },
       { label: "Blog Posts", path: "/accounting/blog-posts", icon: PenLine },
       { label: "Case Studies", path: "/accounting/case-studies", icon: FolderOpen },
       { label: "FAQs", path: "/accounting/faqs", icon: HelpCircle },

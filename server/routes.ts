@@ -61,6 +61,11 @@ export async function registerRoutes(
     res.json(items);
   });
 
+  app.get("/api/pricing-plans", async (_req, res) => {
+    const plans = await storage.getPricingPlans(true);
+    res.json(plans);
+  });
+
   app.post(api.contact.create.path, async (req, res) => {
     try {
       const input = api.contact.create.input.parse(req.body);
@@ -1141,6 +1146,50 @@ export async function registerRoutes(
   app.delete("/api/accounting/site-stats/:id", requireAuth, requirePermission("content.delete"), async (req, res) => {
     const deleted = await storage.deleteSiteStat(parseInt(req.params.id));
     if (!deleted) return res.status(404).json({ message: "Stat not found" });
+    res.json({ message: "Deleted" });
+  });
+
+  // ===== SERVICES MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/services", requireAuth, requirePermission("content.view"), async (_req, res) => {
+    const items = await storage.getServices();
+    res.json(items);
+  });
+
+  app.patch("/api/accounting/services/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
+    const { title, slug, description, icon, image, features } = req.body;
+    const updated = await storage.updateService(parseInt(req.params.id), { title, slug, description, icon, image, features });
+    if (!updated) return res.status(404).json({ message: "Service not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/services/:id", requireAuth, requirePermission("content.delete"), async (req, res) => {
+    const deleted = await storage.deleteService(parseInt(req.params.id));
+    if (!deleted) return res.status(404).json({ message: "Service not found" });
+    res.json({ message: "Deleted" });
+  });
+
+  // ===== PRICING PLANS MANAGEMENT (Accounting) =====
+  app.get("/api/accounting/pricing-plans", requireAuth, requirePermission("content.view"), async (_req, res) => {
+    const plans = await storage.getPricingPlans();
+    res.json(plans);
+  });
+
+  app.post("/api/accounting/pricing-plans", requireAuth, requirePermission("content.create"), async (req, res) => {
+    const { name, price, period, description, features, isPopular, ctaLabel, displayOrder, isActive } = req.body;
+    if (!name || !price || !description) return res.status(400).json({ message: "Name, price, and description are required" });
+    const plan = await storage.createPricingPlan({ name, price, period: period || "one-time", description, features: features || [], isPopular: isPopular || false, ctaLabel: ctaLabel || "Get Started", displayOrder: displayOrder || 0, isActive: isActive !== false });
+    res.status(201).json(plan);
+  });
+
+  app.patch("/api/accounting/pricing-plans/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
+    const updated = await storage.updatePricingPlan(parseInt(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ message: "Plan not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/pricing-plans/:id", requireAuth, requirePermission("content.delete"), async (req, res) => {
+    const deleted = await storage.deletePricingPlan(parseInt(req.params.id));
+    if (!deleted) return res.status(404).json({ message: "Plan not found" });
     res.json({ message: "Deleted" });
   });
 

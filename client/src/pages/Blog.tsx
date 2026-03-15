@@ -10,7 +10,7 @@ export default function Blog() {
   });
 
   return (
-    <div className="pt-24 pb-20">
+    <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
       <section className="relative bg-slate-900 dark:bg-black py-20 mb-16 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-sky-900/30 to-sky-900/30" />
         <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />

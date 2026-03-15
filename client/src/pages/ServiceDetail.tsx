@@ -248,14 +248,22 @@ const SERVICES_DATA: Record<string, {
   }
 };
 
+const SLUG_ALIASES: Record<string, string> = {
+  "mobile-apps": "mobile-app",
+  "ui-ux-design": "ui-ux",
+  "graphic-design": "branding",
+  "domain-hosting": "hosting",
+};
+
 export default function ServiceDetail() {
   const { slug } = useParams();
   const s = useSiteSettings();
-  const service = SERVICES_DATA[slug || ""];
+  const resolvedSlug = SLUG_ALIASES[slug || ""] || slug || "";
+  const service = SERVICES_DATA[resolvedSlug];
 
   if (!service) {
     return (
-      <div className="pt-24 pb-20">
+      <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
         <div className="container mx-auto px-4 md:px-6 text-center">
           <h1 className="text-4xl font-bold mb-4 dark:text-white">Service Not Found</h1>
           <p className="text-slate-600 dark:text-slate-400 mb-8">The service you're looking for doesn't exist.</p>

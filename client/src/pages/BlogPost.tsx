@@ -14,8 +14,8 @@ export default function BlogPost() {
 
   if (isLoading) {
     return (
-      <div className="pt-24 pb-20">
-        <div className="container mx-auto px-4 md:px-6 py-12 text-center text-slate-500">
+      <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
+        <div className="container mx-auto px-4 md:px-6 py-12 text-center text-slate-500 dark:text-slate-400">
           Loading...
         </div>
       </div>
@@ -24,7 +24,7 @@ export default function BlogPost() {
 
   if (error || !post) {
     return (
-      <div className="pt-24 pb-20">
+      <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
         <div className="container mx-auto px-4 md:px-6 py-12 text-center">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Post Not Found</h2>
           <p className="text-slate-500 dark:text-slate-400 mb-6">The blog post you're looking for doesn't exist or has been removed.</p>
@@ -37,7 +37,7 @@ export default function BlogPost() {
   }
 
   return (
-    <div className="pt-24 pb-20">
+    <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
       {post.coverImage && (
         <section className="relative h-[300px] md:h-[400px] overflow-hidden">
           <img

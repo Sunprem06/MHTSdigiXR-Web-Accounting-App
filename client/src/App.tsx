@@ -65,6 +65,8 @@ import CaseStudiesManagement from "@/pages/accounting/CaseStudiesManagement";
 import FAQManagement from "@/pages/accounting/FAQManagement";
 import TestimonialsManagement from "@/pages/accounting/TestimonialsManagement";
 import SiteStatsManagement from "@/pages/accounting/SiteStatsManagement";
+import ServicesManagement from "@/pages/accounting/ServicesManagement";
+import PricingPlansManagement from "@/pages/accounting/PricingPlansManagement";
 
 function WebsiteRouter() {
   return (
@@ -197,6 +199,12 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/site-stats">
         {() => <ProtectedRoute requiredPermission="content.view"><SiteStatsManagement /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/services-management">
+        {() => <ProtectedRoute requiredPermission="content.view"><ServicesManagement /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/pricing-plans">
+        {() => <ProtectedRoute requiredPermission="content.view"><PricingPlansManagement /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/audit-log">
         {() => <ProtectedRoute requiredPermission="audit.view"><AuditLogPage /></ProtectedRoute>}

@@ -37,6 +37,20 @@ export const services = pgTable("services", {
   features: text("features").array(),
 });
 
+export const pricingPlans = pgTable("pricing_plans", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  price: text("price").notNull(),
+  period: text("period").notNull().default("one-time"),
+  description: text("description").notNull(),
+  features: jsonb("features").$type<string[]>().default([]),
+  isPopular: boolean("is_popular").default(false),
+  ctaLabel: text("cta_label").default("Get Started"),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const caseStudies = pgTable("case_studies", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -350,6 +364,7 @@ export const insertJobApplicationSchema = createInsertSchema(jobApplications).om
 export const insertFaqItemSchema = createInsertSchema(faqItems).omit({ id: true, createdAt: true });
 export const insertTestimonialSchema = createInsertSchema(testimonials).omit({ id: true, createdAt: true });
 export const insertSiteStatSchema = createInsertSchema(siteStats).omit({ id: true });
+export const insertPricingPlanSchema = createInsertSchema(pricingPlans).omit({ id: true, createdAt: true });
 
 export type Post = typeof posts.$inferSelect;
 export type InsertPost = z.infer<typeof insertPostSchema>;
@@ -359,6 +374,8 @@ export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type CaseStudy = typeof caseStudies.$inferSelect;
 export type InsertCaseStudy = z.infer<typeof insertCaseStudySchema>;
+export type PricingPlan = typeof pricingPlans.$inferSelect;
+export type InsertPricingPlan = z.infer<typeof insertPricingPlanSchema>;
 export type DbRole = typeof roles.$inferSelect;
 export type InsertDbRole = z.infer<typeof insertRoleSchema>;
 export type Employee = typeof employees.$inferSelect;

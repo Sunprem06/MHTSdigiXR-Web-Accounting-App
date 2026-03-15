@@ -1,17 +1,18 @@
 import { db } from "./db";
 import {
-  contactMessages, posts, services, caseStudies,
+  contactMessages, posts, services, caseStudies, pricingPlans,
   employees, auditLogs, accountGroups, ledgerAccounts,
   financialYears, companySettings, vouchers, voucherEntries, auditNotes,
   parties, products, quotations, expenseClaims, roles,
   jobPostings, jobApplications, faqItems, testimonials, siteStats,
   type InsertContactMessage, type InsertPost, type InsertService, type InsertCaseStudy,
+  type InsertPricingPlan,
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
   type InsertFinancialYear, type InsertCompanySettings, type InsertVoucher, type InsertVoucherEntry,
   type InsertAuditNote, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
   type InsertDbRole, type InsertJobPosting, type InsertJobApplication,
   type InsertFaqItem, type InsertTestimonial, type InsertSiteStat,
-  type ContactMessage, type Post, type Service, type CaseStudy,
+  type ContactMessage, type Post, type Service, type CaseStudy, type PricingPlan,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
   type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
   type Party, type Product, type Quotation, type ExpenseClaim, type DbRole,
@@ -27,6 +28,14 @@ export interface IStorage {
   getServices(): Promise<Service[]>;
   getService(slug: string): Promise<Service | undefined>;
   createService(service: InsertService): Promise<Service>;
+  updateService(id: number, data: Partial<Service>): Promise<Service | undefined>;
+  deleteService(id: number): Promise<boolean>;
+
+  getPricingPlans(activeOnly?: boolean): Promise<PricingPlan[]>;
+  getPricingPlan(id: number): Promise<PricingPlan | undefined>;
+  createPricingPlan(plan: InsertPricingPlan): Promise<PricingPlan>;
+  updatePricingPlan(id: number, data: Partial<PricingPlan>): Promise<PricingPlan | undefined>;
+  deletePricingPlan(id: number): Promise<boolean>;
   getCaseStudies(): Promise<CaseStudy[]>;
   createCaseStudy(caseStudy: InsertCaseStudy): Promise<CaseStudy>;
 
@@ -200,6 +209,43 @@ export class DatabaseStorage implements IStorage {
   async createService(service: InsertService): Promise<Service> {
     const [newService] = await db.insert(services).values(service).returning();
     return newService;
+  }
+
+  async updateService(id: number, data: Partial<Service>): Promise<Service | undefined> {
+    const [updated] = await db.update(services).set(data).where(eq(services.id, id)).returning();
+    return updated;
+  }
+
+  async deleteService(id: number): Promise<boolean> {
+    const result = await db.delete(services).where(eq(services.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getPricingPlans(activeOnly?: boolean): Promise<PricingPlan[]> {
+    if (activeOnly) {
+      return await db.select().from(pricingPlans).where(eq(pricingPlans.isActive, true)).orderBy(pricingPlans.displayOrder);
+    }
+    return await db.select().from(pricingPlans).orderBy(pricingPlans.displayOrder);
+  }
+
+  async getPricingPlan(id: number): Promise<PricingPlan | undefined> {
+    const [plan] = await db.select().from(pricingPlans).where(eq(pricingPlans.id, id));
+    return plan;
+  }
+
+  async createPricingPlan(plan: InsertPricingPlan): Promise<PricingPlan> {
+    const [newPlan] = await db.insert(pricingPlans).values(plan).returning();
+    return newPlan;
+  }
+
+  async updatePricingPlan(id: number, data: Partial<PricingPlan>): Promise<PricingPlan | undefined> {
+    const [updated] = await db.update(pricingPlans).set(data).where(eq(pricingPlans.id, id)).returning();
+    return updated;
+  }
+
+  async deletePricingPlan(id: number): Promise<boolean> {
+    const result = await db.delete(pricingPlans).where(eq(pricingPlans.id, id)).returning();
+    return result.length > 0;
   }
 
   async getCaseStudies(): Promise<CaseStudy[]> {

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { faqItems, testimonials, siteStats, posts, caseStudies } from "@shared/schema";
+import { faqItems, testimonials, siteStats, posts, caseStudies, pricingPlans } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
 export async function seedContent() {
@@ -68,6 +68,15 @@ export async function seedContent() {
       { title: "Healthcare Appointment App", client: "MediCare Plus", description: "Developed a cross-platform mobile app for managing doctor appointments, prescriptions, and health records.", image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&q=80", category: "Mobile App", results: ["50k+ Downloads", "4.8 Star Rating"] },
       { title: "Corporate Rebranding", client: "TechFlow Inc", description: "Complete brand identity redesign including logo, color palette, typography, and brand guidelines.", image: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=600&q=80", category: "Branding", results: ["Modern Identity", "Unified Brand Voice"] },
       { title: "SEO Campaign for Real Estate", client: "Urban Properties", description: "Comprehensive SEO strategy including keyword research, on-page optimization, content creation, and link building.", image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&q=80", category: "Digital Marketing", results: ["#1 Ranking for Keywords", "200% More Leads"] },
+    ]);
+  }
+
+  const [ppCount] = await db.select({ count: sql<number>`count(*)::int` }).from(pricingPlans);
+  if ((ppCount?.count ?? 0) === 0) {
+    await db.insert(pricingPlans).values([
+      { name: "Starter", price: "15,000", period: "one-time", description: "Perfect for small businesses getting started online", features: ["Basic website (5 pages)", "Mobile responsive", "Basic SEO setup", "Contact form", "1 month support", "Social media integration"], isPopular: false, ctaLabel: "GET STARTED", displayOrder: 1, isActive: true },
+      { name: "Growth", price: "35,000", period: "one-time", description: "Comprehensive solution for growing businesses", features: ["Custom website (10 pages)", "Advanced SEO", "Blog integration", "E-commerce (basic)", "3 months support", "Google Analytics", "Content management", "Email marketing setup"], isPopular: true, ctaLabel: "MOST POPULAR", displayOrder: 2, isActive: true },
+      { name: "Enterprise", price: "Custom", period: "quote", description: "Tailored solutions for large-scale projects", features: ["Unlimited pages", "Custom features", "Advanced e-commerce", "API integrations", "Dedicated support", "Performance optimization", "Security hardening", "Monthly maintenance"], isPopular: false, ctaLabel: "CONTACT SALES", displayOrder: 3, isActive: true },
     ]);
   }
 
