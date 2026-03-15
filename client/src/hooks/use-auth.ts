@@ -1,25 +1,16 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
-import type { Role } from "@shared/schema";
+import type { Permission } from "@shared/schema";
 
 interface AuthUser {
   id: number;
   username: string;
   email: string;
   fullName: string;
-  role: Role;
+  role: string;
+  permissions: Permission[];
   isActive: boolean;
 }
-
-const WRITE_ROLES: Role[] = ["super_admin", "admin", "senior_accountant", "accountant", "data_entry"];
-const MANAGE_LEDGER_ROLES: Role[] = ["super_admin", "admin", "senior_accountant"];
-const APPROVE_ROLES: Role[] = ["super_admin", "admin", "senior_accountant"];
-const DELETE_ROLES: Role[] = ["super_admin", "admin"];
-const MANAGE_EMPLOYEES_ROLES: Role[] = ["super_admin", "admin"];
-const VIEW_REPORTS_ROLES: Role[] = ["super_admin", "admin", "auditor", "senior_accountant", "accountant"];
-const PRINT_ROLES: Role[] = ["super_admin", "admin", "auditor", "senior_accountant", "accountant"];
-const VIEW_AUDIT_ROLES: Role[] = ["super_admin", "admin", "auditor"];
-const SETTINGS_ROLES: Role[] = ["super_admin"];
 
 export function useAuth() {
   const { data: user, isLoading, error } = useQuery<AuthUser | null>({
@@ -49,15 +40,26 @@ export function useAuth() {
     },
   });
 
-  const canWrite = user ? WRITE_ROLES.includes(user.role) : false;
-  const canManageLedgers = user ? MANAGE_LEDGER_ROLES.includes(user.role) : false;
-  const canApprove = user ? APPROVE_ROLES.includes(user.role) : false;
-  const canDelete = user ? DELETE_ROLES.includes(user.role) : false;
-  const canManageEmployees = user ? MANAGE_EMPLOYEES_ROLES.includes(user.role) : false;
-  const canViewReports = user ? VIEW_REPORTS_ROLES.includes(user.role) : false;
-  const canPrint = user ? PRINT_ROLES.includes(user.role) : false;
-  const canViewAudit = user ? VIEW_AUDIT_ROLES.includes(user.role) : false;
-  const canManageSettings = user ? SETTINGS_ROLES.includes(user.role) : false;
+  const perms = user?.permissions || [];
+
+  const hasPermission = (...ps: Permission[]): boolean => {
+    return ps.every(p => perms.includes(p));
+  };
+
+  const hasAnyPermission = (...ps: Permission[]): boolean => {
+    return ps.some(p => perms.includes(p));
+  };
+
+  const canWrite = hasAnyPermission("vouchers.create", "quotations.create", "invoices.create", "expenses.create");
+  const canManageLedgers = hasPermission("ledgers.create");
+  const canApprove = hasAnyPermission("vouchers.approve", "quotations.approve", "expenses.approve");
+  const canDelete = hasAnyPermission("parties.delete", "products.delete", "quotations.delete");
+  const canManageEmployees = hasPermission("employees.manage");
+  const canViewReports = hasPermission("reports.view");
+  const canPrint = hasPermission("reports.view");
+  const canViewAudit = hasPermission("audit.view");
+  const canManageSettings = hasPermission("settings.manage");
+  const canManageRoles = hasPermission("roles.manage");
 
   return {
     user,
@@ -67,6 +69,8 @@ export function useAuth() {
     logout: logoutMutation.mutateAsync,
     loginError: loginMutation.error,
     isLoggingIn: loginMutation.isPending,
+    hasPermission,
+    hasAnyPermission,
     canWrite,
     canManageLedgers,
     canApprove,
@@ -76,5 +80,6 @@ export function useAuth() {
     canPrint,
     canViewAudit,
     canManageSettings,
+    canManageRoles,
   };
 }

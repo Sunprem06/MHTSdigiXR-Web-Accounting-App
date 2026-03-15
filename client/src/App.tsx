@@ -55,6 +55,7 @@ import GstSummary from "@/pages/accounting/reports/GstSummary";
 import EmployeeManagement from "@/pages/accounting/EmployeeManagement";
 import AuditLogPage from "@/pages/accounting/AuditLog";
 import SettingsPage from "@/pages/accounting/Settings";
+import RolesPage from "@/pages/accounting/Roles";
 
 function WebsiteRouter() {
   return (
@@ -158,13 +159,16 @@ function AccountingRouter() {
         {() => <ProtectedRoute roles={["super_admin", "admin", "auditor", "senior_accountant", "accountant"]}><GstSummary /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/employees">
-        {() => <ProtectedRoute roles={["super_admin", "admin"]}><EmployeeManagement /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="employees.manage"><EmployeeManagement /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/roles">
+        {() => <ProtectedRoute requiredPermission="roles.view"><RolesPage /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/audit-log">
-        {() => <ProtectedRoute roles={["super_admin", "admin", "auditor"]}><AuditLogPage /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="audit.view"><AuditLogPage /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/settings">
-        {() => <ProtectedRoute roles={["super_admin"]}><SettingsPage /></ProtectedRoute>}
+        {() => <ProtectedRoute requiredPermission="settings.view"><SettingsPage /></ProtectedRoute>}
       </Route>
     </Switch>
   );

@@ -1,15 +1,16 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
-import type { Role } from "@shared/schema";
+import type { Permission } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  roles?: Role[];
+  roles?: string[];
+  requiredPermission?: Permission;
 }
 
-export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
-  const { user, isLoading, isAuthenticated } = useAuth();
+export function ProtectedRoute({ children, roles, requiredPermission }: ProtectedRouteProps) {
+  const { user, isLoading, isAuthenticated, hasPermission } = useAuth();
 
   if (isLoading) {
     return (
@@ -24,6 +25,17 @@ export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
   }
 
   if (roles && !roles.includes(user!.role)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950" data-testid="access-denied">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Access Denied</h1>
+          <p className="text-slate-500 dark:text-slate-400">You don't have permission to access this page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (requiredPermission && !hasPermission(requiredPermission)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950" data-testid="access-denied">
         <div className="text-center">

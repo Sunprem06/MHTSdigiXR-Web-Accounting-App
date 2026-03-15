@@ -3,15 +3,16 @@ import {
   contactMessages, posts, services, caseStudies,
   employees, auditLogs, accountGroups, ledgerAccounts,
   financialYears, companySettings, vouchers, voucherEntries, auditNotes,
-  parties, products, quotations, expenseClaims,
+  parties, products, quotations, expenseClaims, roles,
   type InsertContactMessage, type InsertPost, type InsertService, type InsertCaseStudy,
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
   type InsertFinancialYear, type InsertCompanySettings, type InsertVoucher, type InsertVoucherEntry,
   type InsertAuditNote, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
+  type InsertDbRole,
   type ContactMessage, type Post, type Service, type CaseStudy,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
   type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
-  type Party, type Product, type Quotation, type ExpenseClaim
+  type Party, type Product, type Quotation, type ExpenseClaim, type DbRole
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -25,6 +26,12 @@ export interface IStorage {
   createService(service: InsertService): Promise<Service>;
   getCaseStudies(): Promise<CaseStudy[]>;
   createCaseStudy(caseStudy: InsertCaseStudy): Promise<CaseStudy>;
+
+  getRoles(): Promise<DbRole[]>;
+  getRoleBySlug(slug: string): Promise<DbRole | undefined>;
+  createRole(role: InsertDbRole): Promise<DbRole>;
+  updateRole(id: number, data: Partial<InsertDbRole>): Promise<DbRole | undefined>;
+  deleteRole(id: number): Promise<boolean>;
 
   getEmployeeById(id: number): Promise<Employee | undefined>;
   getEmployeeByUsername(username: string): Promise<Employee | undefined>;
@@ -154,6 +161,30 @@ export class DatabaseStorage implements IStorage {
   async createCaseStudy(caseStudy: InsertCaseStudy): Promise<CaseStudy> {
     const [newCaseStudy] = await db.insert(caseStudies).values(caseStudy).returning();
     return newCaseStudy;
+  }
+
+  async getRoles(): Promise<DbRole[]> {
+    return await db.select().from(roles).orderBy(roles.slug);
+  }
+
+  async getRoleBySlug(slug: string): Promise<DbRole | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.slug, slug));
+    return role;
+  }
+
+  async createRole(role: InsertDbRole): Promise<DbRole> {
+    const [newRole] = await db.insert(roles).values(role).returning();
+    return newRole;
+  }
+
+  async updateRole(id: number, data: Partial<InsertDbRole>): Promise<DbRole | undefined> {
+    const [updated] = await db.update(roles).set(data).where(eq(roles.id, id)).returning();
+    return updated;
+  }
+
+  async deleteRole(id: number): Promise<boolean> {
+    const result = await db.delete(roles).where(eq(roles.id, id)).returning();
+    return result.length > 0;
   }
 
   async getEmployeeById(id: number): Promise<Employee | undefined> {

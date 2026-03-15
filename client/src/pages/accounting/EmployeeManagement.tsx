@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { useAuth } from "@/hooks/use-auth";
-import { ROLES, ROLE_LABELS } from "@shared/schema";
-import type { Role } from "@shared/schema";
+import { ROLE_LABELS } from "@shared/schema";
+import type { DbRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,7 +22,7 @@ interface Employee {
   username: string;
   email: string;
   fullName: string;
-  role: Role;
+  role: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -38,16 +38,20 @@ export default function EmployeeManagement() {
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newFullName, setNewFullName] = useState("");
-  const [newRole, setNewRole] = useState<Role>("viewer");
+  const [newRole, setNewRole] = useState("viewer");
 
   const [editFullName, setEditFullName] = useState("");
   const [editEmail, setEditEmail] = useState("");
-  const [editRole, setEditRole] = useState<Role>("viewer");
+  const [editRole, setEditRole] = useState("viewer");
   const [editIsActive, setEditIsActive] = useState(true);
   const [editPassword, setEditPassword] = useState("");
 
   const { data: employees, isLoading } = useQuery<Employee[]>({
     queryKey: ["/api/accounting/employees"],
+  });
+
+  const { data: dbRoles } = useQuery<DbRole[]>({
+    queryKey: ["/api/accounting/roles"],
   });
 
   const createMutation = useMutation({
@@ -124,9 +128,10 @@ export default function EmployeeManagement() {
     setEditOpen(true);
   };
 
-  const availableRoles = user?.role === "super_admin"
-    ? ROLES
-    : ROLES.filter((r) => r !== "super_admin" && r !== "admin");
+  const availableRoles = (dbRoles || []).filter(r => {
+    if (user?.role === "super_admin") return true;
+    return r.slug !== "super_admin" && r.slug !== "admin";
+  });
 
   const filteredEmployees = employees?.filter((emp) => {
     if (user?.role === "super_admin") return true;
@@ -186,7 +191,7 @@ export default function EmployeeManagement() {
                       <TableCell>{emp.email}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" data-testid={`badge-role-${emp.id}`}>
-                          {ROLE_LABELS[emp.role]}
+                          {dbRoles?.find(r => r.slug === emp.role)?.label || ROLE_LABELS[emp.role] || emp.role}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -239,14 +244,14 @@ export default function EmployeeManagement() {
               </div>
               <div>
                 <Label>Role</Label>
-                <Select value={newRole} onValueChange={(v) => setNewRole(v as Role)}>
+                <Select value={newRole} onValueChange={setNewRole}>
                   <SelectTrigger data-testid="select-new-role">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableRoles.map((role) => (
-                      <SelectItem key={role} value={role} data-testid={`option-role-${role}`}>
-                        {ROLE_LABELS[role]}
+                    {availableRoles.map((r) => (
+                      <SelectItem key={r.slug} value={r.slug} data-testid={`option-role-${r.slug}`}>
+                        {r.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -285,14 +290,14 @@ export default function EmployeeManagement() {
               </div>
               <div>
                 <Label>Role</Label>
-                <Select value={editRole} onValueChange={(v) => setEditRole(v as Role)}>
+                <Select value={editRole} onValueChange={setEditRole}>
                   <SelectTrigger data-testid="select-edit-role">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableRoles.map((role) => (
-                      <SelectItem key={role} value={role} data-testid={`option-edit-role-${role}`}>
-                        {ROLE_LABELS[role]}
+                    {availableRoles.map((r) => (
+                      <SelectItem key={r.slug} value={r.slug} data-testid={`option-edit-role-${r.slug}`}>
+                        {r.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

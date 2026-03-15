@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { requireAuth, requireRole } from "./auth";
+import { requireAuth, requireRole, requirePermission } from "./auth";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 
 export async function registerRoutes(
@@ -67,6 +67,95 @@ export async function registerRoutes(
   app.get("/api/accounting/dashboard", requireAuth, async (req, res) => {
     const stats = await storage.getDashboardStats();
     res.json(stats);
+  });
+
+  // Roles
+  app.get("/api/accounting/roles", requireAuth, async (req, res) => {
+    const allRoles = await storage.getRoles();
+    res.json(allRoles);
+  });
+
+  app.post("/api/accounting/roles", requireAuth, requirePermission("roles.manage"), async (req, res) => {
+    try {
+      const { slug, label, description, permissions } = req.body;
+      if (!slug || !label) {
+        return res.status(400).json({ message: "Slug and label are required" });
+      }
+      if (!/^[a-z][a-z0-9_]{1,49}$/.test(slug)) {
+        return res.status(400).json({ message: "Slug must be lowercase letters, digits, underscores; 2-50 chars" });
+      }
+      const { ALL_PERMISSIONS: AP } = await import("@shared/schema");
+      const validPerms = Array.isArray(permissions) ? permissions.filter((p: string) => (AP as readonly string[]).includes(p)) : [];
+      const role = await storage.createRole({
+        slug, label, description: description || null,
+        permissions: validPerms,
+        isSystem: false,
+      });
+      await storage.createAuditLog({
+        employeeId: req.user!.id, action: "create", entity: "role",
+        entityId: role.id, details: `Created role: ${label} (${slug})`,
+        ipAddress: req.ip || null,
+      });
+      res.status(201).json(role);
+    } catch (err: any) {
+      if (err.code === "23505") {
+        return res.status(400).json({ message: "Role slug already exists" });
+      }
+      throw err;
+    }
+  });
+
+  app.patch("/api/accounting/roles/:id", requireAuth, requirePermission("roles.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getRoles().then(rs => rs.find(r => r.id === id));
+    if (!existing) return res.status(404).json({ message: "Role not found" });
+
+    const { ALL_PERMISSIONS: AP } = await import("@shared/schema");
+    const data: Record<string, unknown> = {};
+    if (req.body.label) data.label = req.body.label;
+    if (req.body.description !== undefined) data.description = req.body.description;
+    if (req.body.permissions) {
+      data.permissions = Array.isArray(req.body.permissions)
+        ? req.body.permissions.filter((p: string) => (AP as readonly string[]).includes(p))
+        : [];
+    }
+    if (!existing.isSystem && req.body.slug) {
+      if (!/^[a-z][a-z0-9_]{1,49}$/.test(req.body.slug)) {
+        return res.status(400).json({ message: "Invalid slug format" });
+      }
+      data.slug = req.body.slug;
+    }
+
+    const updated = await storage.updateRole(id, data);
+    if (!updated) return res.status(404).json({ message: "Role not found" });
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "role",
+      entityId: id, details: `Updated role: ${existing.slug}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/roles/:id", requireAuth, requirePermission("roles.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getRoles().then(rs => rs.find(r => r.id === id));
+    if (!existing) return res.status(404).json({ message: "Role not found" });
+    if (existing.isSystem) return res.status(403).json({ message: "Cannot delete system roles" });
+
+    const allEmployees = await storage.getEmployees();
+    const inUse = allEmployees.some(e => e.role === existing.slug);
+    if (inUse) return res.status(400).json({ message: "Cannot delete role — it is assigned to employees" });
+
+    const deleted = await storage.deleteRole(id);
+    if (!deleted) return res.status(404).json({ message: "Role not found" });
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "role",
+      entityId: id, details: `Deleted role: ${existing.slug}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ success: true });
   });
 
   // Employees

@@ -43,6 +43,16 @@ export const caseStudies = pgTable("case_studies", {
   results: text("results").array(),
 });
 
+export const roles = pgTable("roles", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  label: text("label").notNull(),
+  description: text("description"),
+  permissions: jsonb("permissions").notNull().default([]),
+  isSystem: boolean("is_system").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -50,6 +60,7 @@ export const employees = pgTable("employees", {
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
   role: text("role").notNull().default("viewer"),
+  permissions: jsonb("permissions"),
   isActive: boolean("is_active").notNull().default(true),
   lastLogin: timestamp("last_login"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -231,6 +242,7 @@ export const insertPostSchema = createInsertSchema(posts).omit({ id: true, creat
 export const insertContactMessageSchema = createInsertSchema(contactMessages).omit({ id: true, createdAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true });
 export const insertCaseStudySchema = createInsertSchema(caseStudies).omit({ id: true });
+export const insertRoleSchema = createInsertSchema(roles).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, lastLogin: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 export const insertAccountGroupSchema = createInsertSchema(accountGroups).omit({ id: true });
@@ -253,6 +265,8 @@ export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type CaseStudy = typeof caseStudies.$inferSelect;
 export type InsertCaseStudy = z.infer<typeof insertCaseStudySchema>;
+export type DbRole = typeof roles.$inferSelect;
+export type InsertDbRole = z.infer<typeof insertRoleSchema>;
 export type Employee = typeof employees.$inferSelect;
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
@@ -280,10 +294,10 @@ export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
 export type ExpenseClaim = typeof expenseClaims.$inferSelect;
 export type InsertExpenseClaim = z.infer<typeof insertExpenseClaimSchema>;
 
-export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer"] as const;
+export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer", "sales_person", "sales_manager"] as const;
 export type Role = typeof ROLES[number];
 
-export const ROLE_LABELS: Record<Role, string> = {
+export const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
   auditor: "Auditor",
@@ -291,6 +305,82 @@ export const ROLE_LABELS: Record<Role, string> = {
   accountant: "Accountant",
   data_entry: "Data Entry Operator",
   viewer: "Viewer",
+  sales_person: "Sales Person",
+  sales_manager: "Sales Manager",
+};
+
+export const ALL_PERMISSIONS = [
+  "dashboard.view",
+  "ledgers.view", "ledgers.create", "ledgers.edit",
+  "parties.view", "parties.create", "parties.edit", "parties.delete",
+  "products.view", "products.create", "products.edit", "products.delete",
+  "quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.approve",
+  "invoices.view", "invoices.create",
+  "vouchers.view", "vouchers.create", "vouchers.edit", "vouchers.approve",
+  "expenses.view", "expenses.create", "expenses.approve",
+  "reports.view",
+  "audit.view", "audit.notes",
+  "employees.view", "employees.manage",
+  "roles.view", "roles.manage",
+  "settings.view", "settings.manage",
+] as const;
+
+export type Permission = typeof ALL_PERMISSIONS[number];
+
+export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Permission[] }> = {
+  dashboard: { label: "Dashboard", permissions: ["dashboard.view"] },
+  ledgers: { label: "Ledger Accounts", permissions: ["ledgers.view", "ledgers.create", "ledgers.edit"] },
+  parties: { label: "Parties", permissions: ["parties.view", "parties.create", "parties.edit", "parties.delete"] },
+  products: { label: "Products", permissions: ["products.view", "products.create", "products.edit", "products.delete"] },
+  quotations: { label: "Quotations", permissions: ["quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.approve"] },
+  invoices: { label: "Invoices", permissions: ["invoices.view", "invoices.create"] },
+  vouchers: { label: "Vouchers", permissions: ["vouchers.view", "vouchers.create", "vouchers.edit", "vouchers.approve"] },
+  expenses: { label: "Expenses", permissions: ["expenses.view", "expenses.create", "expenses.approve"] },
+  reports: { label: "Reports", permissions: ["reports.view"] },
+  audit: { label: "Audit", permissions: ["audit.view", "audit.notes"] },
+  employees: { label: "Employees", permissions: ["employees.view", "employees.manage"] },
+  roles: { label: "Roles", permissions: ["roles.view", "roles.manage"] },
+  settings: { label: "Settings", permissions: ["settings.view", "settings.manage"] },
+};
+
+export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
+  super_admin: [...ALL_PERMISSIONS],
+  admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.")),
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "reports.view", "audit.view", "audit.notes"],
+  senior_accountant: [
+    "dashboard.view",
+    "ledgers.view", "ledgers.create", "ledgers.edit",
+    "parties.view", "parties.create", "parties.edit", "parties.delete",
+    "products.view", "products.create", "products.edit", "products.delete",
+    "quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.approve",
+    "invoices.view", "invoices.create",
+    "vouchers.view", "vouchers.create", "vouchers.edit", "vouchers.approve",
+    "expenses.view", "expenses.create", "expenses.approve",
+    "reports.view",
+  ],
+  accountant: [
+    "dashboard.view",
+    "ledgers.view", "ledgers.create", "ledgers.edit",
+    "parties.view", "parties.create", "parties.edit",
+    "products.view", "products.create", "products.edit",
+    "quotations.view", "quotations.create", "quotations.edit",
+    "invoices.view", "invoices.create",
+    "vouchers.view", "vouchers.create", "vouchers.edit",
+    "expenses.view", "expenses.create",
+    "reports.view",
+  ],
+  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view"],
+  viewer: ["dashboard.view"],
+  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view"],
+  sales_manager: [
+    "dashboard.view",
+    "quotations.view", "quotations.create", "quotations.edit", "quotations.approve",
+    "parties.view", "parties.create", "parties.edit",
+    "products.view",
+    "invoices.view", "invoices.create",
+    "expenses.view",
+    "reports.view",
+  ],
 };
 
 export const VOUCHER_TYPES = ["sales", "purchase", "payment", "receipt", "journal", "contra", "credit_note", "debit_note"] as const;

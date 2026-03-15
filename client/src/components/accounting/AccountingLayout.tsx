@@ -5,10 +5,10 @@ import {
   LayoutDashboard, BookOpen, FileText, BarChart3, Users, Settings, LogOut,
   ChevronDown, ChevronRight, ShoppingCart, Package, CreditCard, Receipt,
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
-  Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee
+  Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
-import type { Role } from "@shared/schema";
+import type { Permission } from "@shared/schema";
 
 interface AccountingLayoutProps {
   children: React.ReactNode;
@@ -18,35 +18,19 @@ interface NavItem {
   label: string;
   path?: string;
   icon: any;
-  roles?: Role[];
+  requiredPermission?: Permission;
   children?: { label: string; path: string; icon: any }[];
 }
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", path: "/accounting", icon: LayoutDashboard },
+  { label: "Dashboard", path: "/accounting", icon: LayoutDashboard, requiredPermission: "dashboard.view" },
+  { label: "Ledger Accounts", path: "/accounting/ledgers", icon: BookOpen, requiredPermission: "ledgers.view" },
+  { label: "Parties", path: "/accounting/parties", icon: UserCheck, requiredPermission: "parties.view" },
+  { label: "Products", path: "/accounting/products", icon: Boxes, requiredPermission: "products.view" },
+  { label: "Quotations", path: "/accounting/quotations", icon: FileSpreadsheet, requiredPermission: "quotations.view" },
+  { label: "Invoices", path: "/accounting/invoices", icon: Receipt, requiredPermission: "invoices.view" },
   {
-    label: "Ledger Accounts", path: "/accounting/ledgers", icon: BookOpen,
-    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
-  },
-  {
-    label: "Parties", path: "/accounting/parties", icon: UserCheck,
-    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
-  },
-  {
-    label: "Products", path: "/accounting/products", icon: Boxes,
-    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
-  },
-  {
-    label: "Quotations", path: "/accounting/quotations", icon: FileSpreadsheet,
-    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
-  },
-  {
-    label: "Invoices", path: "/accounting/invoices", icon: Receipt,
-    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
-  },
-  {
-    label: "Vouchers", icon: FileText,
-    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"],
+    label: "Vouchers", icon: FileText, requiredPermission: "vouchers.view",
     children: [
       { label: "All Vouchers", path: "/accounting/vouchers", icon: FileText },
       { label: "Sales", path: "/accounting/vouchers/new?type=sales", icon: ShoppingCart },
@@ -59,13 +43,9 @@ const navItems: NavItem[] = [
       { label: "Debit Note", path: "/accounting/vouchers/new?type=debit_note", icon: FileText },
     ],
   },
+  { label: "Expenses", path: "/accounting/expenses", icon: Wallet, requiredPermission: "expenses.view" },
   {
-    label: "Expenses", path: "/accounting/expenses", icon: Wallet,
-    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry"],
-  },
-  {
-    label: "Reports", icon: BarChart3,
-    roles: ["super_admin", "admin", "auditor", "senior_accountant", "accountant"],
+    label: "Reports", icon: BarChart3, requiredPermission: "reports.view",
     children: [
       { label: "Day Book", path: "/accounting/reports/day-book", icon: ClipboardList },
       { label: "Trial Balance", path: "/accounting/reports/trial-balance", icon: Scale },
@@ -74,22 +54,14 @@ const navItems: NavItem[] = [
       { label: "GST Summary", path: "/accounting/reports/gst-summary", icon: IndianRupee },
     ],
   },
-  {
-    label: "Audit Log", path: "/accounting/audit-log", icon: Shield,
-    roles: ["super_admin", "admin", "auditor"],
-  },
-  {
-    label: "Employees", path: "/accounting/employees", icon: Users,
-    roles: ["super_admin", "admin"],
-  },
-  {
-    label: "Settings", path: "/accounting/settings", icon: Settings,
-    roles: ["super_admin"],
-  },
+  { label: "Audit Log", path: "/accounting/audit-log", icon: Shield, requiredPermission: "audit.view" },
+  { label: "Employees", path: "/accounting/employees", icon: Users, requiredPermission: "employees.manage" },
+  { label: "Roles", path: "/accounting/roles", icon: KeyRound, requiredPermission: "roles.view" },
+  { label: "Settings", path: "/accounting/settings", icon: Settings, requiredPermission: "settings.view" },
 ];
 
 export function AccountingLayout({ children }: AccountingLayoutProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const [location] = useLocation();
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["Vouchers", "Reports"]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -106,8 +78,8 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
   };
 
   const filteredItems = navItems.filter(item => {
-    if (!item.roles) return true;
-    return item.roles.includes(user?.role as Role);
+    if (!item.requiredPermission) return true;
+    return hasPermission(item.requiredPermission);
   });
 
   const isActive = (path?: string) => {
@@ -135,7 +107,7 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
 
       <div className="p-3 mx-3 mt-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg border border-sky-100 dark:border-sky-800" data-testid="user-profile-badge">
         <p className="font-semibold text-sm text-slate-900 dark:text-white truncate">{user?.fullName}</p>
-        <p className="text-xs text-sky-600 dark:text-sky-400">{ROLE_LABELS[user?.role as Role] || user?.role}</p>
+        <p className="text-xs text-sky-600 dark:text-sky-400">{ROLE_LABELS[user?.role || ""] || user?.role}</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">

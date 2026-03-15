@@ -6,6 +6,7 @@ This is a full-stack digital agency website for Maanagarram Hi Tech Solutions (b
 
 ## Recent Changes (Mar 2026)
 
+- **Database-Driven Roles & Permissions**: New `roles` DB table with slug, label, description, permissions (JSONB), isSystem flag. 9 system roles seeded on startup (Super Admin, Admin, Auditor, Senior Accountant, Accountant, Data Entry Operator, Viewer, Sales Person, Sales Manager). 35 granular permissions organized into 13 groups (dashboard, ledgers, parties, products, quotations, invoices, vouchers, expenses, reports, audit, employees, roles, settings). Employees table has optional `permissions` JSONB for per-user overrides. `hasPermission()` / `hasAnyPermission()` in useAuth hook. Sidebar nav items filtered by permission. New Roles Management page at /accounting/roles for Super Admin/Admin. Employee Add/Edit loads roles dynamically from API. ProtectedRoute supports `requiredPermission` prop.
 - **Quotation Approval Workflow**: Draft → Submit for Review → Approve/Reject flow; added assignedTo, reviewedBy, reviewedAt, submittedAt columns; Senior Accountant/Admin/Super Admin can approve or reject submitted quotations with optional rejection reason; data_entry users can create and submit their own quotations; "Assigned To" column in list; amber "Submitted" badge; workflow trail shown in QuotationView
 - **Quotation Fixes**: Fixed quotation number generation to use MAX instead of count(*) to prevent gaps after deletions; added Edit/Delete buttons restricted to Super Admin and Admin roles; added quotation View page with print support; quotation edit mode loads existing data via PATCH
 - **Invoices Tab**: New dedicated Invoices section in sidebar (between Products and Vouchers); Invoices list page showing all Sales vouchers; InvoiceEntry form for creating sales invoices with product line items, GST calculations, and auto-generated ledger entries; Invoice View back button updated to point to Invoices list
@@ -25,7 +26,7 @@ This is a full-stack digital agency website for Maanagarram Hi Tech Solutions (b
 - **Expense Management**: Employee expense claim submission, approval workflow
 - **Ledger Statements**: Transaction history with running balance per account
 - **Accounting Application**: Full TallyPrime 7.0-inspired accounting system with double-entry bookkeeping
-- **Role-Based Access Control**: 7 world-standard roles (Super Admin, Admin, Auditor, Senior Accountant, Accountant, Data Entry Operator, Viewer)
+- **Role-Based Access Control**: 9 database-driven roles with 35 granular permissions (Super Admin, Admin, Auditor, Senior Accountant, Accountant, Data Entry Operator, Viewer, Sales Person, Sales Manager)
 - **Authentication System**: Passport.js with express-session, bcrypt password hashing, PostgreSQL session store
 - **Voucher System**: Sales, Purchase, Payment, Receipt, Journal, Contra, Credit Note, Debit Note with approval workflow
 - **Financial Reports**: Day Book, Trial Balance, Profit & Loss (Gross + Net), Balance Sheet (with Net Profit), GST Summary
@@ -77,7 +78,8 @@ The frontend follows a component-based architecture with:
 - **Case Studies**: Project showcases with client info and results
 - **Contact Messages**: Form submissions from visitors
 - **Conversations/Messages**: AI chat history storage
-- **Employees**: User accounts with roles and credentials
+- **Roles**: Role definitions with slug, label, description, permissions (JSONB), isSystem flag
+- **Employees**: User accounts with roles, optional per-user permission overrides
 - **Audit Logs**: System activity tracking
 - **Account Groups**: Chart of account categories (Assets, Liabilities, Income, Expenses, Capital)
 - **Ledger Accounts**: Individual accounts within groups
@@ -91,17 +93,23 @@ The frontend follows a component-based architecture with:
 - **Quotations**: Estimates with line items, GST calculation, convert-to-invoice
 - **Expense Claims**: Employee expense submissions with approval workflow
 
-### Accounting System Roles
+### Accounting System Roles (Database-Driven)
+
+Roles are stored in the `roles` DB table with granular permissions. 9 system roles are seeded on startup. Custom roles can be created via the Roles Management page.
 
 | Role | Access Level |
 |------|-------------|
-| Super Admin | Full system control — all users, settings, data |
-| Admin | Manage users (except Super Admin), all accounting operations |
-| Auditor | Read-only + audit notes, cannot modify financial data |
-| Senior Accountant | Create/edit/approve vouchers, manage ledgers, all reports |
-| Accountant | Create/edit vouchers, view ledgers, view reports |
-| Data Entry Operator | Create draft vouchers only, view own entries |
-| Viewer | Read-only dashboard, summary access only |
+| Super Admin | Full system control — all 35 permissions |
+| Admin | All except settings management (33 permissions) |
+| Auditor | Read-only + audit notes (11 permissions) |
+| Senior Accountant | Create/edit/approve vouchers, manage ledgers, full CRUD (27 permissions) |
+| Accountant | Create/edit vouchers, view ledgers, reports (21 permissions) |
+| Data Entry Operator | Create drafts, view own entries (9 permissions) |
+| Viewer | Dashboard view only (1 permission) |
+| Sales Person | Quotations, parties, products (7 permissions) |
+| Sales Manager | Approve quotations, manage parties, reports (13 permissions) |
+
+Permissions are organized in 13 groups: dashboard, ledgers, parties, products, quotations, invoices, vouchers, expenses, reports, audit, employees, roles, settings.
 
 ### Default Login
 - **Username**: superadmin

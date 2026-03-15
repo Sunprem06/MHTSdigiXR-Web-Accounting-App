@@ -6,7 +6,8 @@ import { pool } from "./db";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import type { Express, Request, Response, NextFunction } from "express";
-import type { Role } from "@shared/schema";
+import type { Role, Permission } from "@shared/schema";
+import { SYSTEM_ROLE_PERMISSIONS } from "@shared/schema";
 
 declare global {
   namespace Express {
@@ -16,9 +17,33 @@ declare global {
       email: string;
       fullName: string;
       role: Role;
+      permissions: Permission[];
       isActive: boolean;
     }
   }
+}
+
+async function resolvePermissions(employee: { role: string; permissions: unknown }): Promise<Permission[]> {
+  const rolePerms: Permission[] = [];
+  try {
+    const dbRole = await storage.getRoleBySlug(employee.role);
+    if (dbRole && Array.isArray(dbRole.permissions)) {
+      rolePerms.push(...(dbRole.permissions as Permission[]));
+    }
+  } catch {
+    const fallback = SYSTEM_ROLE_PERMISSIONS[employee.role];
+    if (fallback) rolePerms.push(...fallback);
+  }
+  if (rolePerms.length === 0) {
+    const fallback = SYSTEM_ROLE_PERMISSIONS[employee.role];
+    if (fallback) rolePerms.push(...fallback);
+  }
+  const userOverrides = Array.isArray(employee.permissions) ? (employee.permissions as Permission[]) : [];
+  if (userOverrides.length > 0) {
+    const merged = new Set([...rolePerms, ...userOverrides]);
+    return [...merged];
+  }
+  return rolePerms;
 }
 
 export function setupAuth(app: Express) {
@@ -61,12 +86,14 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Invalid username or password" });
         }
         await storage.updateEmployeeLastLogin(employee.id);
+        const perms = await resolvePermissions(employee);
         return done(null, {
           id: employee.id,
           username: employee.username,
           email: employee.email,
           fullName: employee.fullName,
           role: employee.role as Role,
+          permissions: perms,
           isActive: employee.isActive,
         });
       } catch (err) {
@@ -85,12 +112,14 @@ export function setupAuth(app: Express) {
       if (!employee || !employee.isActive) {
         return done(null, false);
       }
+      const perms = await resolvePermissions(employee);
       done(null, {
         id: employee.id,
         username: employee.username,
         email: employee.email,
         fullName: employee.fullName,
         role: employee.role as Role,
+        permissions: perms,
         isActive: employee.isActive,
       });
     } catch (err) {
@@ -158,6 +187,20 @@ export function requireRole(...roles: Role[]) {
       return res.status(401).json({ message: "Authentication required" });
     }
     if (!roles.includes(req.user!.role as Role)) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
+    next();
+  };
+}
+
+export function requirePermission(...perms: Permission[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    const userPerms = req.user!.permissions || [];
+    const hasAll = perms.every(p => userPerms.includes(p));
+    if (!hasAll) {
       return res.status(403).json({ message: "Insufficient permissions" });
     }
     next();
