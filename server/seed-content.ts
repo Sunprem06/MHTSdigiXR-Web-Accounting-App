@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { faqItems, testimonials, siteStats, posts, caseStudies, pricingPlans } from "@shared/schema";
+import { faqItems, testimonials, siteStats, posts, caseStudies, pricingPlans, legalPages } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
 export async function seedContent() {
@@ -77,6 +77,262 @@ export async function seedContent() {
       { name: "Starter", price: "15,000", period: "one-time", description: "Perfect for small businesses getting started online", features: ["Basic website (5 pages)", "Mobile responsive", "Basic SEO setup", "Contact form", "1 month support", "Social media integration"], isPopular: false, ctaLabel: "GET STARTED", displayOrder: 1, isActive: true },
       { name: "Growth", price: "35,000", period: "one-time", description: "Comprehensive solution for growing businesses", features: ["Custom website (10 pages)", "Advanced SEO", "Blog integration", "E-commerce (basic)", "3 months support", "Google Analytics", "Content management", "Email marketing setup"], isPopular: true, ctaLabel: "MOST POPULAR", displayOrder: 2, isActive: true },
       { name: "Enterprise", price: "Custom", period: "quote", description: "Tailored solutions for large-scale projects", features: ["Unlimited pages", "Custom features", "Advanced e-commerce", "API integrations", "Dedicated support", "Performance optimization", "Security hardening", "Monthly maintenance"], isPopular: false, ctaLabel: "CONTACT SALES", displayOrder: 3, isActive: true },
+    ]);
+  }
+
+  const [legalCount] = await db.select({ count: sql<number>`count(*)::int` }).from(legalPages);
+  if ((legalCount?.count ?? 0) === 0) {
+    await db.insert(legalPages).values([
+      {
+        slug: "privacy-policy",
+        title: "Privacy Policy",
+        effectiveDate: "2024-01-01",
+        content: `Privacy Policy
+
+Maanagarram Hi Tech Solutions (operating as MHTSdigiXR), headquartered in Chennai, Tamil Nadu, India, is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your personal information.
+
+1. Information We Collect
+
+We collect the following personal information when you voluntarily provide it through our website:
+
+- Name, email address, and phone number via our Contact form
+- Name, email, phone, cover letter, and resume via our Careers application form
+- Session cookies for website functionality
+
+We do not collect any information automatically beyond standard server logs (IP address, browser type, pages visited).
+
+2. How We Use Your Information
+
+The information we collect is used solely for the following purposes:
+
+- To respond to your enquiries and service requests
+- To process job applications submitted through our Careers page
+- To communicate with you about our services when you have contacted us
+- To maintain and improve our website functionality
+
+3. Data Sharing
+
+We do not sell, trade, rent, or otherwise share your personal data with any third parties. Your information is used exclusively by Maanagarram Hi Tech Solutions for the purposes stated above.
+
+4. Cookies
+
+Our website uses cookies strictly for session management (keeping you logged in). We do not use tracking cookies, advertising cookies, or analytics cookies that collect personal data.
+
+5. Data Security
+
+We implement reasonable security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. All data is stored on secure servers with encrypted connections.
+
+6. Your Rights
+
+You have the right to:
+- Request access to the personal data we hold about you
+- Request correction of inaccurate personal data
+- Request deletion of your personal data
+- Withdraw consent for data processing
+
+To exercise any of these rights, please contact us at info@mhtsdigixr.com.
+
+7. Data Retention
+
+We retain personal data only for as long as necessary to fulfill the purposes for which it was collected. Contact form submissions are retained for up to 12 months. Job application data is retained for up to 24 months.
+
+8. Governing Law
+
+This Privacy Policy is governed by and construed in accordance with:
+- The Information Technology Act, 2000 (IT Act)
+- The Information Technology (Amendment) Act, 2008
+- The Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011
+
+9. Jurisdiction
+
+Any disputes arising from this Privacy Policy shall be subject to the exclusive jurisdiction of the courts in Chennai, Tamil Nadu, India.
+
+10. Changes to This Policy
+
+We reserve the right to update this Privacy Policy at any time. Changes will be posted on this page with an updated effective date.
+
+11. Contact Us
+
+If you have any questions about this Privacy Policy, please contact us at:
+
+Maanagarram Hi Tech Solutions (MHTSdigiXR)
+Chennai, Tamil Nadu, India
+Email: info@mhtsdigixr.com`
+      },
+      {
+        slug: "terms-of-service",
+        title: "Terms of Service",
+        effectiveDate: "2024-01-01",
+        content: `Terms of Service
+
+These Terms of Service ("Terms") govern your engagement with Maanagarram Hi Tech Solutions (operating as MHTSdigiXR), a company registered in Chennai, Tamil Nadu, India. By engaging our services, you agree to be bound by these Terms.
+
+1. Services
+
+Maanagarram Hi Tech Solutions provides digital services including but not limited to:
+- Web Development and Design
+- Mobile Application Development
+- Digital Marketing and SEO
+- Branding and Graphic Design
+- Domain Registration and Web Hosting
+- UI/UX Design
+- Video and Animation Production
+- AI Integration Solutions
+
+2. Client Responsibilities
+
+By engaging our services, you agree to:
+- Provide accurate and complete project requirements in a timely manner
+- Supply all necessary content, images, credentials, and access required for the project
+- Review and provide feedback on deliverables within the agreed timelines
+- Make payments as per the agreed payment schedule
+- Ensure that all content provided to us does not infringe on any third-party intellectual property rights
+
+3. Intellectual Property
+
+- All work product (code, designs, content) created by MHTSdigiXR during the engagement remains our property until full and final payment is received
+- Upon receipt of full payment, ownership of the deliverables transfers to the client, except for any third-party components, open-source software, or pre-existing intellectual property of MHTSdigiXR
+- MHTSdigiXR reserves the right to use completed projects in our portfolio and case studies unless explicitly agreed otherwise in writing
+
+4. Confidentiality
+
+Both parties agree to:
+- Keep all project-related information, business data, and proprietary details confidential
+- Not disclose confidential information to any third party without prior written consent
+- Use confidential information solely for the purposes of the engagement
+- This obligation survives the termination of the engagement
+
+5. Payment Terms
+
+- Payment terms are as specified in the individual project proposal or quotation
+- Standard terms: 50% advance payment to commence work, 50% upon completion
+- For larger projects, milestone-based payment schedules may be agreed upon
+- Late payments may attract interest at 1.5% per month on the outstanding amount
+- Work may be paused if payments are not received within 15 days of the due date
+
+6. Project Timelines
+
+- Estimated timelines are provided in good faith based on the agreed project scope
+- Timelines may be extended due to delays in client feedback, content supply, or scope changes
+- Any changes to the agreed scope will be documented and may result in revised timelines and costs
+
+7. Limitation of Liability
+
+- MHTSdigiXR's total liability under any engagement shall not exceed the total value of the contract
+- We shall not be liable for any indirect, incidental, consequential, or punitive damages
+- We shall not be liable for any loss of profits, data, or business opportunities arising from our services
+- We do not guarantee specific business outcomes, search engine rankings, or revenue increases
+
+8. Termination
+
+- Either party may terminate the engagement with 15 days' written notice
+- Upon termination, the client shall pay for all work completed up to the date of termination
+- Any advance payments for uncompleted work will be adjusted against work done
+- Termination does not affect any rights or obligations that have accrued prior to the date of termination
+
+9. Force Majeure
+
+Neither party shall be liable for any failure or delay in performance due to circumstances beyond their reasonable control, including but not limited to natural disasters, war, pandemic, government actions, or internet/power outages.
+
+10. Dispute Resolution
+
+- All disputes shall first be attempted to be resolved through amicable negotiation
+- If negotiation fails, disputes shall be referred to arbitration under the Arbitration and Conciliation Act, 1996
+- The arbitration shall be conducted in Chennai, Tamil Nadu, India
+- The language of arbitration shall be English
+
+11. Governing Law
+
+These Terms shall be governed by and construed in accordance with the laws of India. The courts in Chennai, Tamil Nadu shall have exclusive jurisdiction over any legal proceedings.
+
+12. Amendments
+
+MHTSdigiXR reserves the right to modify these Terms at any time. Updated Terms will be posted on our website with the revised effective date. Continued engagement after such changes constitutes acceptance.
+
+13. Contact
+
+For questions about these Terms, please contact:
+
+Maanagarram Hi Tech Solutions (MHTSdigiXR)
+Chennai, Tamil Nadu, India
+Email: info@mhtsdigixr.com`
+      },
+      {
+        slug: "refund-policy",
+        title: "No Refund Policy",
+        effectiveDate: "2024-01-01",
+        content: `No Refund Policy
+
+Maanagarram Hi Tech Solutions (operating as MHTSdigiXR), Chennai, Tamil Nadu, India, maintains a strict No Refund Policy for all digital services. Please read this policy carefully before engaging our services.
+
+1. Policy Statement
+
+Maanagarram Hi Tech Solutions does not offer refunds once a project has commenced or a digital service has been activated. This policy applies to all services including web development, mobile app development, digital marketing, SEO, branding, design, hosting, and all other digital services offered by MHTSdigiXR.
+
+2. Legal Basis
+
+This No Refund Policy is in compliance with applicable Indian law:
+
+a) Consumer Protection Act, 2019: Under the Act, digital and software services are classified as services. Once a service has been delivered or commenced, refunds are at the discretion of the service provider. Digital work product, by its nature, cannot be "returned" like a physical product.
+
+b) Information Technology Act, 2000: Electronic contracts entered into via our website or through signed proposals are valid and legally binding upon acceptance. By making payment and agreeing to our Terms of Service, you enter into a binding contract.
+
+c) Indian Contract Act, 1872: Once consideration has been paid and service delivery has commenced, the contract is in effect and cannot be unilaterally revoked by the client without cause attributable to the service provider.
+
+3. Rationale
+
+Digital services involve significant investment of time, resources, and intellectual effort from the moment a project commences. Unlike physical goods, digital work product (designs, code, strategies, content) cannot be returned or resold. The work performed is specific to each client's requirements and has no residual value to MHTSdigiXR once created.
+
+4. Exceptions
+
+Refunds or credits may be considered solely in the following exceptional circumstances:
+
+a) Non-Delivery: If MHTSdigiXR is unable to deliver the agreed scope of work for reasons entirely within our control and fails to provide a suitable alternative within a reasonable timeframe.
+
+b) Duplicate Payment: If a client has made a duplicate payment in error, the duplicate amount will be refunded within 15 business days.
+
+c) Partial Credits: At the sole discretion of the management of Maanagarram Hi Tech Solutions, partial credits toward future services may be offered in cases where a project is discontinued before completion by mutual agreement.
+
+5. Advance Payments
+
+- Advance payments made to commence a project are non-refundable once work has begun
+- If a project is cancelled before any work has commenced (within 48 hours of payment and before any team resources are allocated), a refund of the advance may be considered on a case-by-case basis
+- The decision to refund an advance payment in such cases rests solely with MHTSdigiXR's management
+
+6. Scope Changes and Cancellations
+
+- If a client wishes to cancel a project mid-way, payment for all work completed up to the cancellation date is due in full
+- No refund will be provided for work already completed and delivered
+- Any remaining balance from advance payments will be adjusted against the value of work completed
+
+7. Dispute Resolution
+
+- Clients who wish to raise concerns about service quality should contact us at info@mhtsdigixr.com
+- We are committed to resolving service quality issues promptly through additional revisions or corrections
+- If a dispute cannot be resolved amicably, it shall be subject to arbitration in Chennai, Tamil Nadu, under the Arbitration and Conciliation Act, 1996
+
+8. Jurisdiction
+
+This policy and any disputes arising from it shall be governed by the laws of India and subject to the exclusive jurisdiction of the courts in Chennai, Tamil Nadu, India.
+
+9. Acknowledgment
+
+By engaging our services and making payment, you acknowledge that:
+- You have read and understood this No Refund Policy
+- You agree to be bound by this policy
+- You have reviewed the project proposal or quotation carefully before making payment
+- You understand that digital services cannot be returned once delivered or commenced
+
+10. Contact
+
+For any questions regarding this policy, please contact:
+
+Maanagarram Hi Tech Solutions (MHTSdigiXR)
+Chennai, Tamil Nadu, India
+Email: info@mhtsdigixr.com
+
+We strongly advise all clients to thoroughly review project proposals, quotations, and all terms before making any payment.`
+      }
     ]);
   }
 

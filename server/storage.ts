@@ -1,18 +1,18 @@
 import { db } from "./db";
 import {
-  contactMessages, posts, services, caseStudies, pricingPlans,
+  contactMessages, posts, services, caseStudies, pricingPlans, legalPages,
   employees, auditLogs, accountGroups, ledgerAccounts,
   financialYears, companySettings, vouchers, voucherEntries, auditNotes,
   parties, products, quotations, expenseClaims, roles,
   jobPostings, jobApplications, faqItems, testimonials, siteStats,
   type InsertContactMessage, type InsertPost, type InsertService, type InsertCaseStudy,
-  type InsertPricingPlan,
+  type InsertPricingPlan, type InsertLegalPage,
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
   type InsertFinancialYear, type InsertCompanySettings, type InsertVoucher, type InsertVoucherEntry,
   type InsertAuditNote, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
   type InsertDbRole, type InsertJobPosting, type InsertJobApplication,
   type InsertFaqItem, type InsertTestimonial, type InsertSiteStat,
-  type ContactMessage, type Post, type Service, type CaseStudy, type PricingPlan,
+  type ContactMessage, type Post, type Service, type CaseStudy, type PricingPlan, type LegalPage,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
   type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
   type Party, type Product, type Quotation, type ExpenseClaim, type DbRole,
@@ -73,6 +73,11 @@ export interface IStorage {
 
   getCompanySettings(): Promise<CompanySettings | undefined>;
   upsertCompanySettings(settings: InsertCompanySettings): Promise<CompanySettings>;
+
+  getLegalPages(): Promise<LegalPage[]>;
+  getLegalPageBySlug(slug: string): Promise<LegalPage | undefined>;
+  upsertLegalPage(data: InsertLegalPage): Promise<LegalPage>;
+  updateLegalPage(slug: string, data: Partial<InsertLegalPage>): Promise<LegalPage | undefined>;
 
   getVouchers(filters?: { type?: string; status?: string; startDate?: string; endDate?: string; createdBy?: number }): Promise<Voucher[]>;
   getVoucher(id: number): Promise<Voucher | undefined>;
@@ -441,6 +446,32 @@ export class DatabaseStorage implements IStorage {
     }
     const [newSettings] = await db.insert(companySettings).values(settings).returning();
     return newSettings;
+  }
+
+  async getLegalPages(): Promise<LegalPage[]> {
+    return db.select().from(legalPages);
+  }
+
+  async getLegalPageBySlug(slug: string): Promise<LegalPage | undefined> {
+    const [page] = await db.select().from(legalPages).where(eq(legalPages.slug, slug)).limit(1);
+    return page;
+  }
+
+  async upsertLegalPage(data: InsertLegalPage): Promise<LegalPage> {
+    const existing = await this.getLegalPageBySlug(data.slug);
+    if (existing) {
+      const [updated] = await db.update(legalPages).set({ ...data, updatedAt: new Date() }).where(eq(legalPages.id, existing.id)).returning();
+      return updated;
+    }
+    const [newPage] = await db.insert(legalPages).values(data).returning();
+    return newPage;
+  }
+
+  async updateLegalPage(slug: string, data: Partial<InsertLegalPage>): Promise<LegalPage | undefined> {
+    const existing = await this.getLegalPageBySlug(slug);
+    if (!existing) return undefined;
+    const [updated] = await db.update(legalPages).set({ ...data, updatedAt: new Date() }).where(eq(legalPages.id, existing.id)).returning();
+    return updated;
   }
 
   async getVouchers(filters?: { type?: string; status?: string; startDate?: string; endDate?: string; createdBy?: number }): Promise<Voucher[]> {

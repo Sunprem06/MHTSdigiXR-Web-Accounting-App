@@ -118,7 +118,18 @@ export async function registerRoutes(
       instagramUrl: settings.instagramUrl ?? "",
       facebookUrl: settings.facebookUrl ?? "",
       copyrightText: settings.copyrightText ?? "",
+      aboutStory: settings.aboutStory ?? "",
+      aboutVision: settings.aboutVision ?? "",
+      aboutMission: settings.aboutMission ?? "",
+      foundedYear: settings.foundedYear ?? "",
+      aboutLocation: settings.aboutLocation ?? "",
     });
+  });
+
+  app.get("/api/legal/:slug", async (req, res) => {
+    const page = await storage.getLegalPageBySlug(req.params.slug);
+    if (!page) return res.status(404).json({ message: "Page not found" });
+    res.json(page);
   });
 
   // ===== ACCOUNTING API ROUTES (Protected) =====
@@ -866,6 +877,24 @@ export async function registerRoutes(
   app.put("/api/accounting/company-settings", requireAuth, requirePermission("settings.manage"), async (req, res) => {
     const settings = await storage.upsertCompanySettings(req.body);
     res.json(settings);
+  });
+
+  app.get("/api/accounting/legal-pages", requireAuth, requirePermission("settings.manage"), async (_req, res) => {
+    const pages = await storage.getLegalPages();
+    res.json(pages);
+  });
+
+  app.patch("/api/accounting/legal-pages/:slug", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+    const { title, content, effectiveDate } = req.body;
+    if (title === undefined && content === undefined && effectiveDate === undefined) return res.status(400).json({ message: "No fields to update" });
+    const updates: any = {};
+    if (title !== undefined) updates.title = title;
+    if (content !== undefined) updates.content = content;
+    if (effectiveDate !== undefined) updates.effectiveDate = effectiveDate || null;
+    updates.updatedBy = req.user!.id;
+    const page = await storage.updateLegalPage(req.params.slug, updates);
+    if (!page) return res.status(404).json({ message: "Legal page not found" });
+    res.json(page);
   });
 
   // Audit Logs

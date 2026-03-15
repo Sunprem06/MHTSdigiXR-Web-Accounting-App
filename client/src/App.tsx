@@ -31,6 +31,7 @@ import Blog from "@/pages/Blog";
 import BlogPost from "@/pages/BlogPost";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
+import LegalPage from "@/pages/LegalPage";
 import NotFound from "@/pages/not-found";
 
 import AccountingLogin from "@/pages/accounting/Login";
@@ -96,6 +97,9 @@ function WebsiteRouter() {
             <Route path="/blog/:slug" component={BlogPost} />
             <Route path="/about" component={About} />
             <Route path="/contact" component={Contact} />
+            <Route path="/privacy-policy" component={LegalPage} />
+            <Route path="/terms-of-service" component={LegalPage} />
+            <Route path="/refund-policy" component={LegalPage} />
             <Route component={NotFound} />
           </Switch>
         </main>

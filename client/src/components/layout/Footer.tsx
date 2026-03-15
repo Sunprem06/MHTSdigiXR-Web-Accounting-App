@@ -102,8 +102,9 @@ export function Footer() {
         <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500">
           <p>{s.copyrightText || `@${currentYear} All rights reserved by ${s.companyName}`}</p>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+            <Link href="/privacy-policy" className="hover:text-white transition-colors" data-testid="link-privacy-policy">Privacy Policy</Link>
+            <Link href="/terms-of-service" className="hover:text-white transition-colors" data-testid="link-terms-of-service">Terms of Service</Link>
+            <Link href="/refund-policy" className="hover:text-white transition-colors" data-testid="link-refund-policy">Refund Policy</Link>
           </div>
         </div>
       </div>

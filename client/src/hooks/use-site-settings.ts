@@ -15,6 +15,11 @@ export interface SiteSettings {
   instagramUrl: string;
   facebookUrl: string;
   copyrightText: string;
+  aboutStory: string;
+  aboutVision: string;
+  aboutMission: string;
+  foundedYear: string;
+  aboutLocation: string;
 }
 
 const DEFAULTS: SiteSettings = {
@@ -32,6 +37,11 @@ const DEFAULTS: SiteSettings = {
   instagramUrl: "",
   facebookUrl: "",
   copyrightText: "",
+  aboutStory: "",
+  aboutVision: "",
+  aboutMission: "",
+  foundedYear: "",
+  aboutLocation: "",
 };
 
 export function useSiteSettings(): SiteSettings {
@@ -57,5 +67,10 @@ export function useSiteSettings(): SiteSettings {
     instagramUrl: data.instagramUrl ?? "",
     facebookUrl: data.facebookUrl ?? "",
     copyrightText: data.copyrightText ?? "",
+    aboutStory: data.aboutStory ?? "",
+    aboutVision: data.aboutVision ?? "",
+    aboutMission: data.aboutMission ?? "",
+    foundedYear: data.foundedYear ?? "",
+    aboutLocation: data.aboutLocation ?? "",
   };
 }

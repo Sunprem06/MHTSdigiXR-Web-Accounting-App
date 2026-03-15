@@ -180,6 +180,21 @@ export const companySettings = pgTable("company_settings", {
   instagramUrl: text("instagram_url"),
   facebookUrl: text("facebook_url"),
   copyrightText: text("copyright_text"),
+  aboutStory: text("about_story"),
+  aboutVision: text("about_vision"),
+  aboutMission: text("about_mission"),
+  foundedYear: text("founded_year"),
+  aboutLocation: text("about_location"),
+});
+
+export const legalPages = pgTable("legal_pages", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  effectiveDate: text("effective_date"),
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const parties = pgTable("parties", {
@@ -352,6 +367,7 @@ export const insertAccountGroupSchema = createInsertSchema(accountGroups).omit({
 export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit({ id: true, createdAt: true });
 export const insertFinancialYearSchema = createInsertSchema(financialYears).omit({ id: true });
 export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({ id: true });
+export const insertLegalPageSchema = createInsertSchema(legalPages).omit({ id: true, updatedAt: true });
 export const insertVoucherSchema = createInsertSchema(vouchers).omit({ id: true, createdAt: true });
 export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit({ id: true });
 export const insertAuditNoteSchema = createInsertSchema(auditNotes).omit({ id: true, createdAt: true });
@@ -390,6 +406,8 @@ export type FinancialYear = typeof financialYears.$inferSelect;
 export type InsertFinancialYear = z.infer<typeof insertFinancialYearSchema>;
 export type CompanySettings = typeof companySettings.$inferSelect;
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type LegalPage = typeof legalPages.$inferSelect;
+export type InsertLegalPage = z.infer<typeof insertLegalPageSchema>;
 export type Voucher = typeof vouchers.$inferSelect;
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
 export type VoucherEntry = typeof voucherEntries.$inferSelect;

@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Save, Plus, Globe } from "lucide-react";
+import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil } from "lucide-react";
 
 interface CompanySettings {
   id?: number;
@@ -30,6 +31,20 @@ interface CompanySettings {
   instagramUrl: string | null;
   facebookUrl: string | null;
   copyrightText: string | null;
+  aboutStory: string | null;
+  aboutVision: string | null;
+  aboutMission: string | null;
+  foundedYear: string | null;
+  aboutLocation: string | null;
+}
+
+interface LegalPageData {
+  id: number;
+  slug: string;
+  title: string;
+  content: string;
+  effectiveDate: string | null;
+  updatedAt: string | null;
 }
 
 interface FinancialYear {
@@ -62,6 +77,18 @@ export default function Settings() {
   const [facebookUrl, setFacebookUrl] = useState("");
   const [copyrightText, setCopyrightText] = useState("");
 
+  const [aboutStory, setAboutStory] = useState("");
+  const [aboutVision, setAboutVision] = useState("");
+  const [aboutMission, setAboutMission] = useState("");
+  const [foundedYear, setFoundedYear] = useState("");
+  const [aboutLocation, setAboutLocation] = useState("");
+
+  const [legalDialogOpen, setLegalDialogOpen] = useState(false);
+  const [editingLegal, setEditingLegal] = useState<LegalPageData | null>(null);
+  const [legalTitle, setLegalTitle] = useState("");
+  const [legalContent, setLegalContent] = useState("");
+  const [legalEffectiveDate, setLegalEffectiveDate] = useState("");
+
   const [fyOpen, setFyOpen] = useState(false);
   const [fyName, setFyName] = useState("");
   const [fyStart, setFyStart] = useState("");
@@ -73,6 +100,11 @@ export default function Settings() {
 
   const { data: financialYears, isLoading: fyLoading } = useQuery<FinancialYear[]>({
     queryKey: ["/api/accounting/financial-years"],
+  });
+
+  const { data: legalPagesData, isLoading: legalLoading } = useQuery<LegalPageData[]>({
+    queryKey: ["/api/accounting/legal-pages"],
+    enabled: isSuperAdmin,
   });
 
   useEffect(() => {
@@ -92,6 +124,11 @@ export default function Settings() {
       setInstagramUrl(settings.instagramUrl || "");
       setFacebookUrl(settings.facebookUrl || "");
       setCopyrightText(settings.copyrightText || "");
+      setAboutStory(settings.aboutStory || "");
+      setAboutVision(settings.aboutVision || "");
+      setAboutMission(settings.aboutMission || "");
+      setFoundedYear(settings.foundedYear || "");
+      setAboutLocation(settings.aboutLocation || "");
     }
   }, [settings]);
 
@@ -128,6 +165,22 @@ export default function Settings() {
     },
   });
 
+  const saveLegalMutation = useMutation({
+    mutationFn: async ({ slug, data }: { slug: string; data: { title: string; content: string; effectiveDate: string } }) => {
+      const res = await apiRequest("PATCH", `/api/accounting/legal-pages/${slug}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/legal-pages"] });
+      setLegalDialogOpen(false);
+      setEditingLegal(null);
+      toast({ title: "Legal page updated successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleSave = () => {
     saveMutation.mutate({ companyName, address, gstin, phone, email });
   };
@@ -149,6 +202,33 @@ export default function Settings() {
       instagramUrl,
       facebookUrl,
       copyrightText,
+    });
+  };
+
+  const handleSaveAbout = () => {
+    saveMutation.mutate({
+      companyName: companyName || "Maanagarram Hi Tech Solutions",
+      aboutStory,
+      aboutVision,
+      aboutMission,
+      foundedYear,
+      aboutLocation,
+    });
+  };
+
+  const openLegalEditor = (page: LegalPageData) => {
+    setEditingLegal(page);
+    setLegalTitle(page.title);
+    setLegalContent(page.content);
+    setLegalEffectiveDate(page.effectiveDate || "");
+    setLegalDialogOpen(true);
+  };
+
+  const handleSaveLegal = () => {
+    if (!editingLegal) return;
+    saveLegalMutation.mutate({
+      slug: editingLegal.slug,
+      data: { title: legalTitle, content: legalContent, effectiveDate: legalEffectiveDate },
     });
   };
 
@@ -289,6 +369,108 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {isSuperAdmin && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-sky-500" />
+                <CardTitle>About Page Content</CardTitle>
+              </div>
+              <CardDescription>
+                Manage the text displayed on the public About page. Changes appear immediately.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {settingsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
+                </div>
+              ) : (
+                <div className="space-y-4 max-w-2xl">
+                  <div>
+                    <Label>Company Story</Label>
+                    <Textarea value={aboutStory} onChange={(e) => setAboutStory(e.target.value)} rows={4} placeholder="Our founding story and what we do..." data-testid="input-about-story" />
+                  </div>
+                  <div>
+                    <Label>Location Description</Label>
+                    <Textarea value={aboutLocation} onChange={(e) => setAboutLocation(e.target.value)} rows={3} placeholder="Where we are based and who we serve..." data-testid="input-about-location" />
+                  </div>
+                  <div>
+                    <Label>Vision</Label>
+                    <Textarea value={aboutVision} onChange={(e) => setAboutVision(e.target.value)} rows={3} placeholder="Our vision statement..." data-testid="input-about-vision" />
+                  </div>
+                  <div>
+                    <Label>Mission</Label>
+                    <Textarea value={aboutMission} onChange={(e) => setAboutMission(e.target.value)} rows={3} placeholder="Our mission statement..." data-testid="input-about-mission" />
+                  </div>
+                  <div className="max-w-xs">
+                    <Label>Founded Year</Label>
+                    <Input value={foundedYear} onChange={(e) => setFoundedYear(e.target.value)} placeholder="e.g., 2022" data-testid="input-founded-year" />
+                  </div>
+                  <Button onClick={handleSaveAbout} disabled={saveMutation.isPending} data-testid="button-save-about">
+                    {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Save About Content
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isSuperAdmin && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-sky-500" />
+                <CardTitle>Legal Pages</CardTitle>
+              </div>
+              <CardDescription>
+                Edit the Privacy Policy, Terms of Service, and Refund Policy displayed on the public website.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {legalLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
+                </div>
+              ) : !legalPagesData || legalPagesData.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400" data-testid="text-no-legal-pages">
+                  No legal pages found. They will be created automatically on next server restart.
+                </div>
+              ) : (
+                <Table data-testid="table-legal-pages">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Page</TableHead>
+                      <TableHead>Effective Date</TableHead>
+                      <TableHead>Last Updated</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {legalPagesData.map((page) => (
+                      <TableRow key={page.id} data-testid={`row-legal-${page.slug}`}>
+                        <TableCell className="font-medium">{page.title}</TableCell>
+                        <TableCell>{page.effectiveDate || "—"}</TableCell>
+                        <TableCell>
+                          {page.updatedAt
+                            ? new Date(page.updatedAt).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => openLegalEditor(page)} data-testid={`button-edit-legal-${page.slug}`}>
+                            <Pencil className="w-4 h-4 mr-1" /> Edit
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle>Financial Years</CardTitle>
@@ -336,6 +518,51 @@ export default function Settings() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={legalDialogOpen} onOpenChange={setLegalDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-legal">
+            <DialogHeader>
+              <DialogTitle>Edit {editingLegal?.title || "Legal Page"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Page Title</Label>
+                  <Input value={legalTitle} onChange={(e) => setLegalTitle(e.target.value)} data-testid="input-legal-title" />
+                </div>
+                <div>
+                  <Label>Effective Date</Label>
+                  <Input type="date" value={legalEffectiveDate} onChange={(e) => setLegalEffectiveDate(e.target.value)} data-testid="input-legal-effective-date" />
+                </div>
+              </div>
+              <div>
+                <Label>Content</Label>
+                <Textarea
+                  value={legalContent}
+                  onChange={(e) => setLegalContent(e.target.value)}
+                  rows={20}
+                  className="font-mono text-sm"
+                  placeholder="Full policy content..."
+                  data-testid="input-legal-content"
+                />
+                <p className="text-xs text-slate-500 mt-1">Use plain text with blank lines between paragraphs. Numbered headings (e.g. "1. Section") will be formatted automatically.</p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLegalDialogOpen(false)} data-testid="button-cancel-legal">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveLegal}
+                disabled={saveLegalMutation.isPending || !legalTitle || !legalContent}
+                data-testid="button-save-legal"
+              >
+                {saveLegalMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={fyOpen} onOpenChange={setFyOpen}>
           <DialogContent data-testid="dialog-add-financial-year">

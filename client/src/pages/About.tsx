@@ -11,8 +11,17 @@ const TEAM_VALUES = [
   { icon: Award, title: "Quality Obsessed", desc: "We never compromise on quality. Every pixel and line of code matters." },
 ];
 
+const DEFAULT_STORY = `{brand} was founded in December 2022 with a vision to empower businesses through digital transformation. We genuinely feel like an extended marketing and technology arm for every brand we associate with.`;
+const DEFAULT_LOCATION = "Based in Chennai, India, we serve clients globally, providing bespoke solutions that drive growth and efficiency. Our approach combines technical expertise with creative innovation to solve complex business challenges.";
+const DEFAULT_VISION = "To be a global leader in digital innovation, creating solutions that not only solve today's problems but anticipate tomorrow's opportunities. We envision a world where every business has access to world-class digital solutions.";
+const DEFAULT_MISSION = "To empower businesses of all sizes with affordable, high-quality digital solutions that drive measurable growth and success. We aim to be the trusted partner for brands seeking digital transformation.";
+
 export default function About() {
   const s = useSiteSettings();
+  const story = s.aboutStory || DEFAULT_STORY.replace("{brand}", `${s.companyName} (${s.brandName})`);
+  const location = s.aboutLocation || DEFAULT_LOCATION;
+  const vision = s.aboutVision || DEFAULT_VISION;
+  const mission = s.aboutMission || DEFAULT_MISSION;
   return (
     <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
       <div className="container mx-auto px-4 md:px-6">
@@ -30,10 +39,10 @@ export default function About() {
               Your Extended <span className="text-gradient">Digital Team</span>
             </h1>
             <p className="text-lg text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
-              {s.companyName} ({s.brandName}) was founded in December 2022 with a vision to empower businesses through digital transformation. We genuinely feel like an extended marketing and technology arm for every brand we associate with.
+              {story}
             </p>
             <p className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
-              Based in Chennai, India, we serve clients globally, providing bespoke solutions that drive growth and efficiency. Our approach combines technical expertise with creative innovation to solve complex business challenges.
+              {location}
             </p>
             
             <div className="grid grid-cols-2 gap-4">
@@ -59,8 +68,8 @@ export default function About() {
               className="rounded-3xl shadow-2xl"
             />
             <div className="absolute -bottom-6 -right-6 bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 max-w-xs">
-              <p className="text-4xl font-bold text-sky-600 dark:text-sky-400 mb-1">150+</p>
-              <p className="text-slate-600 dark:text-slate-300 font-medium">Projects Successfully Delivered</p>
+              <p className="text-4xl font-bold text-sky-600 dark:text-sky-400 mb-1">{ s.foundedYear ? `Since ${s.foundedYear}` : "150+"}</p>
+              <p className="text-slate-600 dark:text-slate-300 font-medium">{ s.foundedYear ? "Serving Clients" : "Projects Successfully Delivered"}</p>
             </div>
           </motion.div>
         </div>
@@ -110,7 +119,7 @@ export default function About() {
           >
             <h2 className="text-2xl font-bold mb-4">Our Vision</h2>
             <p className="text-slate-300 leading-relaxed">
-              To be a global leader in digital innovation, creating solutions that not only solve today's problems but anticipate tomorrow's opportunities. We envision a world where every business has access to world-class digital solutions.
+              {vision}
             </p>
           </motion.div>
           <motion.div 
@@ -122,7 +131,7 @@ export default function About() {
           >
             <h2 className="text-2xl font-bold mb-4">Our Mission</h2>
             <p className="text-white/90 leading-relaxed">
-              To empower businesses of all sizes with affordable, high-quality digital solutions that drive measurable growth and success. We aim to be the trusted partner for brands seeking digital transformation.
+              {mission}
             </p>
           </motion.div>
         </div>
