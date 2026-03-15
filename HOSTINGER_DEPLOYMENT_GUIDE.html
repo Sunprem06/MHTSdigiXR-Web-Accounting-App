@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MHTSdigiX Deployment Guide for Hostinger</title>
+    <title>MHTSdigiXR Deployment Guide for Hostinger</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -81,8 +81,8 @@
 <body>
 
 <div class="logo">
-    <h1>MHTSdigiX Deployment Guide</h1>
-    <p>Complete Instructions for Hostinger with maanagaram.com</p>
+    <h1>MHTSdigiXR Deployment Guide</h1>
+    <p>Complete Instructions for Hostinger with mhtsdigixr.com</p>
     <p><strong>Document Version:</strong> 1.0 | <strong>Last Updated:</strong> February 2026</p>
 </div>
 
@@ -90,7 +90,7 @@
 
 <div class="important">
     <strong>IMPORTANT: Hosting Type Required</strong><br><br>
-    Your MHTSdigiX website is a <strong>full-stack Node.js application</strong> with:
+    Your MHTSdigiXR website is a <strong>full-stack Node.js application</strong> with:
     <ul>
         <li>React frontend</li>
         <li>Express.js backend</li>
@@ -115,12 +115,12 @@
     </ol>
 </div>
 
-<h2>Step 2: Connect Your Domain (maanagaram.com)</h2>
+<h2>Step 2: Connect Your Domain (mhtsdigixr.com)</h2>
 <div class="step-box">
     <h3>If domain is registered on Hostinger:</h3>
     <ol>
         <li>Log in to Hostinger hPanel</li>
-        <li>Go to <strong>Domains</strong> → <strong>maanagaram.com</strong></li>
+        <li>Go to <strong>Domains</strong> → <strong>mhtsdigixr.com</strong></li>
         <li>Click <strong>DNS / Nameservers</strong></li>
         <li>Add A Record:
             <ul>
@@ -278,12 +278,12 @@ pm2 logs mhtsdigix</code></pre>
 <h2>Step 11: Configure Nginx Reverse Proxy</h2>
 <div class="step-box">
     <h3>11.1 Create Nginx Configuration</h3>
-    <pre><code>nano /etc/nginx/sites-available/maanagaram.com</code></pre>
+    <pre><code>nano /etc/nginx/sites-available/mhtsdigixr.com</code></pre>
     
     <h3>11.2 Add This Configuration</h3>
     <pre><code>server {
     listen 80;
-    server_name maanagaram.com www.maanagaram.com;
+    server_name mhtsdigixr.com www.mhtsdigixr.com;
 
     location / {
         proxy_pass http://localhost:5000;
@@ -299,7 +299,7 @@ pm2 logs mhtsdigix</code></pre>
 }</code></pre>
     
     <h3>11.3 Enable the Site</h3>
-    <pre><code>ln -s /etc/nginx/sites-available/maanagaram.com /etc/nginx/sites-enabled/
+    <pre><code>ln -s /etc/nginx/sites-available/mhtsdigixr.com /etc/nginx/sites-enabled/
 nginx -t
 systemctl restart nginx</code></pre>
 </div>
@@ -310,7 +310,7 @@ systemctl restart nginx</code></pre>
     <pre><code>apt install certbot python3-certbot-nginx -y</code></pre>
     
     <h3>12.2 Get SSL Certificate</h3>
-    <pre><code>certbot --nginx -d maanagaram.com -d www.maanagaram.com</code></pre>
+    <pre><code>certbot --nginx -d mhtsdigixr.com -d www.mhtsdigixr.com</code></pre>
     
     <p>Follow prompts: Enter email, agree to terms, choose redirect option (Yes).</p>
     
@@ -330,8 +330,8 @@ ufw status</code></pre>
 <div class="step-box">
     <p>Open browser and visit:</p>
     <ul>
-        <li><strong>https://maanagaram.com</strong></li>
-        <li><strong>https://www.maanagaram.com</strong></li>
+        <li><strong>https://mhtsdigixr.com</strong></li>
+        <li><strong>https://www.mhtsdigixr.com</strong></li>
     </ul>
     
     <p><strong>Test Checklist:</strong></p>
@@ -397,7 +397,7 @@ ufw status</code></pre>
         <td>~$8-12</td>
     </tr>
     <tr>
-        <td>Domain (maanagaram.com)</td>
+        <td>Domain (mhtsdigixr.com)</td>
         <td>~$10/year</td>
     </tr>
     <tr>
@@ -422,8 +422,8 @@ ufw status</code></pre>
 <hr>
 
 <p style="text-align: center; color: #64748b;">
-    <strong>MHTSdigiX</strong> - Maanagarram Hi Tech Solutions<br>
-    Document prepared for maanagaram.com deployment
+    <strong>MHTSdigiXR</strong> - Maanagarram Hi Tech Solutions<br>
+    Document prepared for mhtsdigixr.com deployment
 </p>
 
 </body>

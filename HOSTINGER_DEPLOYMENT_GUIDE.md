@@ -1,12 +1,12 @@
-# MHTSdigiX Deployment Guide for Hostinger
+# MHTSdigiXR Deployment Guide for Hostinger
 
-## Complete Step-by-Step Instructions for maanagaram.com
+## Complete Step-by-Step Instructions for mhtsdigixr.com
 
 ---
 
 ## IMPORTANT: Hosting Type Required
 
-Your MHTSdigiX website is a **full-stack Node.js application** with:
+Your MHTSdigiXR website is a **full-stack Node.js application** with:
 - React frontend
 - Express.js backend
 - PostgreSQL database
@@ -31,11 +31,11 @@ Your MHTSdigiX website is a **full-stack Node.js application** with:
 
 ---
 
-## Step 2: Connect Your Domain (maanagaram.com)
+## Step 2: Connect Your Domain (mhtsdigixr.com)
 
 ### If domain is registered on Hostinger:
 1. Log in to Hostinger hPanel
-2. Go to **Domains** → **maanagaram.com**
+2. Go to **Domains** → **mhtsdigixr.com**
 3. Click **DNS / Nameservers**
 4. Add A Record:
    - Type: `A`
@@ -263,14 +263,14 @@ pm2 logs mhtsdigix
 
 ### 12.1 Create Nginx Configuration
 ```bash
-nano /etc/nginx/sites-available/maanagaram.com
+nano /etc/nginx/sites-available/mhtsdigixr.com
 ```
 
 ### 12.2 Add This Configuration
 ```nginx
 server {
     listen 80;
-    server_name maanagaram.com www.maanagaram.com;
+    server_name mhtsdigixr.com www.mhtsdigixr.com;
 
     location / {
         proxy_pass http://localhost:5000;
@@ -288,7 +288,7 @@ server {
 
 ### 12.3 Enable the Site
 ```bash
-ln -s /etc/nginx/sites-available/maanagaram.com /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/mhtsdigixr.com /etc/nginx/sites-enabled/
 nginx -t
 systemctl restart nginx
 ```
@@ -304,7 +304,7 @@ apt install certbot python3-certbot-nginx -y
 
 ### 13.2 Get SSL Certificate
 ```bash
-certbot --nginx -d maanagaram.com -d www.maanagaram.com
+certbot --nginx -d mhtsdigixr.com -d www.mhtsdigixr.com
 ```
 
 ### 13.3 Follow Prompts
@@ -334,8 +334,8 @@ ufw status
 
 ### 15.1 Check Website
 Open browser and visit:
-- https://maanagaram.com
-- https://www.maanagaram.com
+- https://mhtsdigixr.com
+- https://www.mhtsdigixr.com
 
 ### 15.2 Test All Features
 - [ ] Homepage loads correctly
@@ -425,7 +425,7 @@ pg_dump -U mhtsuser -d mhtsdigix > backup_$(date +%Y%m%d).sql
 | Item | Monthly Cost |
 |------|-------------|
 | Hostinger VPS (KVM 2) | ~$8-12 |
-| Domain (maanagaram.com) | ~$10/year |
+| Domain (mhtsdigixr.com) | ~$10/year |
 | OpenAI API | Pay per use (~$5-20) |
 | SSL Certificate | FREE (Let's Encrypt) |
 
@@ -437,7 +437,7 @@ If VPS setup seems complex, you can also deploy directly from Replit:
 
 1. Click **Deploy** button in Replit
 2. Choose **Reserved VM** deployment
-3. Configure custom domain (maanagaram.com)
+3. Configure custom domain (mhtsdigixr.com)
 4. Add domain DNS records as instructed
 5. Everything (database, AI) works automatically
 
