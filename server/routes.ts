@@ -1177,12 +1177,22 @@ export async function registerRoutes(
   app.post("/api/accounting/pricing-plans", requireAuth, requirePermission("content.create"), async (req, res) => {
     const { name, price, period, description, features, isPopular, ctaLabel, displayOrder, isActive } = req.body;
     if (!name || !price || !description) return res.status(400).json({ message: "Name, price, and description are required" });
-    const plan = await storage.createPricingPlan({ name, price, period: period || "one-time", description, features: features || [], isPopular: isPopular || false, ctaLabel: ctaLabel || "Get Started", displayOrder: displayOrder || 0, isActive: isActive !== false });
+    const validPeriod = period || "one-time";
+    if (!["one-time", "monthly", "yearly", "quote"].includes(validPeriod)) return res.status(400).json({ message: "Invalid period value" });
+    const plan = await storage.createPricingPlan({ name, price, period: validPeriod, description, features: features || [], isPopular: isPopular || false, ctaLabel: ctaLabel || "Get Started", displayOrder: displayOrder || 0, isActive: isActive !== false });
     res.status(201).json(plan);
   });
 
   app.patch("/api/accounting/pricing-plans/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
-    const updated = await storage.updatePricingPlan(parseInt(req.params.id), req.body);
+    const allowedFields = ["name", "price", "period", "description", "features", "isPopular", "ctaLabel", "displayOrder", "isActive"];
+    const filtered: Record<string, any> = {};
+    for (const key of allowedFields) {
+      if (key in req.body) filtered[key] = req.body[key];
+    }
+    if (filtered.period && !["one-time", "monthly", "yearly", "quote"].includes(filtered.period)) {
+      return res.status(400).json({ message: "Invalid period value" });
+    }
+    const updated = await storage.updatePricingPlan(parseInt(req.params.id), filtered);
     if (!updated) return res.status(404).json({ message: "Plan not found" });
     res.json(updated);
   });
