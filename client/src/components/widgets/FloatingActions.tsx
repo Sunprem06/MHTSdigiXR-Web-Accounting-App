@@ -2,12 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { MessageSquare, MessageCircle, X, Send, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
+import { useSiteSettings } from "@/hooks/use-site-settings";
 
-// WhatsApp Number
-const WHATSAPP_NUMBER = "917358105995";
-
-// System prompt for Kayal - the AI assistant
-const SYSTEM_CONTEXT = `You are Kayal, the friendly and knowledgeable AI assistant for MHTSdigiXR (Maanagarram Hi Tech Solutions), a premier digital agency in Chennai, India.
+function buildSystemContext(s: { email: string; phone: string; whatsappNumber: string; websiteUrl: string; address: string }) {
+  return `You are Kayal, the friendly and knowledgeable AI assistant for MHTSdigiXR (Maanagarram Hi Tech Solutions), a premier digital agency in Chennai, India.
 
 You are an expert in:
 - SERVICE SUPPORT: Helping customers understand our services, features, and capabilities
@@ -31,11 +29,11 @@ Pricing Packages:
 - Enterprise Package: Custom pricing (Full digital transformation)
 
 Contact Information:
-- WhatsApp: +91 7358105995
-- Email: info@mhtsdigixr.com
-- Phone: +91 4447740195
-- Address: 4056, 5th Main Road, Ayyapakam, Chennai, Tamil Nadu - 600077
-- Website: www.mhtsdigixr.com
+- WhatsApp: +${s.whatsappNumber ? s.whatsappNumber.replace(/^(\d{2})/, '$1 ') : '91 7358105995'}
+- Email: ${s.email}
+- Phone: ${s.phone}
+- Address: ${s.address}
+- Website: ${s.websiteUrl}
 
 Your personality:
 - Warm, friendly, and professional
@@ -47,8 +45,10 @@ Your personality:
 - Encourage customers to book a free consultation or contact us on WhatsApp for personalized quotes
 
 Always guide customers towards the right service for their needs and encourage them to get in touch for a free consultation.`;
+}
 
 export function FloatingActions() {
+  const s = useSiteSettings();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([
     { role: 'assistant', content: 'Hi there! I\'m Kayal, your digital solutions expert at MHTSdigiXR. How can I help you today? Whether you need help with web development, mobile apps, digital marketing, or any technical questions - I\'m here to assist!' }
@@ -58,14 +58,12 @@ export function FloatingActions() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [conversationId, setConversationId] = useState<number | null>(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingResponse]);
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
-      // Create conversation if needed
       let convId = conversationId;
       if (!convId) {
         const convRes = await fetch('/api/conversations', {
@@ -77,15 +75,13 @@ export function FloatingActions() {
         convId = conv.id;
         setConversationId(convId);
         
-        // Send system context as first message
         await fetch(`/api/conversations/${convId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: SYSTEM_CONTEXT, role: 'system' })
+          body: JSON.stringify({ content: buildSystemContext(s), role: 'system' })
         });
       }
 
-      // Send message and stream response
       const response = await fetch(`/api/conversations/${convId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,7 +114,6 @@ export function FloatingActions() {
                 return { content: fullResponse };
               }
             } catch (e) {
-              // Skip invalid JSON
             }
           }
         }
@@ -142,7 +137,6 @@ export function FloatingActions() {
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-4 items-end">
-      {/* AI Chat Widget */}
       <AnimatePresence>
         {isChatOpen && (
           <motion.div
@@ -209,15 +203,16 @@ export function FloatingActions() {
               </button>
             </div>
             
-            <div className="bg-slate-50 dark:bg-slate-800 p-2 text-center text-xs text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700">
-              Need human help? <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" className="text-sky-600 dark:text-sky-400 font-medium hover:underline">Chat on WhatsApp</a>
-            </div>
+            {s.whatsappNumber && (
+              <div className="bg-slate-50 dark:bg-slate-800 p-2 text-center text-xs text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700">
+                Need human help? <a href={`https://wa.me/${s.whatsappNumber}`} target="_blank" className="text-sky-600 dark:text-sky-400 font-medium hover:underline">Chat on WhatsApp</a>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className="flex gap-4 items-center">
-        {/* Chat Toggle Button */}
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -228,18 +223,19 @@ export function FloatingActions() {
           {isChatOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
         </motion.button>
 
-        {/* WhatsApp Button */}
-        <motion.a
-          href={`https://wa.me/${WHATSAPP_NUMBER}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          data-testid="link-whatsapp-float"
-          className="w-14 h-14 rounded-full bg-[#25D366] shadow-lg flex items-center justify-center text-white hover:shadow-green-500/30 hover:shadow-xl transition-all"
-        >
-          <MessageCircle className="w-7 h-7 fill-current" />
-        </motion.a>
+        {s.whatsappNumber && (
+          <motion.a
+            href={`https://wa.me/${s.whatsappNumber}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            data-testid="link-whatsapp-float"
+            className="w-14 h-14 rounded-full bg-[#25D366] shadow-lg flex items-center justify-center text-white hover:shadow-green-500/30 hover:shadow-xl transition-all"
+          >
+            <MessageCircle className="w-7 h-7 fill-current" />
+          </motion.a>
+        )}
       </div>
     </div>
   );

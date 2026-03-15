@@ -444,7 +444,7 @@ export default function Home() {
                 subtitle: "Hire us to do it for you",
                 desc: "We take care of everything end-to-end using data-driven and performance-based approach.",
                 image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=500&q=80",
-                color: "from-emerald-500 to-emerald-600"
+                color: "from-sky-500 to-sky-600"
               },
               {
                 title: "Consulting",

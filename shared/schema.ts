@@ -120,6 +120,16 @@ export const companySettings = pgTable("company_settings", {
   bankAccount: text("bank_account"),
   bankIfsc: text("bank_ifsc"),
   bankBranch: text("bank_branch"),
+  brandName: text("brand_name"),
+  tagline: text("tagline"),
+  whatsappNumber: text("whatsapp_number"),
+  careersEmail: text("careers_email"),
+  websiteUrl: text("website_url"),
+  linkedinUrl: text("linkedin_url"),
+  twitterUrl: text("twitter_url"),
+  instagramUrl: text("instagram_url"),
+  facebookUrl: text("facebook_url"),
+  copyrightText: text("copyright_text"),
 });
 
 export const parties = pgTable("parties", {

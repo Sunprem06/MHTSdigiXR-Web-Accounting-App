@@ -262,7 +262,7 @@ const FAQ_CATEGORIES: FAQCategory[] = [
   {
     title: "Pricing & Payment",
     icon: HelpCircle,
-    color: "from-emerald-500 to-emerald-600",
+    color: "from-sky-500 to-sky-600",
     faqs: [
       {
         question: "What are your payment terms?",

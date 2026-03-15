@@ -2,6 +2,7 @@ import { useParams } from "wouter";
 import { Link } from "wouter";
 import { ArrowLeft, CheckCircle, Code, Smartphone, BarChart3, Monitor, Search, Palette, Server, Video, Zap, Target, TrendingUp, Users, Shield, Clock, Award, Layers } from "lucide-react";
 import { motion } from "framer-motion";
+import { useSiteSettings } from "@/hooks/use-site-settings";
 
 const SERVICES_DATA: Record<string, {
   title: string;
@@ -249,6 +250,7 @@ const SERVICES_DATA: Record<string, {
 
 export default function ServiceDetail() {
   const { slug } = useParams();
+  const s = useSiteSettings();
   const service = SERVICES_DATA[slug || ""];
 
   if (!service) {
@@ -290,9 +292,11 @@ export default function ServiceDetail() {
               <Link href="/contact" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-bold hover:bg-sky-600 transition-all shadow-lg hover:shadow-sky-500/25" data-testid="button-start-project">
                 Start Your Project
               </Link>
-              <a href="https://wa.me/917358105995" target="_blank" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-transparent text-sky-600 dark:text-sky-400 border-2 border-sky-500 font-bold hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-all" data-testid="link-whatsapp">
-                WhatsApp Us
-              </a>
+              {s.whatsappNumber && (
+                <a href={`https://wa.me/${s.whatsappNumber}`} target="_blank" className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-transparent text-sky-600 dark:text-sky-400 border-2 border-sky-500 font-bold hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-all" data-testid="link-whatsapp">
+                  WhatsApp Us
+                </a>
+              )}
             </div>
           </motion.div>
 

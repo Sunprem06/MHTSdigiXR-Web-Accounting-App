@@ -61,6 +61,30 @@ export async function registerRoutes(
     }
   });
 
+  // ===== PUBLIC SITE SETTINGS ENDPOINT =====
+  app.get("/api/site-settings", async (_req, res) => {
+    const settings = await storage.getCompanySettings();
+    if (!settings) {
+      return res.json({});
+    }
+    res.json({
+      brandName: settings.brandName || "MHTSdigiXR",
+      companyName: settings.companyName || "Maanagarram Hi Tech Solutions",
+      tagline: settings.tagline || "",
+      phone: settings.phone || "",
+      email: settings.email || "",
+      address: settings.address || "",
+      whatsappNumber: settings.whatsappNumber || "",
+      careersEmail: settings.careersEmail || "",
+      websiteUrl: settings.websiteUrl || "",
+      linkedinUrl: settings.linkedinUrl || "",
+      twitterUrl: settings.twitterUrl || "",
+      instagramUrl: settings.instagramUrl || "",
+      facebookUrl: settings.facebookUrl || "",
+      copyrightText: settings.copyrightText || "",
+    });
+  });
+
   // ===== ACCOUNTING API ROUTES (Protected) =====
 
   // Dashboard

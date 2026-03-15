@@ -6,6 +6,7 @@ import {
   GraduationCap, Coffee, Laptop, ArrowRight, ChevronDown, 
   CheckCircle, Send, Globe, Rocket, Target
 } from "lucide-react";
+import { useSiteSettings } from "@/hooks/use-site-settings";
 
 interface JobPosition {
   id: string;
@@ -164,7 +165,7 @@ const VALUES = [
   { icon: Globe, title: "Inclusivity", desc: "We celebrate diversity and welcome all perspectives" }
 ];
 
-function JobCard({ job, isExpanded, onToggle }: { job: JobPosition; isExpanded: boolean; onToggle: () => void }) {
+function JobCard({ job, isExpanded, onToggle, careersEmail }: { job: JobPosition; isExpanded: boolean; onToggle: () => void; careersEmail: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -233,7 +234,7 @@ function JobCard({ job, isExpanded, onToggle }: { job: JobPosition; isExpanded: 
           </div>
 
           <a
-            href="mailto:careers@mhtsdigixr.com?subject=Application for {job.title}"
+            href={`mailto:${careersEmail}?subject=Application for ${job.title}`}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all"
             data-testid={`button-apply-${job.id}`}
           >
@@ -246,6 +247,7 @@ function JobCard({ job, isExpanded, onToggle }: { job: JobPosition; isExpanded: 
 }
 
 export default function Careers() {
+  const s = useSiteSettings();
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [filterDepartment, setFilterDepartment] = useState<string>("All");
 
@@ -387,6 +389,7 @@ export default function Careers() {
                 job={job}
                 isExpanded={expandedJob === job.id}
                 onToggle={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
+                careersEmail={s.careersEmail}
               />
             ))}
           </div>
@@ -414,7 +417,7 @@ export default function Careers() {
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <a 
-                href="mailto:careers@mhtsdigixr.com?subject=General Application"
+                href={`mailto:${s.careersEmail}?subject=General Application`}
                 className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg"
                 data-testid="button-send-resume"
               >

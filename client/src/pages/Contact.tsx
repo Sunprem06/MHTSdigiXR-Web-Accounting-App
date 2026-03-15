@@ -2,11 +2,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertContactMessageSchema, type InsertContactMessage } from "@shared/routes";
 import { useContact } from "@/hooks/use-contact";
+import { useSiteSettings } from "@/hooks/use-site-settings";
 import { MapPin, Phone, Mail, Send } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Contact() {
   const { mutate, isPending } = useContact();
+  const s = useSiteSettings();
   
   const form = useForm<InsertContactMessage>({
     resolver: zodResolver(insertContactMessageSchema),
@@ -49,7 +51,6 @@ export default function Contact() {
 
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid lg:grid-cols-2 gap-16">
-          {/* Contact Info */}
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -63,41 +64,46 @@ export default function Contact() {
             </div>
 
             <div className="grid gap-6">
-              <div className="flex gap-4 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-                <div className="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
-                  <MapPin className="w-6 h-6" />
+              {s.address && (
+                <div className="flex gap-4 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
+                  <div className="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-1">Our Location</h3>
+                    <p className="text-slate-600 dark:text-slate-300">{s.address}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">Our Location</h3>
-                  <p className="text-slate-600 dark:text-slate-300">4056, 5th Main Road, Ayyapakam,<br />Chennai, Tamil Nadu, India - 600077</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-                <div className="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
-                  <Phone className="w-6 h-6" />
+              {s.phone && (
+                <div className="flex gap-4 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
+                  <div className="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                    <Phone className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-1">Phone Number</h3>
+                    <p className="text-slate-600 dark:text-slate-300">{s.phone}</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Mon-Fri from 9am to 6pm</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">Phone Number</h3>
-                  <p className="text-slate-600 dark:text-slate-300">+91 44 4774 0195</p>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Mon-Fri from 9am to 6pm</p>
-                </div>
-              </div>
+              )}
 
-              <div className="flex gap-4 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-                <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
-                  <Mail className="w-6 h-6" />
+              {s.email && (
+                <div className="flex gap-4 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
+                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-1">Email Address</h3>
+                    <p className="text-slate-600 dark:text-slate-300">{s.email}</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">We reply within 24 hours</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">Email Address</h3>
-                  <p className="text-slate-600 dark:text-slate-300">info@mhtsdigixr.com</p>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">We reply within 24 hours</p>
-                </div>
-              </div>
+              )}
             </div>
           </motion.div>
 
-          {/* Contact Form */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}

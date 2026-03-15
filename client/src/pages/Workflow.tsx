@@ -15,7 +15,7 @@ const STEPS = [
     title: "2. Planning",
     desc: "We create a comprehensive roadmap, sitemap, and wireframes to outline the project structure.",
     image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&q=80",
-    color: "from-emerald-500 to-emerald-600"
+    color: "from-sky-500 to-sky-600"
   },
   {
     icon: Code,

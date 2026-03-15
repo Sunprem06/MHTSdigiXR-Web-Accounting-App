@@ -360,7 +360,7 @@ const navLinks = [
 
 ---
 
-### AI CHATBOT "MEENA" (`client/src/components/widgets/FloatingActions.tsx`)
+### AI CHATBOT "KAYAL" (`client/src/components/widgets/FloatingActions.tsx`)
 
 The chatbot uses OpenAI through Replit AI Integrations.
 
