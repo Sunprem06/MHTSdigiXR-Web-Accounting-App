@@ -987,8 +987,23 @@ async function seedDatabase() {
     }
   }
 
-  // Seed default company settings (only on first create, never overwrites existing values)
+  // Seed default company settings; backfill new website fields only if ALL are null (pre-migration state)
   const existingSettings = await storage.getCompanySettings();
+  if (existingSettings &&
+      existingSettings.brandName === null &&
+      existingSettings.whatsappNumber === null &&
+      existingSettings.careersEmail === null &&
+      existingSettings.websiteUrl === null) {
+    await storage.upsertCompanySettings({
+      ...existingSettings,
+      brandName: "MHTSdigiXR",
+      tagline: "Empowering businesses with cutting-edge digital solutions.",
+      whatsappNumber: "917358105995",
+      careersEmail: "careers@mhtsdigixr.com",
+      websiteUrl: "www.mhtsdigixr.com",
+      email: existingSettings.email || "info@mhtsdigixr.com",
+    });
+  }
   if (!existingSettings) {
     await storage.upsertCompanySettings({
       companyName: "Maanagarram Hi Tech Solutions",
