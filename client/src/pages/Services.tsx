@@ -41,8 +41,8 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 export default function Services() {
-  const { data: servicesList = [], isLoading: servicesLoading } = useQuery<Service[]>({ queryKey: ["/api/services"] });
-  const { data: pricingPlans = [], isLoading: pricingLoading } = useQuery<PricingPlan[]>({ queryKey: ["/api/pricing-plans"] });
+  const { data: servicesList = [], isLoading: servicesLoading } = useQuery<Service[]>({ queryKey: ["/api/services"], staleTime: 5 * 60 * 1000 });
+  const { data: pricingPlans = [], isLoading: pricingLoading } = useQuery<PricingPlan[]>({ queryKey: ["/api/pricing-plans"], staleTime: 5 * 60 * 1000 });
 
   return (
     <div className="pt-24 pb-20 bg-white dark:bg-slate-900">
@@ -168,7 +168,31 @@ export default function Services() {
           </div>
         </section>
 
-        {pricingPlans.length > 0 && (
+        {pricingLoading && (
+          <section className="mb-20">
+            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl py-16 px-8">
+              <div className="text-center mb-12">
+                <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded mx-auto mb-3 animate-pulse" />
+                <div className="h-10 w-64 bg-slate-200 dark:bg-slate-700 rounded mx-auto animate-pulse" />
+              </div>
+              <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                {[1,2,3].map(i => (
+                  <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg animate-pulse">
+                    <div className="h-6 w-24 bg-slate-200 dark:bg-slate-700 rounded mb-4" />
+                    <div className="h-10 w-32 bg-slate-200 dark:bg-slate-700 rounded mb-4" />
+                    <div className="h-4 w-full bg-slate-200 dark:bg-slate-700 rounded mb-6" />
+                    <div className="space-y-3 mb-8">
+                      {[1,2,3,4].map(j => <div key={j} className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded" />)}
+                    </div>
+                    <div className="h-12 w-full bg-slate-200 dark:bg-slate-700 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {!pricingLoading && pricingPlans.length > 0 && (
           <section className="mb-20">
             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl py-16 px-8">
               <div className="text-center mb-12">
