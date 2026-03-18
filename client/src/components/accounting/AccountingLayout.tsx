@@ -91,7 +91,7 @@ const navItems: NavItem[] = [
 export function AccountingLayout({ children }: AccountingLayoutProps) {
   const { user, logout, hasPermission, passwordExpiryDays } = useAuth();
   const [location] = useLocation();
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(["Vouchers", "Reports", "Recruitment", "Website CMS"]);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");

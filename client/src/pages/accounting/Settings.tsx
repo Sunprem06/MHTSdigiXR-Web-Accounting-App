@@ -104,7 +104,7 @@ export default function Settings() {
   const [fyStart, setFyStart] = useState("");
   const [fyEnd, setFyEnd] = useState("");
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["company", "website", "about", "legal", "smtp", "financial"]));
   const toggleSection = (key: string) => setCollapsed(prev => {
     const next = new Set(prev);
     next.has(key) ? next.delete(key) : next.add(key);
