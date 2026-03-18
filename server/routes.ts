@@ -1717,19 +1717,6 @@ async function seedDatabase() {
     }
   }
 
-  // Idempotent fix: update broken image URLs for already-seeded services
-  const fixedImages: Record<string, string> = {
-    "domain-hosting": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1000",
-    "graphic-design": "https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&q=80&w=1000",
-    "ui-ux-design": "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&q=80&w=1000",
-  };
-  const allServices = await storage.getServices();
-  for (const svc of allServices) {
-    if (fixedImages[svc.slug] && svc.image !== fixedImages[svc.slug]) {
-      await storage.updateService(svc.id, { image: fixedImages[svc.slug] });
-    }
-  }
-
   const postsList = await storage.getPosts();
   if (postsList.length === 0) {
     await storage.createPost({ title: "The Future of Digital Marketing in 2026", slug: "future-of-digital-marketing-2026", summary: "Explore the latest trends and technologies shaping the digital marketing landscape.", content: "Digital marketing is evolving rapidly with AI, automation, and personalization leading the way...", coverImage: "https://images.unsplash.com/photo-1432888498266-38ffec3eaf0a?auto=format&fit=crop&q=80&w=1000" });
