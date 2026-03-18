@@ -90,7 +90,20 @@ export default function Services() {
                   <Link href={`/services/${service.slug}`} data-testid={`link-service-${service.slug}`}>
                     <div className="h-full bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-2xl hover:border-sky-200 dark:hover:border-sky-700 transition-all duration-300 cursor-pointer group" data-testid={`card-service-${service.slug}`}>
                       <div className="relative h-48 overflow-hidden">
-                        <img src={service.image} alt={service.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <img
+                          src={service.image}
+                          alt={service.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = "none";
+                            const placeholder = target.nextElementSibling as HTMLElement | null;
+                            if (placeholder) placeholder.style.display = "flex";
+                          }}
+                        />
+                        <div className={`absolute inset-0 bg-gradient-to-br ${color} hidden items-center justify-center`}>
+                          <IconComponent className="w-16 h-16 text-white opacity-60" />
+                        </div>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                         <div className={`absolute top-4 left-4 w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-white shadow-lg`}>
                           <IconComponent className="w-6 h-6" />
