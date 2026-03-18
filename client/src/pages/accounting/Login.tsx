@@ -182,7 +182,7 @@ export default function AccountingLogin() {
                   className="text-sm text-sky-500 hover:text-sky-600 hover:underline"
                   data-testid="link-back-to-website"
                 >
-                  ← Back to Website
+                  Back to Website
                 </a>
               </div>
             </div>
