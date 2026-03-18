@@ -89,7 +89,7 @@ export function Navbar() {
               data-testid="link-accounting-login"
             >
               <LogIn className="w-4 h-4" />
-              Login
+              Accounts
             </Link>
             <button
               onClick={toggleDarkMode}
@@ -150,7 +150,7 @@ export function Navbar() {
                 data-testid="link-accounting-login-mobile"
               >
                 <LogIn className="w-5 h-5" />
-                Login
+                Accounts
               </Link>
               <hr className="border-slate-100 dark:border-slate-800" />
               <div className="flex flex-col gap-3 p-2">
