@@ -318,7 +318,7 @@ export const auditNotes = pgTable("audit_notes", {
 export const JOB_POSTING_STATUSES = ["draft", "open", "closed"] as const;
 export type JobPostingStatus = typeof JOB_POSTING_STATUSES[number];
 
-export const JOB_APPLICATION_STATUSES = ["received", "reviewed", "shortlisted", "rejected", "hired"] as const;
+export const JOB_APPLICATION_STATUSES = ["new", "reviewing", "shortlisted", "interview", "offered", "hired", "rejected"] as const;
 export type JobApplicationStatus = typeof JOB_APPLICATION_STATUSES[number];
 
 export const jobPostings = pgTable("job_postings", {

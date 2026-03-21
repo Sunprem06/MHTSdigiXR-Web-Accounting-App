@@ -1455,11 +1455,11 @@ export async function registerRoutes(
 
   app.patch("/api/accounting/job-applications/:id", requireAuth, requirePermission("jobs.edit"), async (req, res) => {
     const id = parseInt(req.params.id);
-    const validStatuses = ["received", "reviewed", "shortlisted", "rejected", "hired"] as const;
+    const validStatuses = ["new", "reviewing", "shortlisted", "interview", "offered", "hired", "rejected"] as const;
     const data: Partial<JobApplication> = {};
     if (req.body.status && validStatuses.includes(req.body.status)) {
       data.status = req.body.status;
-      if (req.body.status !== "received") {
+      if (req.body.status !== "new") {
         data.reviewedBy = req.user!.id;
         data.reviewedAt = new Date();
       }
