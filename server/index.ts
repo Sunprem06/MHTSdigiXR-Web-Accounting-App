@@ -1,3 +1,4 @@
+import { sanitizeInputs, securityHeaders, globalErrorHandler } from "./middleware/security.js";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -24,6 +25,8 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(securityHeaders);
+app.use(sanitizeInputs);
 
 setupAuth(app);
 
