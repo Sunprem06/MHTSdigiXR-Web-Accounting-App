@@ -21,6 +21,7 @@ function ScrollToTop() {
 }
 
 
+import Home from "@/pages/Home";
 import Services from "@/pages/Services";
 import ServiceDetail from "@/pages/ServiceDetail";
 import FAQ from "@/pages/FAQ";
@@ -38,6 +39,7 @@ import AccountingLogin from "@/pages/accounting/Login";
 import ForgotPassword from "@/pages/accounting/ForgotPassword";
 import ResetPassword from "@/pages/accounting/ResetPassword";
 import ForceChangePassword from "@/pages/accounting/ForceChangePassword";
+import AccountingDashboard from "@/pages/accounting/Dashboard";
 import Ledgers from "@/pages/accounting/Ledgers";
 import VoucherList from "@/pages/accounting/VoucherList";
 import VoucherEntry from "@/pages/accounting/VoucherEntry";
