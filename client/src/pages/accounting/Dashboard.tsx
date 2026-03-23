@@ -14,7 +14,7 @@ export default function AccountingDashboard() {
   const [error, setError] = useState<string|null>(null);
   const [currency, setCurrency] = useState("INR");
   useEffect(() => { fetch("/api/accounting/dashboard").then(r=>r.json()).then(setData).catch(()=>setError("Failed to load. Please refresh.")).finally(()=>setLoading(false)); }, []);
-  const fmt = (n: number) => `${SYM[currency]}${n.toLocaleString("en-IN",{maximumFractionDigits:2})}`;
+  const fmt = (n: number) => `${SYM[currency]}${Number(n||0).toLocaleString("en-IN",{maximumFractionDigits:2})}`;
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-8">
       <SEO title="Accounting" url="/accounting" />
@@ -30,21 +30,34 @@ export default function AccountingDashboard() {
         {error && <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-red-700">{error}</div>}
         {data && <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card label="Total revenue" value={fmt(data.financials.totalRevenue)} color="bg-green-50 text-green-800"/>
-            <Card label="Total expenses" value={fmt(data.financials.totalExpenses)} color="bg-red-50 text-red-800"/>
-            <Card label="Net profit" value={fmt(data.financials.netProfit)} color="bg-sky-50 text-sky-800"/>
-            <Card label="GST collected" value={fmt(data.financials.totalGSTCollected)} color="bg-purple-50 text-purple-800"/>
+            <Card label="Total income" value={fmt(data.totalIncome)} color="bg-green-50 text-green-800"/>
+            <Card label="Total expenses" value={fmt(data.totalExpenses)} color="bg-red-50 text-red-800"/>
+            <Card label="Receivables" value={fmt(data.totalReceivables)} color="bg-sky-50 text-sky-800"/>
+            <Card label="Payables" value={fmt(data.totalPayables)} color="bg-purple-50 text-purple-800"/>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card label="Total invoices" value={data.invoices.total} color="bg-white border border-gray-100"/>
-            <Card label="Paid" value={data.invoices.paid} color="bg-white border border-gray-100"/>
-            <Card label="Pending" value={data.invoices.pending} color="bg-white border border-gray-100"/>
-            <Card label="Overdue" value={data.invoices.overdue} color="bg-white border border-gray-100"/>
+            <Card label="Cash in hand" value={fmt(data.cashInHand)} color="bg-white border border-gray-100"/>
+            <Card label="Bank balance" value={fmt(data.bankBalance)} color="bg-white border border-gray-100"/>
+            <Card label="Pending approvals" value={data.pendingApprovals ?? 0} color="bg-white border border-gray-100"/>
+            <Card label="Financial year" value={data.activeFinancialYear?.name ?? "—"} color="bg-white border border-gray-100"/>
           </div>
+          {data.recentVouchers?.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
+              <h2 className="font-semibold text-gray-800 mb-4">Recent vouchers</h2>
+              <div className="space-y-2">
+                {data.recentVouchers.map((v: any) => (
+                  <div key={v.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                    <div><span className="font-medium text-gray-700 text-sm">{v.voucherNumber}</span><span className="ml-2 text-xs text-gray-400 capitalize">{v.type}</span></div>
+                    <span className="text-sm font-semibold text-gray-800">{fmt(parseFloat(v.totalAmount||"0"))}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="bg-white rounded-2xl border border-gray-100 p-6">
             <h2 className="font-semibold text-gray-800 mb-4">Quick actions</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[["All invoices","/accounting/invoices"],["New expense","/accounting/expenses/new"],["P&L report","/accounting/reports"],["Convert currency","/accounting/convert"]].map(([l,p])=>(
+              {[["All invoices","/accounting/invoices"],["New voucher","/accounting/vouchers/new"],["P&L report","/accounting/reports"],["Ledgers","/accounting/ledgers"]].map(([l,p])=>(
                 <button key={p} onClick={()=>nav(p)} className="p-4 rounded-xl bg-gray-50 hover:bg-sky-50 hover:text-sky-600 text-gray-600 text-sm font-medium transition-colors">{l}</button>
               ))}
             </div>

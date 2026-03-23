@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -42,10 +42,9 @@ export default function AccountingLogin() {
     setCaptchaError(false);
   }, []);
 
-  if (isAuthenticated) {
-    setLocation("/accounting");
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated) setLocation("/accounting");
+  }, [isAuthenticated, setLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
