@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/SEO";
 import { Spinner } from "@/components/ui/loading";
+import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 const SYM: Record<string,string> = { INR:"₹", USD:"$", AED:"د.إ", EUR:"€", GBP:"£" };
 function Card({ label, value, color }: { label:string; value:string|number; color:string }) {
   return <div className={`rounded-2xl p-6 ${color}`}><p className="text-sm opacity-70 mb-1">{label}</p><p className="text-2xl font-bold">{value}</p></div>;
@@ -16,7 +17,7 @@ export default function AccountingDashboard() {
   useEffect(() => { fetch("/api/accounting/dashboard").then(r=>r.json()).then(setData).catch(()=>setError("Failed to load. Please refresh.")).finally(()=>setLoading(false)); }, []);
   const fmt = (n: number) => `${SYM[currency]}${Number(n||0).toLocaleString("en-IN",{maximumFractionDigits:2})}`;
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-8">
+    <AccountingLayout>
       <SEO title="Accounting" url="/accounting" />
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-8">
@@ -64,6 +65,6 @@ export default function AccountingDashboard() {
           </div>
         </>}
       </div>
-    </div>
+    </AccountingLayout>
   );
 }
