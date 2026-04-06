@@ -161,38 +161,7 @@ export async function registerRoutes(
     res.json(page);
   });
 
-  // ===== PUBLIC AUTH ROUTES (no login required) =====
 
-  app.post("/api/auth/forgot-password", async (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "Email is required" });
-    const smtp = await storage.getSmtpSettings();
-    if (!smtp) return res.status(503).json({ message: "Password reset is not configured. Contact your administrator." });
-    const employee = await storage.getEmployeeByEmail(email);
-    if (!employee) return res.json({ message: "If this email is registered, a reset link will be sent." });
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await storage.createPasswordResetToken({ token, employeeId: employee.id, expiresAt, used: false });
-    const baseUrl = req.protocol + "://" + req.get("host");
-    const resetUrl = `${baseUrl}/accounting/reset-password?token=${token}`;
-    const text = `Hello ${employee.fullName},\n\nA password reset was requested for your MHTSdigiXR account.\n\nClick the link below to reset your password (valid for 1 hour):\n${resetUrl}\n\nIf you did not request this, please ignore this email.\n\nMHTSdigiXR Team`;
-    await sendEmail(email, "Password Reset — MHTSdigiXR", text);
-    res.json({ message: "If this email is registered, a reset link will be sent." });
-  });
-
-  app.post("/api/auth/reset-password", async (req, res) => {
-    const { token, password } = req.body;
-    if (!token || !password) return res.status(400).json({ message: "Token and password are required" });
-    if (password.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
-    const record = await storage.getPasswordResetToken(token);
-    if (!record) return res.status(400).json({ message: "Invalid or expired reset link" });
-    if (record.used) return res.status(400).json({ message: "This reset link has already been used" });
-    if (new Date() > new Date(record.expiresAt)) return res.status(400).json({ message: "This reset link has expired" });
-    const hashed = await bcrypt.hash(password, 10);
-    await storage.updateEmployeePassword(record.employeeId, hashed);
-    await storage.markPasswordResetTokenUsed(record.id);
-    res.json({ message: "Password reset successfully. You can now log in." });
-  });
 
   // ===== ACCOUNTING API ROUTES (Protected) =====
 

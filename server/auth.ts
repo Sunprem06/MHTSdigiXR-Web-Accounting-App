@@ -9,6 +9,7 @@ import bcrypt from "bcryptjs";
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Role, Permission } from "@shared/schema";
 import { SYSTEM_ROLE_PERMISSIONS } from "@shared/schema";
+import { rateLimiter } from "./middleware/security.js";
 
 const PASSWORD_EXPIRY_DAYS = 45;
 const CHALLENGE_TOKEN_EXPIRY_MS = 10 * 60 * 1000;
@@ -156,7 +157,8 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/login", (req: Request, res: Response, next: NextFunction) => {
+app.use("/api/auth/login", rateLimiter(10, 60000));  
+app.post("/api/auth/login", (req: Request, res: Response, next: NextFunction) => {
     passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
       if (err) return next(err);
       if (!user) {

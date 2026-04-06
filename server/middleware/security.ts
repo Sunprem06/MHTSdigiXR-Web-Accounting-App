@@ -26,6 +26,8 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
   res.setHeader("X-Frame-Options","DENY");
   res.setHeader("X-XSS-Protection","1; mode=block");
   res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");
+  res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains");
+res.setHeader("Content-Security-Policy","default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://images.unsplash.com; connect-src 'self';");
   next();
 }
 export function globalErrorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
