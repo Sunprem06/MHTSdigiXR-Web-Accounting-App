@@ -6,3 +6,4 @@ vite.config.ts.*
 *.tar.gz
 .env
 .env.*
+testing/.local-test-db
