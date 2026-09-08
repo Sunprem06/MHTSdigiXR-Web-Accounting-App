@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Lock, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
@@ -165,9 +166,8 @@ export default function ResetPassword() {
                 <Label htmlFor="password" className="text-slate-700 dark:text-slate-300">New Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
+                  <PasswordInput
                     id="password"
-                    type="password"
                     placeholder="Enter new password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -182,9 +182,8 @@ export default function ResetPassword() {
                 <Label htmlFor="confirm-password" className="text-slate-700 dark:text-slate-300">Confirm Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
+                  <PasswordInput
                     id="confirm-password"
-                    type="password"
                     placeholder="Confirm new password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}

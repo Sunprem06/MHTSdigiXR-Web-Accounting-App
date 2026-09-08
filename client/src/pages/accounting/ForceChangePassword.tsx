@@ -3,6 +3,7 @@ import { useLocation, Redirect } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Lock, AlertCircle, KeyRound, CheckCircle } from "lucide-react";
@@ -112,9 +113,8 @@ export default function ForceChangePassword() {
               <Label htmlFor="newPassword" className="text-slate-700 dark:text-slate-300">New Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
+                <PasswordInput
                   id="newPassword"
-                  type="password"
                   placeholder="Enter new password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -129,9 +129,8 @@ export default function ForceChangePassword() {
               <Label htmlFor="confirmPassword" className="text-slate-700 dark:text-slate-300">Confirm New Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
+                <PasswordInput
                   id="confirmPassword"
-                  type="password"
                   placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

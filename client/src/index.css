@@ -70,6 +70,15 @@
     font-family: var(--font-display);
     @apply font-bold tracking-tight text-slate-900 dark:text-slate-100;
   }
+
+  /* Native date/time inputs render their calendar/clock icon in a fixed dark
+     color regardless of page theme — invert it in dark mode so it's visible
+     against the dark input background instead of near-invisible. */
+  .dark input[type="date"]::-webkit-calendar-picker-indicator,
+  .dark input[type="time"]::-webkit-calendar-picker-indicator,
+  .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
 }
 
 @layer utilities {

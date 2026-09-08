@@ -99,6 +99,7 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -339,6 +340,7 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
           setPasswordError("");
           setShowCurrentPassword(false);
           setShowNewPassword(false);
+          setShowConfirmPassword(false);
         }
       }}>
         <DialogContent className="sm:max-w-md" data-testid="dialog-change-password">
@@ -391,15 +393,25 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={6}
-                data-testid="input-confirm-password"
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  data-testid="input-confirm-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  data-testid="button-toggle-confirm-password"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             {passwordError && (
               <p className="text-sm text-red-600 dark:text-red-400" data-testid="text-password-error">{passwordError}</p>
