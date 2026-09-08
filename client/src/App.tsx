@@ -62,6 +62,7 @@ import EmployeeManagement from "@/pages/accounting/EmployeeManagement";
 import AuditLogPage from "@/pages/accounting/AuditLog";
 import SettingsPage from "@/pages/accounting/Settings";
 import RolesPage from "@/pages/accounting/Roles";
+import ErpLicenses from "@/pages/accounting/ErpLicenses";
 import JobPostings from "@/pages/accounting/JobPostings";
 import JobApplicationsPage from "@/pages/accounting/JobApplications";
 import ContactInbox from "@/pages/accounting/ContactInbox";
@@ -186,6 +187,9 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/roles">
         {() => <ProtectedRoute requiredPermission="roles.view"><RolesPage /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/erp-licenses">
+        {() => <ProtectedRoute requiredPermission="erp_licenses.view"><ErpLicenses /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/job-postings">
         {() => <ProtectedRoute requiredPermission="jobs.view"><JobPostings /></ProtectedRoute>}

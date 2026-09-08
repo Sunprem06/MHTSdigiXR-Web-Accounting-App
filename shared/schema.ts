@@ -378,6 +378,45 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * MHTS ERP desktop-app licensing portal. `licenseFileContents` is the full
+ * Ed25519-signed license.lic JSON, generated OFFLINE by MHTS ERP's own
+ * scripts/generate-license.mjs and pasted in here by staff — this server
+ * never signs anything itself, it only hands the pre-signed file back on a
+ * valid activation request and tracks which machine(s) activated it.
+ */
+export const erpLicenses = pgTable("erp_licenses", {
+  id: serial("id").primaryKey(),
+  licenseId: text("license_id").notNull().unique(),
+  activationCodeHash: text("activation_code_hash").notNull(),
+  licenseFileContents: text("license_file_contents").notNull(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  partyId: integer("party_id").references(() => parties.id),
+  maxActivations: integer("max_activations").notNull().default(1),
+  status: text("status").notNull().default("pending"), // pending | active | revoked
+  // Denormalized copy of the signed payload's own expiry, for portal display/sorting only —
+  // NOT itself authoritative. The desktop app always verifies the signed file independently.
+  expiresAt: timestamp("expires_at"),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** One row per machine that has activated a given erpLicenses record. */
+export const erpLicenseActivations = pgTable("erp_license_activations", {
+  id: serial("id").primaryKey(),
+  erpLicenseId: integer("erp_license_id").references(() => erpLicenses.id).notNull(),
+  machineId: text("machine_id").notNull(),
+  machineLabel: text("machine_label"),
+  activationTokenHash: text("activation_token_hash").notNull(),
+  status: text("status").notNull().default("active"), // active | revoked
+  firstActivatedAt: timestamp("first_activated_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at"),
+  revokedAt: timestamp("revoked_at"),
+  revokedBy: integer("revoked_by").references(() => employees.id),
+});
+
 export const insertPostSchema = createInsertSchema(posts).omit({ id: true, createdAt: true });
 export const insertContactMessageSchema = createInsertSchema(contactMessages).omit({ id: true, createdAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true });
@@ -405,6 +444,8 @@ export const insertSiteStatSchema = createInsertSchema(siteStats).omit({ id: tru
 export const insertPricingPlanSchema = createInsertSchema(pricingPlans).omit({ id: true, createdAt: true });
 export const insertSmtpSettingsSchema = createInsertSchema(smtpSettings).omit({ id: true });
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
+export const insertErpLicenseSchema = createInsertSchema(erpLicenses).omit({ id: true, createdAt: true });
+export const insertErpLicenseActivationSchema = createInsertSchema(erpLicenseActivations).omit({ id: true, firstActivatedAt: true });
 
 export type Post = typeof posts.$inferSelect;
 export type InsertPost = z.infer<typeof insertPostSchema>;
@@ -460,6 +501,10 @@ export type SmtpSettings = typeof smtpSettings.$inferSelect;
 export type InsertSmtpSettings = z.infer<typeof insertSmtpSettingsSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type ErpLicense = typeof erpLicenses.$inferSelect;
+export type InsertErpLicense = z.infer<typeof insertErpLicenseSchema>;
+export type ErpLicenseActivation = typeof erpLicenseActivations.$inferSelect;
+export type InsertErpLicenseActivation = z.infer<typeof insertErpLicenseActivationSchema>;
 
 export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer", "sales_person", "sales_manager"] as const;
 export type Role = typeof ROLES[number];
@@ -493,6 +538,7 @@ export const ALL_PERMISSIONS = [
   "employees.view", "employees.manage",
   "roles.view", "roles.manage",
   "settings.view", "settings.manage",
+  "erp_licenses.view", "erp_licenses.manage",
 ] as const;
 
 export type Permission = typeof ALL_PERMISSIONS[number];
@@ -514,6 +560,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   employees: { label: "Employees", permissions: ["employees.view", "employees.manage"] },
   roles: { label: "Roles", permissions: ["roles.view", "roles.manage"] },
   settings: { label: "Settings", permissions: ["settings.view", "settings.manage"] },
+  erp_licenses: { label: "ERP Licenses", permissions: ["erp_licenses.view", "erp_licenses.manage"] },
 };
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {

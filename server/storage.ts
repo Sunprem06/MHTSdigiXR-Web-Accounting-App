@@ -19,7 +19,10 @@ import {
   type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
   type Party, type Product, type Quotation, type ExpenseClaim, type DbRole,
   type JobPosting, type JobApplication, type FaqItem, type Testimonial, type SiteStat,
-  type SmtpSettings, type PasswordResetToken
+  type SmtpSettings, type PasswordResetToken,
+  erpLicenses, erpLicenseActivations,
+  type InsertErpLicense, type InsertErpLicenseActivation,
+  type ErpLicense, type ErpLicenseActivation
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -194,6 +197,18 @@ export interface IStorage {
   getBalanceSheet(): Promise<{ assets: Array<{ name: string; amount: number }>; liabilities: Array<{ name: string; amount: number }>; capital: Array<{ name: string; amount: number }>; netProfit: number }>;
   getDayBook(startDate?: string, endDate?: string, type?: string): Promise<Voucher[]>;
   getGstSummary(startDate?: string, endDate?: string): Promise<{ outputTax: { cgst: number; sgst: number; igst: number; total: number }; inputTax: { cgst: number; sgst: number; igst: number; total: number }; netLiability: number }>;
+
+  getErpLicenses(): Promise<ErpLicense[]>;
+  getErpLicense(id: number): Promise<ErpLicense | undefined>;
+  getErpLicenseByLicenseId(licenseId: string): Promise<ErpLicense | undefined>;
+  getErpLicenseByActivationCodeHash(activationCodeHash: string): Promise<ErpLicense | undefined>;
+  createErpLicense(license: InsertErpLicense): Promise<ErpLicense>;
+  updateErpLicense(id: number, data: Partial<InsertErpLicense>): Promise<ErpLicense | undefined>;
+
+  getErpLicenseActivations(erpLicenseId: number): Promise<ErpLicenseActivation[]>;
+  getErpLicenseActivationByMachine(erpLicenseId: number, machineId: string): Promise<ErpLicenseActivation | undefined>;
+  createErpLicenseActivation(activation: InsertErpLicenseActivation): Promise<ErpLicenseActivation>;
+  updateErpLicenseActivation(id: number, data: Partial<InsertErpLicenseActivation>): Promise<ErpLicenseActivation | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1187,6 +1202,54 @@ export class DatabaseStorage implements IStorage {
 
   async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
     const [row] = await db.select().from(employees).where(eq(employees.email, email));
+    return row;
+  }
+
+  async getErpLicenses(): Promise<ErpLicense[]> {
+    return await db.select().from(erpLicenses).orderBy(desc(erpLicenses.createdAt));
+  }
+
+  async getErpLicense(id: number): Promise<ErpLicense | undefined> {
+    const [row] = await db.select().from(erpLicenses).where(eq(erpLicenses.id, id));
+    return row;
+  }
+
+  async getErpLicenseByLicenseId(licenseId: string): Promise<ErpLicense | undefined> {
+    const [row] = await db.select().from(erpLicenses).where(eq(erpLicenses.licenseId, licenseId));
+    return row;
+  }
+
+  async getErpLicenseByActivationCodeHash(activationCodeHash: string): Promise<ErpLicense | undefined> {
+    const [row] = await db.select().from(erpLicenses).where(eq(erpLicenses.activationCodeHash, activationCodeHash));
+    return row;
+  }
+
+  async createErpLicense(license: InsertErpLicense): Promise<ErpLicense> {
+    const [row] = await db.insert(erpLicenses).values(license).returning();
+    return row;
+  }
+
+  async updateErpLicense(id: number, data: Partial<InsertErpLicense>): Promise<ErpLicense | undefined> {
+    const [row] = await db.update(erpLicenses).set(data).where(eq(erpLicenses.id, id)).returning();
+    return row;
+  }
+
+  async getErpLicenseActivations(erpLicenseId: number): Promise<ErpLicenseActivation[]> {
+    return await db.select().from(erpLicenseActivations).where(eq(erpLicenseActivations.erpLicenseId, erpLicenseId)).orderBy(desc(erpLicenseActivations.firstActivatedAt));
+  }
+
+  async getErpLicenseActivationByMachine(erpLicenseId: number, machineId: string): Promise<ErpLicenseActivation | undefined> {
+    const [row] = await db.select().from(erpLicenseActivations).where(and(eq(erpLicenseActivations.erpLicenseId, erpLicenseId), eq(erpLicenseActivations.machineId, machineId)));
+    return row;
+  }
+
+  async createErpLicenseActivation(activation: InsertErpLicenseActivation): Promise<ErpLicenseActivation> {
+    const [row] = await db.insert(erpLicenseActivations).values(activation).returning();
+    return row;
+  }
+
+  async updateErpLicenseActivation(id: number, data: Partial<InsertErpLicenseActivation>): Promise<ErpLicenseActivation | undefined> {
+    const [row] = await db.update(erpLicenseActivations).set(data).where(eq(erpLicenseActivations.id, id)).returning();
     return row;
   }
 }
