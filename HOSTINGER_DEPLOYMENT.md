@@ -122,6 +122,26 @@ Inside the editor, paste the following (replace the values with yours):
 DATABASE_URL=postgresql://mhtsuser:YourStrongPassword123!@localhost:5432/mhtsdigixr
 SESSION_SECRET=AnyLongRandomStringHere_MakeItUnique_AtLeast32Characters
 NODE_ENV=production
+APP_BASE_URL=https://yourdomain.com
+
+# Seeds the first super admin account on first startup only — never
+# overwrites an existing admin. If INITIAL_ADMIN_PASSWORD is left out, a
+# random password is generated and printed once to the app log at startup.
+INITIAL_ADMIN_USERNAME=superadmin
+INITIAL_ADMIN_EMAIL=you@yourdomain.com
+INITIAL_ADMIN_PASSWORD=SetAStrongPasswordHere
+INITIAL_ADMIN_PHONE=+91 0000000000
+
+# Optional fallback so "Forgot Password" works even before anyone has
+# logged in to configure SMTP from the admin panel. Leave unset if you'd
+# rather configure SMTP later from Settings → SMTP.
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=you@yourdomain.com
+SMTP_PASSWORD=YourEmailPassword
+SMTP_FROM_NAME=MHTSdigiXR
+SMTP_FROM_EMAIL=you@yourdomain.com
 ```
 
 Save and close: press `Ctrl+X`, then `Y`, then `Enter`
@@ -139,7 +159,14 @@ npm install
 # Push the database schema (creates all tables)
 npm run db:push
 
-# The app will auto-seed default data on first start
+# The app will auto-seed default data, including the super admin
+# account above, on first start
+```
+
+To reset the super admin's password later without touching the database directly:
+
+```bash
+npm run reset-admin-password -- --username=superadmin
 ```
 
 ---

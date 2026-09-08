@@ -491,6 +491,40 @@ npm run build
 | `DATABASE_URL` | PostgreSQL connection string |
 | `SESSION_SECRET` | Session encryption key |
 | `AI_INTEGRATIONS_OPENAI_API_KEY` | OpenAI API key (auto-configured) |
+| `APP_BASE_URL` | Public base URL of the app (e.g. `https://yourdomain.com`), used to build password-reset links. Falls back to the Replit dev domain when unset. |
+
+### Initial super admin seeding
+
+On first startup, if no super admin account exists yet, one is created from these variables. The seed never runs again once that account exists, and it never overwrites an existing admin's details.
+
+| Variable | Description |
+|----------|-------------|
+| `INITIAL_ADMIN_USERNAME` | Username for the seeded super admin (default: `superadmin`) |
+| `INITIAL_ADMIN_EMAIL` | Email for the seeded super admin (default: `admin@localhost` — set this so password reset emails can reach you) |
+| `INITIAL_ADMIN_PASSWORD` | Password for the seeded super admin. If unset, a random password is generated and printed **once** to the server log at startup — copy it immediately, it is not stored anywhere. |
+| `INITIAL_ADMIN_PHONE` | Phone number for the seeded super admin (optional) |
+
+To reset the password later without touching the database directly, run:
+
+```bash
+npm run reset-admin-password -- --username=superadmin
+# or with a specific password:
+npm run reset-admin-password -- --username=superadmin --password="NewStrongPass123!"
+```
+
+### SMTP / email
+
+SMTP can be configured from the admin panel (Settings → SMTP), which is stored in the database. Since that requires being logged in already, you can also set these environment variables as a fallback — used automatically whenever no SMTP row exists in the database yet (e.g. for "Forgot password" to work before first login):
+
+| Variable | Description |
+|----------|-------------|
+| `SMTP_HOST` | SMTP server host |
+| `SMTP_PORT` | SMTP server port (default: `587`) |
+| `SMTP_SECURE` | `"true"` to use TLS/SSL, otherwise unset/`"false"` |
+| `SMTP_USER` | SMTP auth username |
+| `SMTP_PASSWORD` | SMTP auth password |
+| `SMTP_FROM_NAME` | Display name for outgoing emails (default: `MHTSdigiXR`) |
+| `SMTP_FROM_EMAIL` | From-address for outgoing emails |
 
 ---
 

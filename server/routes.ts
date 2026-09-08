@@ -11,9 +11,41 @@ import { rateLimiter } from "./middleware/security.js";
 import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 
+type SmtpConfig = {
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+  password: string;
+  fromName: string;
+  fromEmail: string;
+};
+
+function getEnvSmtpConfig(): SmtpConfig | null {
+  const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_NAME, SMTP_FROM_EMAIL } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASSWORD || !SMTP_FROM_EMAIL) return null;
+  return {
+    host: SMTP_HOST,
+    port: SMTP_PORT ? parseInt(SMTP_PORT, 10) : 587,
+    secure: SMTP_SECURE === "true",
+    username: SMTP_USER,
+    password: SMTP_PASSWORD,
+    fromName: SMTP_FROM_NAME || "MHTSdigiXR",
+    fromEmail: SMTP_FROM_EMAIL,
+  };
+}
+
+// Falls back to env-configured SMTP when no admin-panel settings exist yet
+// (e.g. before anyone has ever logged in to set them).
+async function getEffectiveSmtpConfig(): Promise<SmtpConfig | null> {
+  const dbSettings = await storage.getSmtpSettings();
+  if (dbSettings) return dbSettings;
+  return getEnvSmtpConfig();
+}
+
 async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
   try {
-    const smtp = await storage.getSmtpSettings();
+    const smtp = await getEffectiveSmtpConfig();
     if (!smtp) return false;
     const transporter = nodemailer.createTransport({
       host: smtp.host,
@@ -1550,7 +1582,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email is required" });
       }
 
-      const smtpConfig = await storage.getSmtpSettings();
+      const smtpConfig = await getEffectiveSmtpConfig();
       if (!smtpConfig) {
         return res.status(503).json({ message: "Password reset is not configured — contact your administrator" });
       }
@@ -1881,24 +1913,31 @@ async function seedDatabase() {
     await storage.createPost({ title: "Why Your Business Needs a Mobile App", slug: "why-business-needs-mobile-app", summary: "Understand the benefits of having a dedicated mobile application for your customers.", content: "In today's mobile-first world, having an app can significantly improve customer engagement and retention...", coverImage: "https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&q=80&w=1000" });
   }
 
-  // Seed Super Admin
-  const existingAdmin = await storage.getEmployeeByUsername("superadmin");
+  // Seed Super Admin — only if no admin account exists yet; never overwrites
+  // an existing admin's details on restart. All values come from the
+  // environment; see README.md / HOSTINGER_DEPLOYMENT.md for INITIAL_ADMIN_*.
+  const initialAdminUsername = process.env.INITIAL_ADMIN_USERNAME || "superadmin";
+  const existingAdmin = await storage.getEmployeeByUsername(initialAdminUsername);
   if (!existingAdmin) {
-    const hashedPassword = await bcrypt.hash("admin123", 10);
+    let initialPassword = process.env.INITIAL_ADMIN_PASSWORD;
+    if (!initialPassword) {
+      initialPassword = crypto.randomBytes(12).toString("base64url");
+      console.log(
+        `\n[seed] No INITIAL_ADMIN_PASSWORD set — generated a random password for super admin "${initialAdminUsername}":\n` +
+        `[seed]   ${initialPassword}\n` +
+        `[seed] This is shown once and not stored anywhere. Log in and change it immediately.\n`
+      );
+    }
+    const hashedPassword = await bcrypt.hash(initialPassword, 10);
     await storage.createEmployee({
-      username: "superadmin",
-      email: "premchandar.mhtsl@gmail.com",
+      username: initialAdminUsername,
+      email: process.env.INITIAL_ADMIN_EMAIL || "admin@localhost",
       password: hashedPassword,
       fullName: "Super Administrator",
       role: "super_admin",
-      phone: "+91 9940342155",
+      phone: process.env.INITIAL_ADMIN_PHONE || null,
       isActive: true,
       createdBy: null,
-    });
-  } else if (existingAdmin.email !== "premchandar.mhtsl@gmail.com" || existingAdmin.phone !== "+91 9940342155") {
-    await storage.updateEmployee(existingAdmin.id, {
-      email: "premchandar.mhtsl@gmail.com",
-      phone: "+91 9940342155",
     });
   }
 
