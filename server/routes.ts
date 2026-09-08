@@ -1773,17 +1773,23 @@ export async function registerRoutes(
   });
 
   app.post("/api/accounting/erp-licenses", requireAuth, requirePermission("erp_licenses.manage"), async (req, res) => {
-    const { licenseFileContents, customerName, customerEmail, customerPhone, partyId, maxActivations } = req.body || {};
-    if (!licenseFileContents || !customerName) {
-      return res.status(400).json({ message: "licenseFileContents and customerName are required" });
+    const { licenseFileContentsBase64, customerName, customerEmail, customerPhone, partyId, maxActivations } = req.body || {};
+    if (!licenseFileContentsBase64 || !customerName) {
+      return res.status(400).json({ message: "licenseFileContentsBase64 and customerName are required" });
     }
 
+    // Sent base64-encoded (rather than raw JSON text) specifically so the global
+    // sanitizeInputs middleware's HTML-entity escaping (", ', <, >) — correct for
+    // ordinary form fields — can't corrupt this field's embedded quote characters
+    // before it ever reaches JSON.parse below.
+    let licenseFileContents: string;
     let payload: { licenseId?: string; expiresAt?: string | null };
     try {
+      licenseFileContents = Buffer.from(licenseFileContentsBase64, "base64").toString("utf8");
       payload = JSON.parse(licenseFileContents).payload;
       if (!payload?.licenseId) throw new Error("missing licenseId");
     } catch {
-      return res.status(400).json({ message: "licenseFileContents is not a valid signed license file (paste the exact license.lic contents generated offline)" });
+      return res.status(400).json({ message: "licenseFileContentsBase64 is not a valid signed license file (paste the exact license.lic contents generated offline)" });
     }
 
     if (await storage.getErpLicenseByLicenseId(payload.licenseId)) {
@@ -1827,6 +1833,12 @@ export async function registerRoutes(
   });
 
   app.patch("/api/accounting/erp-licenses/:id/activations/:activationId/revoke", requireAuth, requirePermission("erp_licenses.manage"), async (req, res) => {
+    const licenseId = parseInt(req.params.id);
+    const existingActivations = await storage.getErpLicenseActivations(licenseId);
+    if (!existingActivations.some((a) => a.id === parseInt(req.params.activationId))) {
+      return res.status(404).json({ message: "Activation not found for this license" });
+    }
+
     const activation = await storage.updateErpLicenseActivation(parseInt(req.params.activationId), {
       status: "revoked",
       revokedAt: new Date(),

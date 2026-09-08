@@ -50,8 +50,12 @@ export default function ErpLicenses() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      const { licenseFileContents, ...rest } = formData;
       const res = await apiRequest("POST", "/api/accounting/erp-licenses", {
-        ...formData,
+        ...rest,
+        // Base64-encoded so the global sanitizeInputs middleware's HTML-entity
+        // escaping of raw " and ' characters can't corrupt this embedded JSON.
+        licenseFileContentsBase64: btoa(String.fromCharCode.apply(null, Array.from(new TextEncoder().encode(licenseFileContents)))),
         maxActivations: Number(formData.maxActivations) || 1,
       });
       return res.json();
