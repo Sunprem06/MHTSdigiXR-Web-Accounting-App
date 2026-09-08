@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -605,7 +606,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <Label>Email Password</Label>
-                  <Input type="password" value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} placeholder={smtpData ? "Enter new password to update" : "Your email account password"} data-testid="input-smtp-password" />
+                  <PasswordInput value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} placeholder={smtpData ? "Enter new password to update" : "Your email account password"} data-testid="input-smtp-password" />
                 </div>
                 <div>
                   <Label>Sender Name</Label>

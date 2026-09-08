@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -280,7 +281,7 @@ export default function EmployeeManagement() {
               </div>
               <div>
                 <Label>Password</Label>
-                <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} data-testid="input-new-password" />
+                <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} data-testid="input-new-password" />
               </div>
               <div>
                 <Label>Phone</Label>
@@ -413,7 +414,7 @@ export default function EmployeeManagement() {
               </div>
               <div>
                 <Label>Reset Password (leave empty to keep current)</Label>
-                <Input type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} data-testid="input-edit-password" />
+                <PasswordInput value={editPassword} onChange={(e) => setEditPassword(e.target.value)} data-testid="input-edit-password" />
               </div>
               <div className="border-t pt-3">
                 <div className="flex items-center justify-between mb-2">

@@ -1929,16 +1929,22 @@ async function seedDatabase() {
       );
     }
     const hashedPassword = await bcrypt.hash(initialPassword, 10);
-    await storage.createEmployee({
-      username: initialAdminUsername,
-      email: process.env.INITIAL_ADMIN_EMAIL || "admin@localhost",
-      password: hashedPassword,
-      fullName: "Super Administrator",
-      role: "super_admin",
-      phone: process.env.INITIAL_ADMIN_PHONE || null,
-      isActive: true,
-      createdBy: null,
-    });
+    try {
+      await storage.createEmployee({
+        username: initialAdminUsername,
+        email: process.env.INITIAL_ADMIN_EMAIL || "admin@localhost",
+        password: hashedPassword,
+        fullName: "Super Administrator",
+        role: "super_admin",
+        phone: process.env.INITIAL_ADMIN_PHONE || null,
+        isActive: true,
+        createdBy: null,
+      });
+    } catch (err: any) {
+      // Most commonly a duplicate email (INITIAL_ADMIN_EMAIL already used by another
+      // account) — log it and move on instead of crashing the whole app on startup.
+      console.error(`[seed] Failed to create super admin "${initialAdminUsername}": ${err?.message || err}`);
+    }
   }
 
   // Seed Account Groups (expanded with standard groups)
