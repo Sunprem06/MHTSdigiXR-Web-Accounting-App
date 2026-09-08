@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from "express";
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
 export function rateLimiter(maxRequests: number, windowMs: number) {
+  // Scoped per rateLimiter(...) call site (i.e. per route), not module-wide — a shared
+  // Map here would mean every rate-limited route drew from the same per-IP budget, so a
+  // burst on one route (e.g. login) could false-positive-429 an unrelated route with its
+  // own, possibly lower, threshold.
+  const requestCounts = new Map<string, { count: number; resetTime: number }>();
   return (req: Request, res: Response, next: NextFunction) => {
     const ip = req.ip || req.socket.remoteAddress || "unknown";
     const now = Date.now();
