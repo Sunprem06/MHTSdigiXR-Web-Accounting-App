@@ -565,7 +565,10 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   super_admin: [...ALL_PERMISSIONS],
-  admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.")),
+  // erp_licenses.* is deliberately excluded here too, alongside settings.* — confirmed with
+  // the user that ONLY super_admin should be able to create/revoke ERP licenses or see
+  // activation codes, not every admin.
+  admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.") && !p.startsWith("erp_licenses.")),
   auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes"],
   senior_accountant: [
     "dashboard.view",
