@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { requireAuth, requirePermission, requireRole } from "./auth";
+import { rateLimiter } from "./middleware/security.js";
 import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 
@@ -1662,6 +1663,182 @@ export async function registerRoutes(
   app.get("/api/auth/smtp-configured", async (_req, res) => {
     const smtpConfig = await storage.getSmtpSettings();
     res.json({ configured: !!smtpConfig });
+  });
+
+  // ── MHTS ERP desktop-app licensing portal ──────────────────────────────
+  // Public endpoints below are machine-to-machine (the caller is a desktop
+  // install, not a human with a browser session) — they authenticate with
+  // their own bearer secrets (the activation code, then a per-machine
+  // activation token) instead of the employee session/cookie auth used
+  // everywhere else in this file. Rate-limited since they're the only
+  // endpoints in this app reachable without an employee login.
+
+  function countActiveActivations(activations: Awaited<ReturnType<typeof storage.getErpLicenseActivations>>): number {
+    return activations.filter(a => a.status === "active").length;
+  }
+
+  app.use("/api/erp-licenses/activate", rateLimiter(5, 60 * 60 * 1000));
+  app.post("/api/erp-licenses/activate", async (req, res) => {
+    const { activationCode, machineId, machineLabel } = req.body || {};
+    if (!activationCode || !machineId || typeof activationCode !== "string" || typeof machineId !== "string") {
+      return res.status(400).json({ message: "activationCode and machineId are required" });
+    }
+
+    const license = await storage.getErpLicenseByActivationCodeHash(hashToken(activationCode));
+    if (!license || license.status === "revoked") {
+      return res.status(400).json({ message: "Invalid or revoked activation code" });
+    }
+
+    const existing = await storage.getErpLicenseActivationByMachine(license.id, machineId);
+    const activationToken = crypto.randomBytes(32).toString("hex");
+    const activationTokenHash = hashToken(activationToken);
+
+    if (existing) {
+      // Same machine re-activating (e.g. re-running setup) — rotate its token rather
+      // than consuming another maxActivations slot.
+      await storage.updateErpLicenseActivation(existing.id, {
+        activationTokenHash,
+        machineLabel: machineLabel || existing.machineLabel,
+        status: "active",
+        lastSeenAt: new Date(),
+      });
+    } else {
+      const activations = await storage.getErpLicenseActivations(license.id);
+      if (countActiveActivations(activations) >= license.maxActivations) {
+        return res.status(403).json({ message: "This license has already been activated on the maximum number of machines allowed. Contact MHTSdigiXR support to free up a slot." });
+      }
+      await storage.createErpLicenseActivation({
+        erpLicenseId: license.id,
+        machineId,
+        machineLabel: machineLabel || null,
+        activationTokenHash,
+        status: "active",
+        lastSeenAt: new Date(),
+      });
+    }
+
+    if (license.status === "pending") {
+      await storage.updateErpLicense(license.id, { status: "active" });
+    }
+
+    await storage.createAuditLog({
+      employeeId: null,
+      action: "erp_license_activate",
+      entity: "erp_license",
+      entityId: license.id,
+      details: `Activated for machine ${machineId}${machineLabel ? ` (${machineLabel})` : ""}`,
+      ipAddress: req.ip || req.socket.remoteAddress || null,
+    });
+
+    res.json({ licenseFileContents: license.licenseFileContents, activationToken });
+  });
+
+  app.use("/api/erp-licenses/checkin", rateLimiter(30, 60 * 60 * 1000));
+  app.post("/api/erp-licenses/checkin", async (req, res) => {
+    const { licenseId, machineId, activationToken } = req.body || {};
+    if (!licenseId || !machineId || !activationToken) {
+      return res.status(400).json({ ok: false, status: "invalid_request" });
+    }
+
+    const license = await storage.getErpLicenseByLicenseId(licenseId);
+    if (!license || license.status === "revoked") {
+      return res.json({ ok: false, status: "revoked" });
+    }
+
+    const activation = await storage.getErpLicenseActivationByMachine(license.id, machineId);
+    if (!activation || activation.status === "revoked") {
+      return res.json({ ok: false, status: "revoked" });
+    }
+
+    const providedHash = Buffer.from(hashToken(activationToken));
+    const storedHash = Buffer.from(activation.activationTokenHash);
+    if (providedHash.length !== storedHash.length || !crypto.timingSafeEqual(providedHash, storedHash)) {
+      return res.json({ ok: false, status: "invalid_token" });
+    }
+
+    await storage.updateErpLicenseActivation(activation.id, { lastSeenAt: new Date() });
+    res.json({ ok: true, status: "active" });
+  });
+
+  // Employee-facing management, same session/permission auth as every other /api/accounting/* route.
+  app.get("/api/accounting/erp-licenses", requireAuth, requirePermission("erp_licenses.view"), async (_req, res) => {
+    res.json(await storage.getErpLicenses());
+  });
+
+  app.get("/api/accounting/erp-licenses/:id", requireAuth, requirePermission("erp_licenses.view"), async (req, res) => {
+    const license = await storage.getErpLicense(parseInt(req.params.id));
+    if (!license) return res.status(404).json({ message: "License not found" });
+    const activations = await storage.getErpLicenseActivations(license.id);
+    res.json({ ...license, activations });
+  });
+
+  app.post("/api/accounting/erp-licenses", requireAuth, requirePermission("erp_licenses.manage"), async (req, res) => {
+    const { licenseFileContents, customerName, customerEmail, customerPhone, partyId, maxActivations } = req.body || {};
+    if (!licenseFileContents || !customerName) {
+      return res.status(400).json({ message: "licenseFileContents and customerName are required" });
+    }
+
+    let payload: { licenseId?: string; expiresAt?: string | null };
+    try {
+      payload = JSON.parse(licenseFileContents).payload;
+      if (!payload?.licenseId) throw new Error("missing licenseId");
+    } catch {
+      return res.status(400).json({ message: "licenseFileContents is not a valid signed license file (paste the exact license.lic contents generated offline)" });
+    }
+
+    if (await storage.getErpLicenseByLicenseId(payload.licenseId)) {
+      return res.status(400).json({ message: `A license record for licenseId ${payload.licenseId} already exists` });
+    }
+
+    const activationCode = crypto.randomBytes(15).toString("base64url"); // shown once — staff must copy it now
+    const license = await storage.createErpLicense({
+      licenseId: payload.licenseId,
+      activationCodeHash: hashToken(activationCode),
+      licenseFileContents,
+      customerName,
+      customerEmail: customerEmail || null,
+      customerPhone: customerPhone || null,
+      partyId: partyId || null,
+      maxActivations: maxActivations && Number(maxActivations) > 0 ? Number(maxActivations) : 1,
+      status: "pending",
+      expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
+      createdBy: req.user!.id,
+    });
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "erp_license",
+      entityId: license.id, details: `Created ERP license for ${customerName}`,
+      ipAddress: req.ip || null,
+    });
+
+    res.status(201).json({ ...license, activationCode });
+  });
+
+  app.patch("/api/accounting/erp-licenses/:id/revoke", requireAuth, requirePermission("erp_licenses.manage"), async (req, res) => {
+    const license = await storage.getErpLicense(parseInt(req.params.id));
+    if (!license) return res.status(404).json({ message: "License not found" });
+    const updated = await storage.updateErpLicense(license.id, { status: "revoked" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "revoke", entity: "erp_license",
+      entityId: license.id, details: `Revoked ERP license for ${license.customerName}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.patch("/api/accounting/erp-licenses/:id/activations/:activationId/revoke", requireAuth, requirePermission("erp_licenses.manage"), async (req, res) => {
+    const activation = await storage.updateErpLicenseActivation(parseInt(req.params.activationId), {
+      status: "revoked",
+      revokedAt: new Date(),
+      revokedBy: req.user!.id,
+    });
+    if (!activation) return res.status(404).json({ message: "Activation not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "revoke_activation", entity: "erp_license_activation",
+      entityId: activation.id, details: `Revoked machine activation ${activation.machineId} (frees a slot for re-activation, e.g. after a hardware transfer)`,
+      ipAddress: req.ip || null,
+    });
+    res.json(activation);
   });
 
   // Seed data

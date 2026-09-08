@@ -8,7 +8,7 @@ import {
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
   Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen,
-  Layers, DollarSign, Lock, Eye, EyeOff, Loader2, AlertTriangle
+  Layers, DollarSign, Lock, Eye, EyeOff, Loader2, AlertTriangle, Fingerprint
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -85,6 +85,7 @@ const navItems: NavItem[] = [
   { label: "Audit Log", path: "/accounting/audit-log", icon: Shield, requiredPermission: "audit.view" },
   { label: "Employees", path: "/accounting/employees", icon: Users, requiredPermission: "employees.manage" },
   { label: "Roles", path: "/accounting/roles", icon: KeyRound, requiredPermission: "roles.view" },
+  { label: "ERP Licenses", path: "/accounting/erp-licenses", icon: Fingerprint, requiredPermission: "erp_licenses.view" },
   { label: "Settings", path: "/accounting/settings", icon: Settings, requiredPermission: "settings.view" },
 ];
 
