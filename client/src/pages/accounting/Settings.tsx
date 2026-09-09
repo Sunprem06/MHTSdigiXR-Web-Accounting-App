@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send, ChevronDown, ChevronRight, CheckCircle } from "lucide-react";
-import { EMAIL_TEMPLATE_VARIABLES } from "@shared/schema";
+import { EMAIL_TEMPLATE_VARIABLES, type EmailTemplateKey } from "@shared/schema";
 
 interface CompanySettings {
   id?: number;
@@ -60,7 +60,7 @@ interface FinancialYear {
 
 interface EmailTemplateData {
   id: number;
-  key: "enquiry_welcome" | "employee_welcome" | "tutor_welcome";
+  key: EmailTemplateKey;
   name: string;
   description: string | null;
   subject: string;
@@ -948,6 +948,11 @@ export default function Settings() {
                   {(editingEmailTemplate.key === "employee_welcome" || editingEmailTemplate.key === "tutor_welcome") && (
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                       The username, temporary password and a "Log In" button are added automatically below your message — they don't need a placeholder.
+                    </p>
+                  )}
+                  {editingEmailTemplate.key === "erp_license_activation" && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                      The license ID and activation code are added automatically below your message — they don't need a placeholder.
                     </p>
                   )}
                 </div>

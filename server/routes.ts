@@ -211,12 +211,27 @@ function buildCredentialsHtml(username: string, roleLabel: string, password: str
   `;
 }
 
+function buildActivationCodeHtml(activationCode: string, licenseId: string): string {
+  return `
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+      <tr>
+        <td style="padding: 10px 14px; color: #64748b; font-size: 13px;">License ID</td>
+        <td style="padding: 10px 14px; font-family: monospace;">${escapeHtml(licenseId)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 14px; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;">Activation Code</td>
+        <td style="padding: 10px 14px; font-family: monospace; font-weight: bold; font-size: 15px; border-top: 1px solid #e2e8f0;">${escapeHtml(activationCode)}</td>
+      </tr>
+    </table>
+  `;
+}
+
 // Renders one of the EMAIL_TEMPLATE_KEYS rows (edited by a Super Admin under
 // Settings → Email Templates, no code change needed) into a subject/text/html
 // triple. Returns null if the template row is missing (falls back to a
 // hardcoded message at the call site) — should not happen once seeded.
 async function renderEmailTemplate(
-  key: "enquiry_welcome" | "employee_welcome" | "tutor_welcome",
+  key: "enquiry_welcome" | "employee_welcome" | "tutor_welcome" | "erp_license_activation",
   vars: Record<string, string>,
   brandName: string
 ): Promise<{ subject: string; text: string; html: string } | null> {
@@ -237,6 +252,10 @@ async function renderEmailTemplate(
     heading = `Welcome, ${escapeHtml(vars.fullName || "")}!`;
     extraHtml = buildCredentialsHtml(vars.username || "", vars.role || "", vars.password || "", vars.loginUrl || "");
     extraText = `\n\nUsername: ${vars.username}\nTemporary Password: ${vars.password}\nRole: ${vars.role}\n\nLogin here: ${vars.loginUrl}`;
+  } else if (key === "erp_license_activation") {
+    heading = subject;
+    extraHtml = buildActivationCodeHtml(vars.activationCode || "", vars.licenseId || "");
+    extraText = `\n\nLicense ID: ${vars.licenseId}\nActivation Code: ${vars.activationCode}`;
   }
 
   const html = buildBrandedEmailHtml({ brandName, heading, bodyHtml: bodyHtmlRendered + extraHtml });
@@ -2567,7 +2586,21 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
 
-    res.status(201).json({ ...license, activationCode });
+    // Best-effort — the code is still shown once in the admin UI regardless, so a failed
+    // or skipped (no email on file) send never blocks license creation itself.
+    let emailSent = false;
+    if (customerEmail) {
+      const rendered = await renderEmailTemplate("erp_license_activation", { customerName, licenseId: payload.licenseId, activationCode }, "MHTSdigiXR");
+      emailSent = rendered
+        ? await sendEmail(customerEmail, rendered.subject, rendered.text, rendered.html)
+        : await sendEmail(
+            customerEmail,
+            "Your MHTS ERP Activation Code",
+            `Hello ${customerName},\n\nThank you for choosing MHTS ERP. Your license is ready to activate.\n\nOpen the MHTS ERP desktop app, go to "Activate license," and enter this code:\n\nLicense ID: ${payload.licenseId}\nActivation Code: ${activationCode}\n\nKeep this code safe — it will not be shown again after this email.\n\nMHTSdigiXR Team`,
+          );
+    }
+
+    res.status(201).json({ ...license, activationCode, emailSent });
   });
 
   app.patch("/api/accounting/erp-licenses/:id/revoke", requireAuth, requirePermission("erp_licenses.manage"), async (req, res) => {

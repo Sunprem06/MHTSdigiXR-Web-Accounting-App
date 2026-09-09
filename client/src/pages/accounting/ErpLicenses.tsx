@@ -29,6 +29,7 @@ export default function ErpLicenses() {
   const [showForm, setShowForm] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [issuedCode, setIssuedCode] = useState<string | null>(null);
+  const [issuedEmailStatus, setIssuedEmailStatus] = useState<{ email: string; sent: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -60,10 +61,11 @@ export default function ErpLicenses() {
       });
       return res.json();
     },
-    onSuccess: (created: ErpLicense & { activationCode: string }) => {
+    onSuccess: (created: ErpLicense & { activationCode: string; emailSent: boolean }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting/erp-licenses"] });
       toast({ title: "License created" });
       setShowForm(false);
+      setIssuedEmailStatus(formData.customerEmail ? { email: formData.customerEmail, sent: created.emailSent } : null);
       setFormData({ licenseFileContents: "", customerName: "", customerEmail: "", customerPhone: "", maxActivations: "1" });
       setIssuedCode(created.activationCode);
     },
@@ -220,9 +222,20 @@ export default function ErpLicenses() {
         )}
       </div>
 
-      <Dialog open={issuedCode !== null} onOpenChange={() => setIssuedCode(null)}>
+      <Dialog open={issuedCode !== null} onOpenChange={() => { setIssuedCode(null); setIssuedEmailStatus(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Activation code — shown once</DialogTitle></DialogHeader>
+          {issuedEmailStatus && (
+            issuedEmailStatus.sent ? (
+              <p className="text-sm text-emerald-600 dark:text-emerald-400" data-testid="text-activation-email-status">
+                Emailed to {issuedEmailStatus.email}.
+              </p>
+            ) : (
+              <p className="text-sm text-amber-600 dark:text-amber-400" data-testid="text-activation-email-status">
+                Could not email {issuedEmailStatus.email} (SMTP not configured or the send failed) — copy the code below and send it yourself.
+              </p>
+            )
+          )}
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Copy this now and send it to the customer. It is not stored in plain text and cannot be shown again — revoke and recreate the license if it's lost.
           </p>

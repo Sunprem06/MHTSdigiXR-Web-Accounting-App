@@ -378,6 +378,17 @@ For security, please change your password immediately after your first login.
 
 If you were not expecting this account, please contact your administrator.`,
       },
+      {
+        key: "erp_license_activation",
+        name: "ERP License Activation Code",
+        description: "Sent automatically when a new MHTS ERP desktop-app license is created for a customer. The one-time activation code is added automatically below your message.",
+        subject: "Your MHTS ERP Activation Code",
+        bodyText: `Hello {{customerName}},
+
+Thank you for choosing MHTS ERP. Your license is ready to activate.
+
+Open the MHTS ERP desktop app, go to "Activate license," and enter the code below. Keep it safe — it will not be shown again after this email.`,
+      },
     ]);
   }
 
