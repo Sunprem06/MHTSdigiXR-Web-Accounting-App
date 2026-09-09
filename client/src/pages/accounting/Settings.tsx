@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send, ChevronDown, ChevronRight, CheckCircle } from "lucide-react";
+import { EMAIL_TEMPLATE_VARIABLES } from "@shared/schema";
 
 interface CompanySettings {
   id?: number;
@@ -57,6 +58,16 @@ interface FinancialYear {
   isActive: boolean;
 }
 
+interface EmailTemplateData {
+  id: number;
+  key: "enquiry_welcome" | "employee_welcome" | "tutor_welcome";
+  name: string;
+  description: string | null;
+  subject: string;
+  bodyText: string;
+  updatedAt: string | null;
+}
+
 export default function Settings() {
   const { canManageSettings, user } = useAuth();
   const { toast } = useToast();
@@ -91,6 +102,11 @@ export default function Settings() {
   const [legalContent, setLegalContent] = useState("");
   const [legalEffectiveDate, setLegalEffectiveDate] = useState("");
 
+  const [emailTemplateDialogOpen, setEmailTemplateDialogOpen] = useState(false);
+  const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplateData | null>(null);
+  const [emailTemplateSubject, setEmailTemplateSubject] = useState("");
+  const [emailTemplateBody, setEmailTemplateBody] = useState("");
+
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("465");
   const [smtpSecure, setSmtpSecure] = useState(true);
@@ -106,7 +122,7 @@ export default function Settings() {
   const [fyEnd, setFyEnd] = useState("");
   const [editingFyId, setEditingFyId] = useState<number | null>(null);
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["company", "website", "about", "legal", "smtp", "financial"]));
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["company", "website", "about", "legal", "smtp", "emailTemplates", "financial"]));
   const toggleSection = (key: string) => setCollapsed(prev => {
     const next = new Set(prev);
     next.has(key) ? next.delete(key) : next.add(key);
@@ -123,6 +139,11 @@ export default function Settings() {
 
   const { data: legalPagesData, isLoading: legalLoading } = useQuery<LegalPageData[]>({
     queryKey: ["/api/accounting/legal-pages"],
+    enabled: isSuperAdmin,
+  });
+
+  const { data: emailTemplatesData, isLoading: emailTemplatesLoading } = useQuery<EmailTemplateData[]>({
+    queryKey: ["/api/accounting/email-templates"],
     enabled: isSuperAdmin,
   });
 
@@ -294,6 +315,37 @@ export default function Settings() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
+
+  const saveEmailTemplateMutation = useMutation({
+    mutationFn: async ({ key, data }: { key: string; data: { subject: string; bodyText: string } }) => {
+      const res = await apiRequest("PATCH", `/api/accounting/email-templates/${key}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/email-templates"] });
+      setEmailTemplateDialogOpen(false);
+      setEditingEmailTemplate(null);
+      toast({ title: "Email template updated successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const openEmailTemplateEditor = (tmpl: EmailTemplateData) => {
+    setEditingEmailTemplate(tmpl);
+    setEmailTemplateSubject(tmpl.subject);
+    setEmailTemplateBody(tmpl.bodyText);
+    setEmailTemplateDialogOpen(true);
+  };
+
+  const handleSaveEmailTemplate = () => {
+    if (!editingEmailTemplate) return;
+    saveEmailTemplateMutation.mutate({
+      key: editingEmailTemplate.key,
+      data: { subject: emailTemplateSubject, bodyText: emailTemplateBody },
+    });
+  };
 
   const handleSave = () => {
     saveMutation.mutate({ companyName, address, gstin, phone, email });
@@ -680,6 +732,66 @@ export default function Settings() {
           </Card>
         )}
 
+        {isSuperAdmin && (
+          <Card>
+            <CardHeader className="cursor-pointer" onClick={() => toggleSection("emailTemplates")}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-sky-500" />
+                  <CardTitle>Email Templates</CardTitle>
+                </div>
+                {collapsed.has("emailTemplates") ? <ChevronRight className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+              </div>
+              <CardDescription>
+                Edit the wording of automatic emails — enquiry acknowledgements, and welcome emails for new employee and tutor logins. No code changes needed.
+              </CardDescription>
+            </CardHeader>
+            {!collapsed.has("emailTemplates") && <CardContent className="p-0">
+              {emailTemplatesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
+                </div>
+              ) : !emailTemplatesData || emailTemplatesData.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400" data-testid="text-no-email-templates">
+                  No email templates found. They will be created automatically on next server restart.
+                </div>
+              ) : (
+                <Table data-testid="table-email-templates">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Last Updated</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {emailTemplatesData.map((tmpl) => (
+                      <TableRow key={tmpl.key} data-testid={`row-email-template-${tmpl.key}`}>
+                        <TableCell>
+                          <div className="font-medium">{tmpl.name}</div>
+                          {tmpl.description && <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{tmpl.description}</div>}
+                        </TableCell>
+                        <TableCell className="max-w-[240px] truncate">{tmpl.subject}</TableCell>
+                        <TableCell>
+                          {tmpl.updatedAt
+                            ? new Date(tmpl.updatedAt).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => openEmailTemplateEditor(tmpl)} data-testid={`button-edit-email-template-${tmpl.key}`}>
+                            <Pencil className="w-4 h-4 mr-1" /> Edit
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>}
+          </Card>
+        )}
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 cursor-pointer" onClick={() => toggleSection("financial")}>
             <CardTitle>Financial Years</CardTitle>
@@ -794,6 +906,63 @@ export default function Settings() {
                 data-testid="button-save-legal"
               >
                 {saveLegalMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={emailTemplateDialogOpen} onOpenChange={setEmailTemplateDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-email-template">
+            <DialogHeader>
+              <DialogTitle>Edit {editingEmailTemplate?.name || "Email Template"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Subject Line</Label>
+                <Input value={emailTemplateSubject} onChange={(e) => setEmailTemplateSubject(e.target.value)} data-testid="input-email-template-subject" />
+              </div>
+              <div>
+                <Label>Message</Label>
+                <Textarea
+                  value={emailTemplateBody}
+                  onChange={(e) => setEmailTemplateBody(e.target.value)}
+                  rows={10}
+                  className="font-mono text-sm"
+                  placeholder="Hello {{fullName}}, ..."
+                  data-testid="input-email-template-body"
+                />
+                <p className="text-xs text-slate-500 mt-1">Use plain text with blank lines between paragraphs.</p>
+              </div>
+              {editingEmailTemplate && (
+                <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3">
+                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Available placeholders — type these anywhere in the subject or message and they'll be replaced automatically:</p>
+                  <div className="space-y-1">
+                    {EMAIL_TEMPLATE_VARIABLES[editingEmailTemplate.key].map((v) => (
+                      <div key={v.token} className="text-xs flex gap-2">
+                        <code className="text-sky-600 dark:text-sky-400 font-mono shrink-0">{v.token}</code>
+                        <span className="text-slate-500 dark:text-slate-400">{v.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {(editingEmailTemplate.key === "employee_welcome" || editingEmailTemplate.key === "tutor_welcome") && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                      The username, temporary password and a "Log In" button are added automatically below your message — they don't need a placeholder.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEmailTemplateDialogOpen(false)} data-testid="button-cancel-email-template">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveEmailTemplate}
+                disabled={saveEmailTemplateMutation.isPending || !emailTemplateSubject || !emailTemplateBody}
+                data-testid="button-save-email-template"
+              >
+                {saveEmailTemplateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Save Changes
               </Button>
             </DialogFooter>

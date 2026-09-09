@@ -25,7 +25,8 @@ import {
   type ErpLicense, type ErpLicenseActivation,
   tutors, tutorAgreements, tutorPayslips, payrollEmployees, payrollStatutoryConfigVersions,
   type InsertTutor, type InsertTutorAgreement, type InsertTutorPayslip, type InsertPayrollEmployee, type InsertPayrollStatutoryConfigVersion,
-  type Tutor, type TutorAgreement, type TutorPayslip, type PayrollEmployee, type PayrollStatutoryConfigVersion
+  type Tutor, type TutorAgreement, type TutorPayslip, type PayrollEmployee, type PayrollStatutoryConfigVersion,
+  emailTemplates, type InsertEmailTemplate, type EmailTemplate,
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -90,6 +91,9 @@ export interface IStorage {
   getLegalPageBySlug(slug: string): Promise<LegalPage | undefined>;
   upsertLegalPage(data: InsertLegalPage): Promise<LegalPage>;
   updateLegalPage(slug: string, data: Partial<InsertLegalPage>): Promise<LegalPage | undefined>;
+  getEmailTemplates(): Promise<EmailTemplate[]>;
+  getEmailTemplateByKey(key: string): Promise<EmailTemplate | undefined>;
+  updateEmailTemplate(key: string, data: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined>;
 
   getVouchers(filters?: { type?: string; status?: string; startDate?: string; endDate?: string; createdBy?: number }): Promise<Voucher[]>;
   getVoucher(id: number): Promise<Voucher | undefined>;
@@ -555,6 +559,22 @@ export class DatabaseStorage implements IStorage {
     const existing = await this.getLegalPageBySlug(slug);
     if (!existing) return undefined;
     const [updated] = await db.update(legalPages).set({ ...data, updatedAt: new Date() }).where(eq(legalPages.id, existing.id)).returning();
+    return updated;
+  }
+
+  async getEmailTemplates(): Promise<EmailTemplate[]> {
+    return db.select().from(emailTemplates);
+  }
+
+  async getEmailTemplateByKey(key: string): Promise<EmailTemplate | undefined> {
+    const [tmpl] = await db.select().from(emailTemplates).where(eq(emailTemplates.key, key)).limit(1);
+    return tmpl;
+  }
+
+  async updateEmailTemplate(key: string, data: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined> {
+    const existing = await this.getEmailTemplateByKey(key);
+    if (!existing) return undefined;
+    const [updated] = await db.update(emailTemplates).set({ ...data, updatedAt: new Date() }).where(eq(emailTemplates.id, existing.id)).returning();
     return updated;
   }
 

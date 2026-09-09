@@ -138,7 +138,7 @@ async function getEffectiveSmtpConfig(): Promise<SmtpConfig | null> {
   return getEnvSmtpConfig();
 }
 
-async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
+async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<boolean> {
   try {
     const smtp = await getEffectiveSmtpConfig();
     if (!smtp) return false;
@@ -148,11 +148,100 @@ async function sendEmail(to: string, subject: string, text: string): Promise<boo
       secure: smtp.secure ?? true,
       auth: { user: smtp.username, pass: smtp.password },
     });
-    await transporter.sendMail({ from: `"${smtp.fromName}" <${smtp.fromEmail}>`, to, subject, text });
+    await transporter.sendMail({ from: `"${smtp.fromName}" <${smtp.fromEmail}>`, to, subject, text, ...(html ? { html } : {}) });
     return true;
   } catch {
     return false;
   }
+}
+
+// Shared branded wrapper so transactional emails share one look. Matches the
+// accent color already used by the password-reset email template below.
+function buildBrandedEmailHtml(opts: { brandName: string; heading: string; bodyHtml: string }): string {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
+      <div style="padding: 24px 0 16px; border-bottom: 2px solid #0ea5e9;">
+        <span style="font-size: 18px; font-weight: bold; color: #0ea5e9;">${opts.brandName}</span>
+      </div>
+      <h2 style="color: #0f172a; margin: 24px 0 8px;">${opts.heading}</h2>
+      ${opts.bodyHtml}
+      <p style="color: #94a3b8; font-size: 12px; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+        This is an automated message from ${opts.brandName}. Please do not reply to this email.
+      </p>
+    </div>
+  `;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// Substitutes {{token}} placeholders. `vars` values are used as-is for the
+// plain-text output; the caller must pass HTML-escaped values when rendering
+// into HTML (see renderEmailTemplate below) since some templates (enquiry
+// acknowledgement) fill in public, unauthenticated form input.
+function fillTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_match, key) => vars[key] ?? "");
+}
+
+function textToHtmlParagraphs(text: string): string {
+  return text
+    .split(/\n\s*\n/)
+    .map(p => `<p style="margin: 0 0 12px;">${p.trim().replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+}
+
+function buildCredentialsHtml(username: string, roleLabel: string, password: string, loginUrl: string): string {
+  return `
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+      <tr>
+        <td style="padding: 10px 14px; color: #64748b; font-size: 13px;">Username</td>
+        <td style="padding: 10px 14px; font-family: monospace; font-weight: bold;">${escapeHtml(username)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 14px; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;">Temporary Password</td>
+        <td style="padding: 10px 14px; font-family: monospace; font-weight: bold; border-top: 1px solid #e2e8f0;">${escapeHtml(password)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 14px; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;">Role</td>
+        <td style="padding: 10px 14px; border-top: 1px solid #e2e8f0;">${escapeHtml(roleLabel)}</td>
+      </tr>
+    </table>
+    <p><a href="${loginUrl}" style="display: inline-block; background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In to Your Account</a></p>
+  `;
+}
+
+// Renders one of the EMAIL_TEMPLATE_KEYS rows (edited by a Super Admin under
+// Settings → Email Templates, no code change needed) into a subject/text/html
+// triple. Returns null if the template row is missing (falls back to a
+// hardcoded message at the call site) — should not happen once seeded.
+async function renderEmailTemplate(
+  key: "enquiry_welcome" | "employee_welcome" | "tutor_welcome",
+  vars: Record<string, string>,
+  brandName: string
+): Promise<{ subject: string; text: string; html: string } | null> {
+  const tmpl = await storage.getEmailTemplateByKey(key);
+  if (!tmpl) return null;
+
+  const subject = fillTemplate(tmpl.subject, vars);
+  const bodyTextRendered = fillTemplate(tmpl.bodyText, vars);
+
+  const escapedVars: Record<string, string> = {};
+  for (const [k, v] of Object.entries(vars)) escapedVars[k] = escapeHtml(v);
+  const bodyHtmlRendered = textToHtmlParagraphs(fillTemplate(tmpl.bodyText, escapedVars));
+
+  let extraHtml = "";
+  let extraText = "";
+  let heading = subject;
+  if (key === "employee_welcome" || key === "tutor_welcome") {
+    heading = `Welcome, ${escapeHtml(vars.fullName || "")}!`;
+    extraHtml = buildCredentialsHtml(vars.username || "", vars.role || "", vars.password || "", vars.loginUrl || "");
+    extraText = `\n\nUsername: ${vars.username}\nTemporary Password: ${vars.password}\nRole: ${vars.role}\n\nLogin here: ${vars.loginUrl}`;
+  }
+
+  const html = buildBrandedEmailHtml({ brandName, heading, bodyHtml: bodyHtmlRendered + extraHtml });
+  const text = `${bodyTextRendered}${extraText}`;
+  return { subject, text, html };
 }
 
 export async function registerRoutes(
@@ -225,8 +314,11 @@ export async function registerRoutes(
         if (smtp) {
           const companySettings = await storage.getCompanySettings();
           const adminEmail = companySettings?.email || smtp.fromEmail;
-          const body = `New contact form submission:\n\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\nService: ${input.service || "Not specified"}\n\nMessage:\n${input.message}\n\n---\nView all messages in the Contact Inbox at /accounting/contact-inbox`;
+          const body = `New contact form submission:\n\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\n\nMessage:\n${input.message}\n\n---\nView all messages in the Contact Inbox at /accounting/contact-inbox`;
           await sendEmail(adminEmail, "New Contact Message — MHTSdigiXR", body);
+
+          const rendered = await renderEmailTemplate("enquiry_welcome", { name: input.name }, "MHTSdigiXR");
+          if (rendered) await sendEmail(input.email, rendered.subject, rendered.text, rendered.html);
         }
       } catch (_emailErr) {}
     } catch (err) {
@@ -426,8 +518,15 @@ export async function registerRoutes(
       });
       const { password: _, ...safe } = employee;
       const baseUrl = req.protocol + "://" + req.get("host");
-      const welcomeText = `Hello ${fullName},\n\nYour MHTSdigiXR account has been created.\n\nUsername: ${username}\nPassword: ${password}\nRole: ${role}\nLogin: ${baseUrl}/accounting/login\n\nPlease change your password after first login.\n\nMHTSdigiXR Team`;
-      const emailSent = await sendEmail(email, "Welcome to MHTSdigiXR — Your Account Details", welcomeText);
+      const { ROLE_LABELS } = await import("@shared/schema");
+      const roleLabel = ROLE_LABELS[role] || role;
+      const brandName = role === "tutor" ? "KoodaldigiXS Learning" : "MHTSdigiXR";
+      const loginUrl = `${baseUrl}/accounting/login`;
+      const templateKey = role === "tutor" ? "tutor_welcome" : "employee_welcome";
+      const rendered = await renderEmailTemplate(templateKey, { fullName, username, password, role: roleLabel, loginUrl }, brandName);
+      const emailSent = rendered
+        ? await sendEmail(email, rendered.subject, rendered.text, rendered.html)
+        : await sendEmail(email, `Welcome to ${brandName} — Your Account Details`, `Hello ${fullName},\n\nYour ${brandName} account has been created.\n\nUsername: ${username}\nPassword: ${password}\nRole: ${roleLabel}\nLogin: ${loginUrl}\n\nPlease change your password after first login.\n\n${brandName} Team`);
       res.status(201).json({ ...safe, emailSent });
     } catch (err: any) {
       if (err.code === "23505") {
@@ -1532,6 +1631,28 @@ export async function registerRoutes(
     const page = await storage.updateLegalPage(req.params.slug, updates);
     if (!page) return res.status(404).json({ message: "Legal page not found" });
     res.json(page);
+  });
+
+  app.get("/api/accounting/email-templates", requireAuth, requireRole("super_admin"), async (_req, res) => {
+    const templates = await storage.getEmailTemplates();
+    res.json(templates);
+  });
+
+  app.patch("/api/accounting/email-templates/:key", requireAuth, requireRole("super_admin"), async (req, res) => {
+    const { subject, bodyText } = req.body;
+    if (subject === undefined && bodyText === undefined) return res.status(400).json({ message: "No fields to update" });
+    const updates: any = {};
+    if (subject !== undefined) updates.subject = subject;
+    if (bodyText !== undefined) updates.bodyText = bodyText;
+    updates.updatedBy = req.user!.id;
+    const template = await storage.updateEmailTemplate(req.params.key, updates);
+    if (!template) return res.status(404).json({ message: "Email template not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "email_template",
+      details: `Updated email template: ${req.params.key}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(template);
   });
 
   // Audit Logs

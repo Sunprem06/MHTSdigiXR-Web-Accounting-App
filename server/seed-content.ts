@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { faqItems, testimonials, siteStats, posts, caseStudies, pricingPlans, legalPages } from "@shared/schema";
+import { faqItems, testimonials, siteStats, posts, caseStudies, pricingPlans, legalPages, emailTemplates } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
 export async function seedContent() {
@@ -333,6 +333,51 @@ Email: info@mhtsdigixr.com
 
 We strongly advise all clients to thoroughly review project proposals, quotations, and all terms before making any payment.`
       }
+    ]);
+  }
+
+  const [emailTemplateCount] = await db.select({ count: sql<number>`count(*)::int` }).from(emailTemplates);
+  if ((emailTemplateCount?.count ?? 0) === 0) {
+    await db.insert(emailTemplates).values([
+      {
+        key: "enquiry_welcome",
+        name: "Enquiry Acknowledgement",
+        description: "Sent automatically to anyone who submits the website contact form.",
+        subject: "Thanks for reaching out — MHTSdigiXR",
+        bodyText: `Hello {{name}},
+
+Thank you for contacting MHTSdigiXR. We've received your message and one of our team members will get back to you within 24-48 hours.
+
+In the meantime, feel free to explore our website or reply to this email if you have any additional details to share.
+
+We look forward to working with you!`,
+      },
+      {
+        key: "employee_welcome",
+        name: "Employee Welcome Email",
+        description: "Sent when a new MHTSdigiXR employee login account is created. Username, temporary password, role and the login button are added automatically below your message.",
+        subject: "Welcome to MHTSdigiXR — Your Account Details",
+        bodyText: `Hello {{fullName}},
+
+Welcome to MHTSdigiXR! Your account has been created and is ready to use.
+
+For security, please change your password immediately after your first login.
+
+If you were not expecting this account, please contact your administrator.`,
+      },
+      {
+        key: "tutor_welcome",
+        name: "Tutor Welcome Email",
+        description: "Sent when a new Tutor self-service login account is created. Username, temporary password, role and the login button are added automatically below your message.",
+        subject: "Welcome to KoodaldigiXS Learning — Your Account Details",
+        bodyText: `Hello {{fullName}},
+
+Welcome to KoodaldigiXS Learning! Your tutor account has been created and is ready to use.
+
+For security, please change your password immediately after your first login.
+
+If you were not expecting this account, please contact your administrator.`,
+      },
     ]);
   }
 
