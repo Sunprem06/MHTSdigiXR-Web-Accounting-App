@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AttachmentsPanel } from "@/components/accounting/AttachmentsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PARTY_TYPES } from "@shared/schema";
 import type { Party } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Search, Users, Loader2, X, Save, Trash2 } from "lucide-react";
+import { Plus, Search, Users, Loader2, X, Save, Trash2, Paperclip } from "lucide-react";
 
 const PARTY_TYPE_LABELS: Record<string, string> = {
   customer: "Customer", vendor: "Vendor", both: "Both",
@@ -35,6 +37,7 @@ export default function Parties() {
   const [tab, setTab] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [attachmentsFor, setAttachmentsFor] = useState<Party | null>(null);
 
   const [formData, setFormData] = useState({
     name: "", type: "customer" as string, email: "", phone: "",
@@ -261,6 +264,9 @@ export default function Parties() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setAttachmentsFor(p)} data-testid={`button-attachments-party-${p.id}`}>
+                            <Paperclip className="w-4 h-4" />
+                          </Button>
                           <Button size="sm" variant="ghost" onClick={() => startEdit(p)} data-testid={`button-edit-party-${p.id}`}>Edit</Button>
                           {canDelete && (
                             <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" onClick={() => { if (confirm("Are you sure you want to delete this party?")) deleteMutation.mutate(p.id); }} disabled={deleteMutation.isPending} data-testid={`button-delete-party-${p.id}`}>
@@ -277,6 +283,17 @@ export default function Parties() {
           </Card>
         )}
       </div>
+
+      <Dialog open={!!attachmentsFor} onOpenChange={(open) => !open && setAttachmentsFor(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Attachments — {attachmentsFor?.name}</DialogTitle>
+          </DialogHeader>
+          {attachmentsFor && (
+            <AttachmentsPanel entityType="party" entityId={attachmentsFor.id} uploadPermission="parties.create" managePermission="parties.delete" />
+          )}
+        </DialogContent>
+      </Dialog>
     </AccountingLayout>
   );
 }
