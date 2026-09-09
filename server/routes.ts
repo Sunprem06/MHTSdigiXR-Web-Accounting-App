@@ -74,16 +74,21 @@ function computeTutorPayslip(input: TutorPayslipInputs) {
   return { grossEarnings, platformCommissionAmount, tdsAmount, netPay, tdsRatePercent, validPan, panAtPayment: pan || null };
 }
 
-// A voucher's date must fall within the currently active Financial Year, if one is
-// configured. Checked at every voucher-creation call site (manual entry, quotation
-// conversion, tutor payslip mark-paid) — hard block, not just a warning. Returns an
-// error message to send back with 400, or null if the date is fine / no FY is active
-// yet (an app with no financial years configured at all isn't blocked).
+// A voucher's date must fall within SOME configured Financial Year — not
+// specifically the currently active one. Backdating/catching up entries into a
+// prior year (e.g. FY 2025-26 while FY 2026-27 is active) is normal accounting
+// practice; "active" only means "the default year for new work," not "the only
+// year postings are allowed into." Checked at every voucher-creation call site
+// (manual entry, quotation conversion, tutor payslip mark-paid) — hard block,
+// not just a warning. Returns an error message to send back with 400, or null
+// if the date falls in a defined year / no financial years are configured at
+// all yet (an app that hasn't set one up isn't blocked).
 async function checkFinancialYearForDate(date: string): Promise<string | null> {
-  const activeFy = await storage.getActiveFinancialYear();
-  if (!activeFy) return null;
-  if (date < activeFy.startDate || date > activeFy.endDate) {
-    return `Date ${date} falls outside the active financial year "${activeFy.name}" (${activeFy.startDate} to ${activeFy.endDate}). Activate the correct financial year in Settings first.`;
+  const allFys = await storage.getFinancialYears();
+  if (allFys.length === 0) return null;
+  const matchingFy = allFys.find(fy => date >= fy.startDate && date <= fy.endDate);
+  if (!matchingFy) {
+    return `Date ${date} doesn't fall within any configured financial year. Add or extend a financial year covering this date in Settings first.`;
   }
   return null;
 }
