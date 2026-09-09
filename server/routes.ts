@@ -138,7 +138,7 @@ async function getEffectiveSmtpConfig(): Promise<SmtpConfig | null> {
   return getEnvSmtpConfig();
 }
 
-async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
+async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<boolean> {
   try {
     const smtp = await getEffectiveSmtpConfig();
     if (!smtp) return false;
@@ -148,11 +148,28 @@ async function sendEmail(to: string, subject: string, text: string): Promise<boo
       secure: smtp.secure ?? true,
       auth: { user: smtp.username, pass: smtp.password },
     });
-    await transporter.sendMail({ from: `"${smtp.fromName}" <${smtp.fromEmail}>`, to, subject, text });
+    await transporter.sendMail({ from: `"${smtp.fromName}" <${smtp.fromEmail}>`, to, subject, text, ...(html ? { html } : {}) });
     return true;
   } catch {
     return false;
   }
+}
+
+// Shared branded wrapper so transactional emails share one look. Matches the
+// accent color already used by the password-reset email template below.
+function buildBrandedEmailHtml(opts: { brandName: string; heading: string; bodyHtml: string }): string {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
+      <div style="padding: 24px 0 16px; border-bottom: 2px solid #0ea5e9;">
+        <span style="font-size: 18px; font-weight: bold; color: #0ea5e9;">${opts.brandName}</span>
+      </div>
+      <h2 style="color: #0f172a; margin: 24px 0 8px;">${opts.heading}</h2>
+      ${opts.bodyHtml}
+      <p style="color: #94a3b8; font-size: 12px; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+        This is an automated message from ${opts.brandName}. Please do not reply to this email.
+      </p>
+    </div>
+  `;
 }
 
 export async function registerRoutes(
@@ -426,8 +443,36 @@ export async function registerRoutes(
       });
       const { password: _, ...safe } = employee;
       const baseUrl = req.protocol + "://" + req.get("host");
-      const welcomeText = `Hello ${fullName},\n\nYour MHTSdigiXR account has been created.\n\nUsername: ${username}\nPassword: ${password}\nRole: ${role}\nLogin: ${baseUrl}/accounting/login\n\nPlease change your password after first login.\n\nMHTSdigiXR Team`;
-      const emailSent = await sendEmail(email, "Welcome to MHTSdigiXR — Your Account Details", welcomeText);
+      const { ROLE_LABELS } = await import("@shared/schema");
+      const roleLabel = ROLE_LABELS[role] || role;
+      const brandName = role === "tutor" ? "KoodaldigiXS Learning" : "MHTSdigiXR";
+      const loginUrl = `${baseUrl}/accounting/login`;
+      const welcomeText = `Hello ${fullName},\n\nWelcome to ${brandName}! Your account has been created and is ready to use.\n\nUsername: ${username}\nTemporary Password: ${password}\nRole: ${roleLabel}\n\nLogin here: ${loginUrl}\n\nFor security, please change your password immediately after your first login.\n\nIf you were not expecting this account, please contact your administrator.\n\nRegards,\n${brandName} Team`;
+      const welcomeHtml = buildBrandedEmailHtml({
+        brandName,
+        heading: `Welcome, ${fullName}!`,
+        bodyHtml: `
+          <p>Your ${brandName} account has been created and is ready to use.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <tr>
+              <td style="padding: 10px 14px; color: #64748b; font-size: 13px;">Username</td>
+              <td style="padding: 10px 14px; font-family: monospace; font-weight: bold;">${username}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 14px; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;">Temporary Password</td>
+              <td style="padding: 10px 14px; font-family: monospace; font-weight: bold; border-top: 1px solid #e2e8f0;">${password}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 14px; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;">Role</td>
+              <td style="padding: 10px 14px; border-top: 1px solid #e2e8f0;">${roleLabel}</td>
+            </tr>
+          </table>
+          <p><a href="${loginUrl}" style="display: inline-block; background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In to Your Account</a></p>
+          <p style="color: #64748b; font-size: 14px;">For security, please change your password immediately after your first login.</p>
+          <p style="color: #64748b; font-size: 13px;">If you were not expecting this account, please contact your administrator.</p>
+        `,
+      });
+      const emailSent = await sendEmail(email, `Welcome to ${brandName} — Your Account Details`, welcomeText, welcomeHtml);
       res.status(201).json({ ...safe, emailSent });
     } catch (err: any) {
       if (err.code === "23505") {
