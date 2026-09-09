@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Printer, Loader2 } from "lucide-react";
+import { useActiveFinancialYear } from "@/hooks/use-active-financial-year";
 
 interface DayBookEntry {
   id: number;
@@ -19,10 +20,22 @@ interface DayBookEntry {
 }
 
 export default function DayBook() {
+  const activeFy = useActiveFinancialYear();
   const today = new Date().toISOString().split("T")[0];
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
   const [startDate, setStartDate] = useState(thirtyDaysAgo);
   const [endDate, setEndDate] = useState(today);
+  const [initialized, setInitialized] = useState(false);
+
+  // Default to the active FY's range once it loads — still fully editable, e.g.
+  // back to a "last 30 days" window, afterward.
+  useEffect(() => {
+    if (activeFy && !initialized) {
+      setStartDate(activeFy.startDate);
+      setEndDate(activeFy.endDate);
+      setInitialized(true);
+    }
+  }, [activeFy, initialized]);
 
   const dayBookUrl = `/api/accounting/reports/day-book?startDate=${startDate}&endDate=${endDate}`;
   const { data: entries, isLoading } = useQuery<DayBookEntry[]>({

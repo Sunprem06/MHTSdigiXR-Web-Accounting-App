@@ -93,6 +93,19 @@ async function checkFinancialYearForDate(date: string): Promise<string | null> {
   return null;
 }
 
+// A date is "past year" if there's an active FY configured and the date falls
+// outside its range (either before or, in principle, after — though after would
+// mean the active FY is stale). No active FY at all means nothing is "past" —
+// everything is treated as current, unrestricted work.
+async function isPastFinancialYearDate(date: string): Promise<boolean> {
+  const activeFy = await storage.getActiveFinancialYear();
+  if (!activeFy) return false;
+  return date < activeFy.startDate || date > activeFy.endDate;
+}
+
+const ROLES_ALLOWED_PAST_FY_ENTRY = ["senior_accountant", "admin", "super_admin"];
+const ROLES_ALLOWED_PAST_FY_APPROVAL = ["admin", "super_admin"];
+
 type SmtpConfig = {
   host: string;
   port: number;
@@ -1367,6 +1380,11 @@ export async function registerRoutes(
     const fyError = await checkFinancialYearForDate(voucherData.date);
     if (fyError) return res.status(400).json({ message: fyError });
 
+    const isPastYear = await isPastFinancialYearDate(voucherData.date);
+    if (isPastYear && !ROLES_ALLOWED_PAST_FY_ENTRY.includes(req.user!.role)) {
+      return res.status(403).json({ message: "Only Senior Accountant, Admin, or Super Admin can post into a past financial year. Switch to the active year, or ask one of them to enter this." });
+    }
+
     const totalDebit = entries.reduce((sum: number, e: any) => sum + parseFloat(e.debit || 0), 0);
     const totalCredit = entries.reduce((sum: number, e: any) => sum + parseFloat(e.credit || 0), 0);
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
@@ -1375,6 +1393,10 @@ export async function registerRoutes(
 
     let status = voucherData.status || "pending";
     if (!req.user!.permissions?.includes("vouchers.approve")) status = "draft";
+    // A past-year voucher can never come in pre-approved, even from someone who
+    // holds vouchers.approve (e.g. Senior Accountant) — approving it into a closed
+    // year specifically requires Admin/Super Admin, enforced on the status route.
+    if (isPastYear && status === "approved") status = "pending";
 
     const voucher = await storage.createVoucher(
       { ...voucherData, status, totalAmount: String(totalDebit), createdBy: req.user!.id },
@@ -1390,6 +1412,14 @@ export async function registerRoutes(
 
   app.patch("/api/accounting/vouchers/:id/status", requireAuth, requirePermission("vouchers.approve"), async (req, res) => {
     const { status } = req.body;
+    if (status === "approved") {
+      const voucher = await storage.getVoucher(parseInt(req.params.id));
+      if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+      const isPastYear = await isPastFinancialYearDate(voucher.date);
+      if (isPastYear && !ROLES_ALLOWED_PAST_FY_APPROVAL.includes(req.user!.role)) {
+        return res.status(403).json({ message: "Entries dated in a past financial year require Admin or Super Admin approval." });
+      }
+    }
     const approvedBy = status === "approved" ? req.user!.id : undefined;
     const updated = await storage.updateVoucherStatus(parseInt(req.params.id), status, approvedBy);
     if (!updated) return res.status(404).json({ message: "Voucher not found" });
@@ -1425,7 +1455,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/accounting/reports/balance-sheet", requireAuth, requirePermission("reports.view"), async (req, res) => {
-    const data = await storage.getBalanceSheet();
+    const data = await storage.getBalanceSheet(req.query.asOfDate as string | undefined);
     res.json(data);
   });
 

@@ -1,14 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Printer } from "lucide-react";
+import { useActiveFinancialYear } from "@/hooks/use-active-financial-year";
 
 export default function GstSummary() {
+  const activeFy = useActiveFinancialYear();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (activeFy && !initialized) {
+      setStartDate(activeFy.startDate);
+      setEndDate(activeFy.endDate);
+      setInitialized(true);
+    }
+  }, [activeFy, initialized]);
 
   const qs = new URLSearchParams();
   if (startDate) qs.set("startDate", startDate);
