@@ -29,7 +29,7 @@ interface NavItem {
   path?: string;
   icon: any;
   requiredPermission?: Permission;
-  children?: { label: string; path: string; icon: any }[];
+  children?: { label: string; path: string; icon: any; requiredPermission?: Permission }[];
 }
 
 const navItems: NavItem[] = [
@@ -64,40 +64,44 @@ const navItems: NavItem[] = [
       { label: "GST Summary", path: "/accounting/reports/gst-summary", icon: IndianRupee },
     ],
   },
-  { label: "Recruitment", path: "/accounting/job-postings", icon: Briefcase, requiredPermission: "jobs.view",
-    children: [
-      { label: "Job Postings", path: "/accounting/job-postings", icon: Briefcase },
-      { label: "Applications", path: "/accounting/job-applications", icon: UserCheck },
-    ],
-  },
   {
-    label: "Payroll", icon: Banknote, requiredPermission: "payroll_tutors.view",
+    // Combines every HR-related area — recruitment, staff accounts/roles, and
+    // payroll — into one group instead of scattering them as separate top-level
+    // tabs. No top-level requiredPermission here on purpose: visibility is
+    // per-child below, so the group only shows if at least one HR area is
+    // actually visible to this user (see filteredItems below).
+    label: "HR", icon: Users,
     children: [
-      { label: "Tutors", path: "/accounting/payroll/tutors", icon: GraduationCap },
-      { label: "Tutor Agreements", path: "/accounting/payroll/tutor-agreements", icon: FileText },
-      { label: "Tutor Payslips", path: "/accounting/payroll/tutor-payslips", icon: Receipt },
-      { label: "Employees (Payroll)", path: "/accounting/payroll/employees", icon: Users },
+      { label: "Job Postings", path: "/accounting/job-postings", icon: Briefcase, requiredPermission: "jobs.view" },
+      { label: "Applications", path: "/accounting/job-applications", icon: UserCheck, requiredPermission: "jobs.view" },
+      { label: "Employees", path: "/accounting/employees", icon: Users, requiredPermission: "employees.manage" },
+      { label: "Roles", path: "/accounting/roles", icon: KeyRound, requiredPermission: "roles.view" },
+      { label: "Tutors", path: "/accounting/payroll/tutors", icon: GraduationCap, requiredPermission: "payroll_tutors.view" },
+      { label: "Tutor Agreements", path: "/accounting/payroll/tutor-agreements", icon: FileText, requiredPermission: "payroll_tutors.view" },
+      { label: "Tutor Payslips", path: "/accounting/payroll/tutor-payslips", icon: Receipt, requiredPermission: "payroll_tutors.view" },
+      { label: "Employees (Payroll)", path: "/accounting/payroll/employees", icon: Banknote, requiredPermission: "payroll_employees.view" },
     ],
   },
   { label: "My Payslips", path: "/accounting/payroll/my-payslips", icon: Receipt, requiredPermission: "payroll_tutors.view_own" },
-  {
-    label: "Website CMS", icon: Globe, requiredPermission: "content.view",
-    children: [
-      { label: "Services", path: "/accounting/services-management", icon: Layers },
-      { label: "Pricing Plans", path: "/accounting/pricing-plans", icon: DollarSign },
-      { label: "Blog Posts", path: "/accounting/blog-posts", icon: PenLine },
-      { label: "Case Studies", path: "/accounting/case-studies", icon: FolderOpen },
-      { label: "FAQs", path: "/accounting/faqs", icon: HelpCircle },
-      { label: "Testimonials", path: "/accounting/testimonials", icon: MessageSquare },
-      { label: "Site Stats", path: "/accounting/site-stats", icon: Activity },
-    ],
-  },
   { label: "Contact Inbox", path: "/accounting/contact-inbox", icon: Mail, requiredPermission: "contacts.view" },
   { label: "Audit Log", path: "/accounting/audit-log", icon: Shield, requiredPermission: "audit.view" },
-  { label: "Employees", path: "/accounting/employees", icon: Users, requiredPermission: "employees.manage" },
-  { label: "Roles", path: "/accounting/roles", icon: KeyRound, requiredPermission: "roles.view" },
   { label: "ERP Licenses", path: "/accounting/erp-licenses", icon: Fingerprint, requiredPermission: "erp_licenses.view" },
-  { label: "Settings", path: "/accounting/settings", icon: Settings, requiredPermission: "settings.view" },
+  {
+    // Website CMS (public-site content editing) lives inside Settings rather
+    // than as its own top-level tab — it's a settings/configuration concern,
+    // not something that should be visible as a standalone nav item.
+    label: "Settings", icon: Settings,
+    children: [
+      { label: "General Settings", path: "/accounting/settings", icon: Settings, requiredPermission: "settings.view" },
+      { label: "Services", path: "/accounting/services-management", icon: Layers, requiredPermission: "content.view" },
+      { label: "Pricing Plans", path: "/accounting/pricing-plans", icon: DollarSign, requiredPermission: "content.view" },
+      { label: "Blog Posts", path: "/accounting/blog-posts", icon: PenLine, requiredPermission: "content.view" },
+      { label: "Case Studies", path: "/accounting/case-studies", icon: FolderOpen, requiredPermission: "content.view" },
+      { label: "FAQs", path: "/accounting/faqs", icon: HelpCircle, requiredPermission: "content.view" },
+      { label: "Testimonials", path: "/accounting/testimonials", icon: MessageSquare, requiredPermission: "content.view" },
+      { label: "Site Stats", path: "/accounting/site-stats", icon: Activity, requiredPermission: "content.view" },
+    ],
+  },
 ];
 
 export function AccountingLayout({ children }: AccountingLayoutProps) {
@@ -172,10 +176,22 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
     window.location.href = "/accounting/login";
   };
 
-  const filteredItems = navItems.filter(item => {
-    if (!item.requiredPermission) return true;
-    return hasPermission(item.requiredPermission);
-  });
+  const filteredItems = navItems
+    .map(item => {
+      if (!item.children) return item;
+      const visibleChildren = item.children.filter(
+        child => !child.requiredPermission || hasPermission(child.requiredPermission)
+      );
+      return { ...item, children: visibleChildren };
+    })
+    .filter(item => {
+      if (item.children) {
+        if (item.requiredPermission && !hasPermission(item.requiredPermission)) return false;
+        return item.children.length > 0;
+      }
+      if (!item.requiredPermission) return true;
+      return hasPermission(item.requiredPermission);
+    });
 
   const isActive = (path?: string) => {
     if (!path) return false;
