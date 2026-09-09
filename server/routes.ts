@@ -1266,6 +1266,15 @@ export async function registerRoutes(
     res.json(items);
   });
 
+  app.post("/api/accounting/services", requireAuth, requirePermission("content.create"), async (req, res) => {
+    const { title, slug, description, icon, image, features } = req.body;
+    if (!title || !slug || !description || !icon || !image) {
+      return res.status(400).json({ message: "Title, slug, description, icon, and image are required" });
+    }
+    const created = await storage.createService({ title, slug, description, icon, image, features: features || [] });
+    res.status(201).json(created);
+  });
+
   app.patch("/api/accounting/services/:id", requireAuth, requirePermission("content.edit"), async (req, res) => {
     const { title, slug, description, icon, image, features } = req.body;
     const updated = await storage.updateService(parseInt(req.params.id), { title, slug, description, icon, image, features });

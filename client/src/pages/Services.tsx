@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Server, CheckCircle2, GraduationCap, Clock, IndianRupee, Users, HelpCircle, Layout, TrendingUp } from "lucide-react";
+import { ArrowRight, Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Server, CheckCircle2, GraduationCap, Clock, IndianRupee, Users, HelpCircle, Layout, TrendingUp, Zap } from "lucide-react";
 import { SiReact, SiNextdotjs, SiNodedotjs, SiWordpress, SiShopify, SiPython, SiMongodb, SiAmazon } from "react-icons/si";
 import { useQuery } from "@tanstack/react-query";
 import type { Service, PricingPlan } from "@shared/schema";
@@ -24,7 +24,7 @@ const TECH_STACK = [
 ];
 
 const ICON_MAP: Record<string, typeof Code> = {
-  Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Server, Layout, TrendingUp
+  Code, Smartphone, BarChart3, Palette, Monitor, Globe, Search, Video, Server, Layout, TrendingUp, Zap
 };
 
 const COLOR_MAP: Record<string, string> = {
@@ -38,6 +38,7 @@ const COLOR_MAP: Record<string, string> = {
   "video-animation": "from-yellow-500 to-yellow-600",
   "branding": "from-red-500 to-red-600",
   "hosting": "from-cyan-500 to-cyan-600",
+  "automation-suite": "from-sky-500 to-blue-600",
 };
 
 export default function Services() {

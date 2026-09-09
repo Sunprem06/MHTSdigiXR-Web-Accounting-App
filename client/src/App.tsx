@@ -24,6 +24,7 @@ function ScrollToTop() {
 import Home from "@/pages/Home";
 import Services from "@/pages/Services";
 import ServiceDetail from "@/pages/ServiceDetail";
+import AutomationSuite from "@/pages/AutomationSuite";
 import FAQ from "@/pages/FAQ";
 import Careers from "@/pages/Careers";
 import Workflow from "@/pages/Workflow";
@@ -94,6 +95,7 @@ function WebsiteRouter() {
           <Switch>
             <Route path="/" component={Home} />
             <Route path="/services" component={Services} />
+            <Route path="/services/automation-suite" component={AutomationSuite} />
             <Route path="/services/:slug" component={ServiceDetail} />
             <Route path="/faq" component={FAQ} />
             <Route path="/careers" component={Careers} />
