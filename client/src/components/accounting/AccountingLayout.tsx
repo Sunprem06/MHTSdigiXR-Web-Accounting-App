@@ -29,7 +29,7 @@ interface NavItem {
   path?: string;
   icon: any;
   requiredPermission?: Permission;
-  children?: { label: string; path: string; icon: any; requiredPermission?: Permission }[];
+  children?: NavItem[];
 }
 
 const navItems: NavItem[] = [
@@ -93,13 +93,18 @@ const navItems: NavItem[] = [
     label: "Settings", icon: Settings,
     children: [
       { label: "General Settings", path: "/accounting/settings", icon: Settings, requiredPermission: "settings.view" },
-      { label: "Services", path: "/accounting/services-management", icon: Layers, requiredPermission: "content.view" },
-      { label: "Pricing Plans", path: "/accounting/pricing-plans", icon: DollarSign, requiredPermission: "content.view" },
-      { label: "Blog Posts", path: "/accounting/blog-posts", icon: PenLine, requiredPermission: "content.view" },
-      { label: "Case Studies", path: "/accounting/case-studies", icon: FolderOpen, requiredPermission: "content.view" },
-      { label: "FAQs", path: "/accounting/faqs", icon: HelpCircle, requiredPermission: "content.view" },
-      { label: "Testimonials", path: "/accounting/testimonials", icon: MessageSquare, requiredPermission: "content.view" },
-      { label: "Site Stats", path: "/accounting/site-stats", icon: Activity, requiredPermission: "content.view" },
+      {
+        label: "Website CMS", icon: Globe, requiredPermission: "content.view",
+        children: [
+          { label: "Services", path: "/accounting/services-management", icon: Layers },
+          { label: "Pricing Plans", path: "/accounting/pricing-plans", icon: DollarSign },
+          { label: "Blog Posts", path: "/accounting/blog-posts", icon: PenLine },
+          { label: "Case Studies", path: "/accounting/case-studies", icon: FolderOpen },
+          { label: "FAQs", path: "/accounting/faqs", icon: HelpCircle },
+          { label: "Testimonials", path: "/accounting/testimonials", icon: MessageSquare },
+          { label: "Site Stats", path: "/accounting/site-stats", icon: Activity },
+        ],
+      },
     ],
   },
 ];
@@ -176,22 +181,23 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
     window.location.href = "/accounting/login";
   };
 
+  // Recursive: a group (has children) is visible only if its own permission (if any)
+  // passes AND at least one of its children survives the same filtering — applied at
+  // every nesting level, so an empty sub-group (e.g. Website CMS with none of its
+  // pages visible) drops out without leaving a dangling empty header.
+  const filterNavItem = (item: NavItem): NavItem | null => {
+    if (item.requiredPermission && !hasPermission(item.requiredPermission)) return null;
+    if (!item.children) return item;
+    const visibleChildren = item.children
+      .map(filterNavItem)
+      .filter((child): child is NavItem => child !== null);
+    if (visibleChildren.length === 0) return null;
+    return { ...item, children: visibleChildren };
+  };
+
   const filteredItems = navItems
-    .map(item => {
-      if (!item.children) return item;
-      const visibleChildren = item.children.filter(
-        child => !child.requiredPermission || hasPermission(child.requiredPermission)
-      );
-      return { ...item, children: visibleChildren };
-    })
-    .filter(item => {
-      if (item.children) {
-        if (item.requiredPermission && !hasPermission(item.requiredPermission)) return false;
-        return item.children.length > 0;
-      }
-      if (!item.requiredPermission) return true;
-      return hasPermission(item.requiredPermission);
-    });
+    .map(filterNavItem)
+    .filter((item): item is NavItem => item !== null);
 
   const isActive = (path?: string) => {
     if (!path) return false;
@@ -210,6 +216,52 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
     if (location.startsWith(pathBase + "/") && !window.location.search) return true;
     return false;
   };
+
+  // Recursive so a group can itself contain a sub-group (e.g. Settings > Website
+  // CMS > Services) at arbitrary depth, each level with its own expand/collapse
+  // state (keyed by label — toggleMenu/expandedMenus are shared across all levels).
+  const renderNavItem = (item: NavItem, depth: number): React.ReactNode => (
+    <div key={item.label}>
+      {item.children ? (
+        <>
+          <button
+            onClick={() => toggleMenu(item.label)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
+          >
+            <span className="flex items-center gap-3">
+              <item.icon className="w-4 h-4" />
+              {item.label}
+            </span>
+            {expandedMenus.includes(item.label) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+          {expandedMenus.includes(item.label) && (
+            <div className="ml-4 space-y-1 mt-1">
+              {item.children.map(child => renderNavItem(child, depth + 1))}
+            </div>
+          )}
+        </>
+      ) : (
+        <Link href={item.path!}>
+          <div
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+              isActive(item.path)
+                ? "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-medium"
+                : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}
+            onClick={() => setSidebarOpen(false)}
+            data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
+          >
+            <item.icon className="w-4 h-4" />
+            <span className="flex-1">{item.label}</span>
+            {item.label === "Contact Inbox" && unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center" data-testid="badge-unread-count">{unreadCount}</span>
+            )}
+          </div>
+        </Link>
+      )}
+    </div>
+  );
 
   const sidebar = (
     <div className="flex flex-col h-full">
@@ -236,63 +288,7 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-        {filteredItems.map(item => (
-          <div key={item.label}>
-            {item.children ? (
-              <>
-                <button
-                  onClick={() => toggleMenu(item.label)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
-                >
-                  <span className="flex items-center gap-3">
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </span>
-                  {expandedMenus.includes(item.label) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                </button>
-                {expandedMenus.includes(item.label) && (
-                  <div className="ml-4 space-y-1 mt-1">
-                    {item.children.map(child => (
-                      <Link key={child.path} href={child.path}>
-                        <div
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                            isActive(child.path)
-                              ? "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-medium"
-                              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          }`}
-                          onClick={() => setSidebarOpen(false)}
-                          data-testid={`nav-${child.label.toLowerCase().replace(/\s/g, '-')}`}
-                        >
-                          <child.icon className="w-4 h-4" />
-                          {child.label}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <Link href={item.path!}>
-                <div
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                    isActive(item.path)
-                      ? "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-medium"
-                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                  data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}
-                >
-                  <item.icon className="w-4 h-4" />
-                  <span className="flex-1">{item.label}</span>
-                  {item.label === "Contact Inbox" && unreadCount > 0 && (
-                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center" data-testid="badge-unread-count">{unreadCount}</span>
-                  )}
-                </div>
-              </Link>
-            )}
-          </div>
-        ))}
+        {filteredItems.map(item => renderNavItem(item, 0))}
       </nav>
 
       <div className="p-3 border-t border-slate-200 dark:border-slate-700 space-y-1">
