@@ -74,6 +74,38 @@ function computeTutorPayslip(input: TutorPayslipInputs) {
   return { grossEarnings, platformCommissionAmount, tdsAmount, netPay, tdsRatePercent, validPan, panAtPayment: pan || null };
 }
 
+// A voucher's date must fall within SOME configured Financial Year — not
+// specifically the currently active one. Backdating/catching up entries into a
+// prior year (e.g. FY 2025-26 while FY 2026-27 is active) is normal accounting
+// practice; "active" only means "the default year for new work," not "the only
+// year postings are allowed into." Checked at every voucher-creation call site
+// (manual entry, quotation conversion, tutor payslip mark-paid) — hard block,
+// not just a warning. Returns an error message to send back with 400, or null
+// if the date falls in a defined year / no financial years are configured at
+// all yet (an app that hasn't set one up isn't blocked).
+async function checkFinancialYearForDate(date: string): Promise<string | null> {
+  const allFys = await storage.getFinancialYears();
+  if (allFys.length === 0) return null;
+  const matchingFy = allFys.find(fy => date >= fy.startDate && date <= fy.endDate);
+  if (!matchingFy) {
+    return `Date ${date} doesn't fall within any configured financial year. Add or extend a financial year covering this date in Settings first.`;
+  }
+  return null;
+}
+
+// A date is "past year" if there's an active FY configured and the date falls
+// outside its range (either before or, in principle, after — though after would
+// mean the active FY is stale). No active FY at all means nothing is "past" —
+// everything is treated as current, unrestricted work.
+async function isPastFinancialYearDate(date: string): Promise<boolean> {
+  const activeFy = await storage.getActiveFinancialYear();
+  if (!activeFy) return false;
+  return date < activeFy.startDate || date > activeFy.endDate;
+}
+
+const ROLES_ALLOWED_PAST_FY_ENTRY = ["senior_accountant", "admin", "super_admin"];
+const ROLES_ALLOWED_PAST_FY_APPROVAL = ["admin", "super_admin"];
+
 type SmtpConfig = {
   host: string;
   port: number;
@@ -765,11 +797,14 @@ export async function registerRoutes(
     if (quotation.status !== "accepted" && quotation.status !== "sent") {
       return res.status(400).json({ message: "Only approved quotations can be converted to invoices" });
     }
+    const convertDate = new Date().toISOString().split("T")[0];
+    const fyError = await checkFinancialYearForDate(convertDate);
+    if (fyError) return res.status(400).json({ message: fyError });
 
     const voucherNumber = await storage.getNextVoucherNumber("sales");
     const voucher = await storage.createVoucher({
       voucherNumber,
-      date: new Date().toISOString().split("T")[0],
+      date: convertDate,
       type: "sales",
       narration: `From Quotation ${quotation.quotationNumber}`,
       totalAmount: String(quotation.grandTotal),
@@ -1210,6 +1245,9 @@ export async function registerRoutes(
     if (payslip.status !== "approved") return res.status(400).json({ message: "Only approved payslips can be marked paid" });
     const tutor = await storage.getTutor(payslip.tutorId);
     if (!tutor) return res.status(400).json({ message: "Tutor not found" });
+    const payDate = new Date().toISOString().split("T")[0];
+    const fyError = await checkFinancialYearForDate(payDate);
+    if (fyError) return res.status(400).json({ message: fyError });
 
     const ledgerAccounts = await storage.getLedgerAccounts();
     const feesLedger = ledgerAccounts.find(a => a.name === "Tutor Professional Fees");
@@ -1240,7 +1278,7 @@ export async function registerRoutes(
     const voucherNumber = await storage.getNextVoucherNumber("payment");
     const voucher = await storage.createVoucher({
       voucherNumber,
-      date: new Date().toISOString().split("T")[0],
+      date: payDate,
       type: "payment",
       narration: `Tutor payslip — ${tutor.tutorCode} (${tutor.fullName}) — ${payslip.payMonth}`,
       totalAmount: String(gross),
@@ -1339,6 +1377,13 @@ export async function registerRoutes(
     if (!voucherData.date || !voucherData.type || !voucherData.voucherNumber) {
       return res.status(400).json({ message: "Date, type, and voucher number are required" });
     }
+    const fyError = await checkFinancialYearForDate(voucherData.date);
+    if (fyError) return res.status(400).json({ message: fyError });
+
+    const isPastYear = await isPastFinancialYearDate(voucherData.date);
+    if (isPastYear && !ROLES_ALLOWED_PAST_FY_ENTRY.includes(req.user!.role)) {
+      return res.status(403).json({ message: "Only Senior Accountant, Admin, or Super Admin can post into a past financial year. Switch to the active year, or ask one of them to enter this." });
+    }
 
     const totalDebit = entries.reduce((sum: number, e: any) => sum + parseFloat(e.debit || 0), 0);
     const totalCredit = entries.reduce((sum: number, e: any) => sum + parseFloat(e.credit || 0), 0);
@@ -1348,6 +1393,10 @@ export async function registerRoutes(
 
     let status = voucherData.status || "pending";
     if (!req.user!.permissions?.includes("vouchers.approve")) status = "draft";
+    // A past-year voucher can never come in pre-approved, even from someone who
+    // holds vouchers.approve (e.g. Senior Accountant) — approving it into a closed
+    // year specifically requires Admin/Super Admin, enforced on the status route.
+    if (isPastYear && status === "approved") status = "pending";
 
     const voucher = await storage.createVoucher(
       { ...voucherData, status, totalAmount: String(totalDebit), createdBy: req.user!.id },
@@ -1363,6 +1412,14 @@ export async function registerRoutes(
 
   app.patch("/api/accounting/vouchers/:id/status", requireAuth, requirePermission("vouchers.approve"), async (req, res) => {
     const { status } = req.body;
+    if (status === "approved") {
+      const voucher = await storage.getVoucher(parseInt(req.params.id));
+      if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+      const isPastYear = await isPastFinancialYearDate(voucher.date);
+      if (isPastYear && !ROLES_ALLOWED_PAST_FY_APPROVAL.includes(req.user!.role)) {
+        return res.status(403).json({ message: "Entries dated in a past financial year require Admin or Super Admin approval." });
+      }
+    }
     const approvedBy = status === "approved" ? req.user!.id : undefined;
     const updated = await storage.updateVoucherStatus(parseInt(req.params.id), status, approvedBy);
     if (!updated) return res.status(404).json({ message: "Voucher not found" });
@@ -1398,7 +1455,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/accounting/reports/balance-sheet", requireAuth, requirePermission("reports.view"), async (req, res) => {
-    const data = await storage.getBalanceSheet();
+    const data = await storage.getBalanceSheet(req.query.asOfDate as string | undefined);
     res.json(data);
   });
 
@@ -1418,18 +1475,18 @@ export async function registerRoutes(
     res.json(years);
   });
 
-  app.post("/api/accounting/financial-years", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+  app.post("/api/accounting/financial-years", requireAuth, requirePermission("financial_years.manage"), async (req, res) => {
     const fy = await storage.createFinancialYear(req.body);
     res.status(201).json(fy);
   });
 
-  app.patch("/api/accounting/financial-years/:id", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+  app.patch("/api/accounting/financial-years/:id", requireAuth, requirePermission("financial_years.manage"), async (req, res) => {
     const updated = await storage.updateFinancialYear(parseInt(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Financial year not found" });
     res.json(updated);
   });
 
-  app.post("/api/accounting/financial-years/:id/activate", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+  app.post("/api/accounting/financial-years/:id/activate", requireAuth, requirePermission("financial_years.manage"), async (req, res) => {
     const updated = await storage.activateFinancialYear(parseInt(req.params.id));
     if (!updated) return res.status(404).json({ message: "Financial year not found" });
     await storage.createAuditLog({

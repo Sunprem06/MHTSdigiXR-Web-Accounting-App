@@ -1,29 +1,42 @@
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Printer, Loader2 } from "lucide-react";
+import { useActiveFinancialYear } from "@/hooks/use-active-financial-year";
 
 interface TrialBalanceEntry {
+  accountId: number;
   accountName: string;
-  group: string;
-  debit: string;
-  credit: string;
-}
-
-interface TrialBalanceData {
-  entries: TrialBalanceEntry[];
-  totals: { debit: string; credit: string };
+  groupName: string;
+  debit: number;
+  credit: number;
 }
 
 export default function TrialBalance() {
-  const { data, isLoading } = useQuery<TrialBalanceData>({
-    queryKey: ["/api/accounting/reports/trial-balance"],
+  const activeFy = useActiveFinancialYear();
+  const [asOnDate, setAsOnDate] = useState("");
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (activeFy && !initialized) {
+      setAsOnDate(activeFy.endDate);
+      setInitialized(true);
+    }
+  }, [activeFy, initialized]);
+
+  const url = `/api/accounting/reports/trial-balance${asOnDate ? `?asOnDate=${asOnDate}` : ""}`;
+  const { data, isLoading } = useQuery<TrialBalanceEntry[]>({
+    queryKey: [url],
   });
 
-  const fmt = (val: string) =>
-    parseFloat(val).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+  const fmt = (val: number) => val.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+  const totalDebit = (data || []).reduce((sum, e) => sum + e.debit, 0);
+  const totalCredit = (data || []).reduce((sum, e) => sum + e.credit, 0);
 
   return (
     <AccountingLayout>
@@ -38,9 +51,19 @@ export default function TrialBalance() {
           </Button>
         </div>
 
+        <div className="flex flex-wrap items-end gap-4 print:hidden">
+          <div>
+            <Label>As On Date</Label>
+            <Input type="date" value={asOnDate} onChange={e => setAsOnDate(e.target.value)} data-testid="input-tb-as-on-date" />
+          </div>
+          {activeFy && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 pb-2">Defaulted to end of active FY: {activeFy.name}</p>
+          )}
+        </div>
+
         <div className="hidden print:block text-center mb-4">
           <h2 className="text-xl font-bold">Trial Balance</h2>
-          <p className="text-sm text-slate-600">As on {new Date().toLocaleDateString("en-IN")}</p>
+          <p className="text-sm text-slate-600">As on {asOnDate || new Date().toLocaleDateString("en-IN")}</p>
         </div>
 
         <Card>
@@ -49,7 +72,7 @@ export default function TrialBalance() {
               <div className="flex items-center justify-center py-12" data-testid="loading-trial-balance">
                 <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
               </div>
-            ) : !data || data.entries.length === 0 ? (
+            ) : !data || data.length === 0 ? (
               <div className="text-center py-12 text-slate-500 dark:text-slate-400" data-testid="text-no-entries">
                 No account data available.
               </div>
@@ -64,15 +87,15 @@ export default function TrialBalance() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.entries.map((entry, idx) => (
-                    <TableRow key={idx} data-testid={`row-trial-balance-${idx}`}>
+                  {data.map((entry) => (
+                    <TableRow key={entry.accountId} data-testid={`row-trial-balance-${entry.accountId}`}>
                       <TableCell>{entry.accountName}</TableCell>
-                      <TableCell>{entry.group}</TableCell>
+                      <TableCell>{entry.groupName}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {parseFloat(entry.debit) > 0 ? fmt(entry.debit) : "—"}
+                        {entry.debit > 0 ? fmt(entry.debit) : "—"}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {parseFloat(entry.credit) > 0 ? fmt(entry.credit) : "—"}
+                        {entry.credit > 0 ? fmt(entry.credit) : "—"}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -80,8 +103,8 @@ export default function TrialBalance() {
                 <TableFooter>
                   <TableRow data-testid="row-trial-balance-totals">
                     <TableCell colSpan={2} className="font-bold">Total</TableCell>
-                    <TableCell className="text-right font-mono font-bold">{fmt(data.totals.debit)}</TableCell>
-                    <TableCell className="text-right font-mono font-bold">{fmt(data.totals.credit)}</TableCell>
+                    <TableCell className="text-right font-mono font-bold">{fmt(totalDebit)}</TableCell>
+                    <TableCell className="text-right font-mono font-bold">{fmt(totalCredit)}</TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>

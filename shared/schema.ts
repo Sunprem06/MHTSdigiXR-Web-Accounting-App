@@ -721,6 +721,9 @@ export const ALL_PERMISSIONS = [
   "erp_licenses.view", "erp_licenses.manage",
   "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own",
   "payroll_employees.view", "payroll_employees.manage",
+  // Deliberately separate from settings.manage (which is super_admin-only) so
+  // Admin can also activate/manage financial years without the broader settings access.
+  "financial_years.manage",
 ] as const;
 
 export type Permission = typeof ALL_PERMISSIONS[number];
@@ -745,6 +748,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   erp_licenses: { label: "ERP Licenses", permissions: ["erp_licenses.view", "erp_licenses.manage"] },
   payroll_tutors: { label: "Payroll - Tutors", permissions: ["payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own"] },
   payroll_employees: { label: "Payroll - Employees (Stub)", permissions: ["payroll_employees.view", "payroll_employees.manage"] },
+  financial_years: { label: "Financial Years", permissions: ["financial_years.manage"] },
 };
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {

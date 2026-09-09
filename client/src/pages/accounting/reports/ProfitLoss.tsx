@@ -1,30 +1,70 @@
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Printer, Loader2 } from "lucide-react";
+import { useActiveFinancialYear } from "@/hooks/use-active-financial-year";
 
 interface ProfitLossItem {
-  accountName: string;
-  amount: string;
+  name: string;
+  amount: number;
 }
 
 interface ProfitLossData {
-  income: ProfitLossItem[];
-  expenses: ProfitLossItem[];
-  totalIncome: string;
-  totalExpenses: string;
-  netProfitLoss: string;
+  directIncome: ProfitLossItem[];
+  indirectIncome: ProfitLossItem[];
+  directExpenses: ProfitLossItem[];
+  indirectExpenses: ProfitLossItem[];
+  grossProfit: number;
+  netProfit: number;
 }
 
 export default function ProfitLoss() {
+  const activeFy = useActiveFinancialYear();
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [initialized, setInitialized] = useState(false);
+
+  // Default the range to the active FY once it's loaded — still fully editable afterward.
+  useEffect(() => {
+    if (activeFy && !initialized) {
+      setStartDate(activeFy.startDate);
+      setEndDate(activeFy.endDate);
+      setInitialized(true);
+    }
+  }, [activeFy, initialized]);
+
+  const qs = new URLSearchParams();
+  if (startDate) qs.set("startDate", startDate);
+  if (endDate) qs.set("endDate", endDate);
+  const url = `/api/accounting/reports/profit-loss${qs.toString() ? `?${qs.toString()}` : ""}`;
+
   const { data, isLoading } = useQuery<ProfitLossData>({
-    queryKey: ["/api/accounting/reports/profit-loss"],
+    queryKey: [url],
   });
 
-  const fmt = (val: string) =>
-    parseFloat(val).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+  const fmt = (val: number) => val.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+
+  const renderSection = (title: string, items: ProfitLossItem[], colorClass: string, testId: string) => (
+    <Table data-testid={testId}>
+      <TableBody>
+        {items.length === 0 ? (
+          <TableRow><TableCell className="text-center text-slate-400">None</TableCell></TableRow>
+        ) : (
+          items.map((item, idx) => (
+            <TableRow key={idx}>
+              <TableCell>{item.name}</TableCell>
+              <TableCell className="text-right font-mono">{fmt(item.amount)}</TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
 
   return (
     <AccountingLayout>
@@ -39,9 +79,23 @@ export default function ProfitLoss() {
           </Button>
         </div>
 
+        <div className="flex flex-wrap items-end gap-4 print:hidden">
+          <div>
+            <Label>Start Date</Label>
+            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} data-testid="input-pl-start-date" />
+          </div>
+          <div>
+            <Label>End Date</Label>
+            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} data-testid="input-pl-end-date" />
+          </div>
+          {activeFy && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 pb-2">Defaulted to active FY: {activeFy.name}</p>
+          )}
+        </div>
+
         <div className="hidden print:block text-center mb-4">
           <h2 className="text-xl font-bold">Profit & Loss Statement</h2>
-          <p className="text-sm text-slate-600">As on {new Date().toLocaleDateString("en-IN")}</p>
+          <p className="text-sm text-slate-600">{startDate || "Inception"} to {endDate || new Date().toLocaleDateString("en-IN")}</p>
         </div>
 
         {isLoading ? (
@@ -55,92 +109,37 @@ export default function ProfitLoss() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-lg text-green-700 dark:text-green-400">Income</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table data-testid="table-income">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.income.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={2} className="text-center text-slate-400">No income entries</TableCell>
-                      </TableRow>
-                    ) : (
-                      data.income.map((item, idx) => (
-                        <TableRow key={idx} data-testid={`row-income-${idx}`}>
-                          <TableCell>{item.accountName}</TableCell>
-                          <TableCell className="text-right font-mono">{fmt(item.amount)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                    <TableRow className="font-bold border-t-2">
-                      <TableCell>Total Income</TableCell>
-                      <TableCell className="text-right font-mono" data-testid="text-total-income">
-                        {fmt(data.totalIncome)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-lg text-green-700 dark:text-green-400">Direct Income</CardTitle></CardHeader>
+              <CardContent className="p-0">{renderSection("Direct Income", data.directIncome, "text-green-700", "table-direct-income")}</CardContent>
             </Card>
-
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-lg text-red-700 dark:text-red-400">Expenses</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table data-testid="table-expenses">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.expenses.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={2} className="text-center text-slate-400">No expense entries</TableCell>
-                      </TableRow>
-                    ) : (
-                      data.expenses.map((item, idx) => (
-                        <TableRow key={idx} data-testid={`row-expense-${idx}`}>
-                          <TableCell>{item.accountName}</TableCell>
-                          <TableCell className="text-right font-mono">{fmt(item.amount)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                    <TableRow className="font-bold border-t-2">
-                      <TableCell>Total Expenses</TableCell>
-                      <TableCell className="text-right font-mono" data-testid="text-total-expenses">
-                        {fmt(data.totalExpenses)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-lg text-red-700 dark:text-red-400">Direct Expenses</CardTitle></CardHeader>
+              <CardContent className="p-0">{renderSection("Direct Expenses", data.directExpenses, "text-red-700", "table-direct-expenses")}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-lg text-green-700 dark:text-green-400">Indirect Income</CardTitle></CardHeader>
+              <CardContent className="p-0">{renderSection("Indirect Income", data.indirectIncome, "text-green-700", "table-indirect-income")}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-lg text-red-700 dark:text-red-400">Indirect Expenses</CardTitle></CardHeader>
+              <CardContent className="p-0">{renderSection("Indirect Expenses", data.indirectExpenses, "text-red-700", "table-indirect-expenses")}</CardContent>
             </Card>
 
             <Card className="lg:col-span-2">
-              <CardContent className="py-4">
+              <CardContent className="py-4 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-4">
+                  <span className="text-base font-semibold text-slate-700 dark:text-slate-300">Gross Profit</span>
+                  <span className="text-lg font-bold font-mono" data-testid="text-gross-profit">{fmt(data.grossProfit)}</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t">
                   <span className="text-lg font-bold text-slate-900 dark:text-white">
-                    Net {parseFloat(data.netProfitLoss) >= 0 ? "Profit" : "Loss"}
+                    Net {data.netProfit >= 0 ? "Profit" : "Loss"}
                   </span>
                   <span
-                    className={`text-xl font-bold font-mono ${
-                      parseFloat(data.netProfitLoss) >= 0
-                        ? "text-green-700 dark:text-green-400"
-                        : "text-red-700 dark:text-red-400"
-                    }`}
+                    className={`text-xl font-bold font-mono ${data.netProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}
                     data-testid="text-net-profit-loss"
                   >
-                    {fmt(data.netProfitLoss)}
+                    {fmt(data.netProfit)}
                   </span>
                 </div>
               </CardContent>

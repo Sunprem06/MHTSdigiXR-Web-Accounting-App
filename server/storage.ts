@@ -231,7 +231,7 @@ export interface IStorage {
 
   getTrialBalance(asOnDate?: string): Promise<Array<{ accountId: number; accountName: string; groupName: string; debit: number; credit: number }>>;
   getProfitAndLoss(startDate?: string, endDate?: string): Promise<{ directIncome: Array<{ name: string; amount: number }>; indirectIncome: Array<{ name: string; amount: number }>; directExpenses: Array<{ name: string; amount: number }>; indirectExpenses: Array<{ name: string; amount: number }>; grossProfit: number; netProfit: number }>;
-  getBalanceSheet(): Promise<{ assets: Array<{ name: string; amount: number }>; liabilities: Array<{ name: string; amount: number }>; capital: Array<{ name: string; amount: number }>; netProfit: number }>;
+  getBalanceSheet(asOfDate?: string): Promise<{ assets: Array<{ name: string; amount: number }>; liabilities: Array<{ name: string; amount: number }>; capital: Array<{ name: string; amount: number }>; netProfit: number }>;
   getDayBook(startDate?: string, endDate?: string, type?: string): Promise<Voucher[]>;
   getGstSummary(startDate?: string, endDate?: string): Promise<{ outputTax: { cgst: number; sgst: number; igst: number; total: number }; inputTax: { cgst: number; sgst: number; igst: number; total: number }; netLiability: number }>;
 
@@ -929,7 +929,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDashboardStats() {
-    const allVouchers = await db.select().from(vouchers).where(eq(vouchers.status, "approved"));
+    const activeFy = await this.getActiveFinancialYear();
+
+    // Income/expenses are period figures — scoped to the active FY's date range
+    // when one is configured (matches "activate a year to see that year's P&L").
+    const allVouchers = activeFy
+      ? await db.select().from(vouchers).where(and(eq(vouchers.status, "approved"), gte(vouchers.date, activeFy.startDate), lte(vouchers.date, activeFy.endDate)))
+      : await db.select().from(vouchers).where(eq(vouchers.status, "approved"));
 
     let totalIncome = 0;
     let totalExpenses = 0;
@@ -945,12 +951,23 @@ export class DatabaseStorage implements IStorage {
     const groups = await db.select().from(accountGroups);
     const allAccounts = await db.select().from(ledgerAccounts);
 
+    // Cash/bank/receivables/payables are running (balance-sheet-style) balances —
+    // scoped "as of the end of the active FY" rather than filtered to only that
+    // year's transactions, since a carried-forward balance includes everything
+    // before it too (same treatment as the Balance Sheet report).
+    let validVoucherIds: Set<number> | null = null;
+    if (activeFy) {
+      const voucherList = await db.select().from(vouchers).where(lte(vouchers.date, activeFy.endDate));
+      validVoucherIds = new Set(voucherList.map(v => v.id));
+    }
+
     const getAccountBalance = async (name: string) => {
       const account = allAccounts.find(a => a.name === name);
       if (!account) return 0;
       const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, account.id));
+      const filteredEntries = validVoucherIds ? entries.filter(e => validVoucherIds!.has(e.voucherId)) : entries;
       let balance = parseFloat(account.openingBalance);
-      for (const e of entries) {
+      for (const e of filteredEntries) {
         balance += parseFloat(e.debit) - parseFloat(e.credit);
       }
       return balance;
@@ -967,21 +984,24 @@ export class DatabaseStorage implements IStorage {
 
     if (debtorAccount) {
       const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, debtorAccount.id));
+      const filteredEntries = validVoucherIds ? entries.filter(e => validVoucherIds!.has(e.voucherId)) : entries;
       totalReceivables = parseFloat(debtorAccount.openingBalance);
-      for (const e of entries) totalReceivables += parseFloat(e.debit) - parseFloat(e.credit);
+      for (const e of filteredEntries) totalReceivables += parseFloat(e.debit) - parseFloat(e.credit);
     }
     if (creditorAccount) {
       const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, creditorAccount.id));
+      const filteredEntries = validVoucherIds ? entries.filter(e => validVoucherIds!.has(e.voucherId)) : entries;
       totalPayables = parseFloat(creditorAccount.openingBalance);
-      for (const e of entries) totalPayables += parseFloat(e.credit) - parseFloat(e.debit);
+      for (const e of filteredEntries) totalPayables += parseFloat(e.credit) - parseFloat(e.debit);
     }
 
+    // Pending approvals and recent activity are actionable/current-work items,
+    // not historical figures — deliberately NOT scoped to the active FY, since
+    // a to-do queue doesn't make sense filtered by a prior year.
     const [pendingResult] = await db.select({ count: sql<number>`count(*)` }).from(vouchers).where(eq(vouchers.status, "pending"));
     const pendingApprovals = pendingResult?.count || 0;
 
     const recentVouchers = await db.select().from(vouchers).orderBy(desc(vouchers.createdAt)).limit(10);
-
-    const activeFy = await this.getActiveFinancialYear();
 
     return {
       totalIncome,
@@ -1086,7 +1106,7 @@ export class DatabaseStorage implements IStorage {
     return { directIncome, indirectIncome, directExpenses, indirectExpenses, grossProfit, netProfit };
   }
 
-  async getBalanceSheet() {
+  async getBalanceSheet(asOfDate?: string) {
     const groups = await db.select().from(accountGroups);
     const allAccounts = await db.select().from(ledgerAccounts);
 
@@ -1094,13 +1114,20 @@ export class DatabaseStorage implements IStorage {
     const liabilityGroups = groups.filter(g => g.type === "liability").map(g => g.id);
     const capitalGroups = groups.filter(g => g.type === "capital").map(g => g.id);
 
+    let validVoucherIds: Set<number> | null = null;
+    if (asOfDate) {
+      const voucherList = await db.select().from(vouchers).where(lte(vouchers.date, asOfDate));
+      validVoucherIds = new Set(voucherList.map(v => v.id));
+    }
+
     const computeBalances = async (groupIds: number[]) => {
       const accounts = allAccounts.filter(a => groupIds.includes(a.groupId));
       const result: Array<{ name: string; amount: number }> = [];
       for (const account of accounts) {
         const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, account.id));
+        const filteredEntries = validVoucherIds ? entries.filter(e => validVoucherIds!.has(e.voucherId)) : entries;
         let amount = parseFloat(account.openingBalance);
-        for (const e of entries) {
+        for (const e of filteredEntries) {
           amount += parseFloat(e.debit) - parseFloat(e.credit);
         }
         if (amount !== 0) result.push({ name: account.name, amount: Math.abs(amount) });
@@ -1108,7 +1135,7 @@ export class DatabaseStorage implements IStorage {
       return result;
     };
 
-    const pnl = await this.getProfitAndLoss();
+    const pnl = await this.getProfitAndLoss(undefined, asOfDate);
 
     return {
       assets: await computeBalances(assetGroups),
