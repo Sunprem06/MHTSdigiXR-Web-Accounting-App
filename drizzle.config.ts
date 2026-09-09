@@ -11,8 +11,9 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
-  // The "session" table is created/owned by connect-pg-simple (server/auth.ts),
-  // not by Drizzle — it has no definition in shared/schema.ts on purpose.
-  // Without this, `db:push` sees it as an orphan and offers to DELETE it.
-  tablesFilter: ["!session"],
+  // "session" is created/owned by connect-pg-simple (server/auth.ts); "sessions"
+  // (plural) is a separate pre-existing table this app's DB role doesn't even own.
+  // Neither has a definition in shared/schema.ts on purpose — without this filter,
+  // `db:push` treats them as orphans and tries to delete/alter them.
+  tablesFilter: ["!session", "!sessions"],
 });
