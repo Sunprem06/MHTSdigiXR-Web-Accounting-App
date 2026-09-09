@@ -41,11 +41,51 @@ const ACCEPTANCE_COLORS: Record<string, string> = {
 
 const emptyForm = {
   tutorId: "", agreementRef: "", subject: "", startDate: "", endDate: "",
-  sessionsSummary: "", weeklySchedule: "",
+  totalClasses: "", hoursPerClass: "2", scheduleDays: "2", startTime: "", endTime: "",
   compensationType: "per_hour", rateFee: "", platformCommissionPercent: "0",
   paymentFrequency: "monthly", agreementStatus: "in_progress", tutorAcceptanceStatus: "pending_response",
   postCourseSupportMonths: "",
 };
+
+const HOURS_PER_CLASS_OPTIONS: string[] = [];
+for (let h = 1; h <= 8; h += 0.5) HOURS_PER_CLASS_OPTIONS.push(String(h));
+
+const TIME_SLOTS: string[] = (() => {
+  const slots: string[] = [];
+  for (let mins = 6 * 60; mins <= 21 * 60 + 30; mins += 30) {
+    const h24 = Math.floor(mins / 60);
+    const m = mins % 60;
+    const period = h24 >= 12 ? "PM" : "AM";
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    slots.push(`${h12}:${String(m).padStart(2, "0")} ${period}`);
+  }
+  return slots;
+})();
+
+function composeSessionsSummary(totalClasses: string, hoursPerClass: string): string {
+  if (!totalClasses) return "";
+  return `${totalClasses} classes | ${hoursPerClass} hrs per class`;
+}
+
+function parseSessionsSummary(s: string | null): { totalClasses: string; hoursPerClass: string } {
+  const match = (s || "").match(/(\d+)\s*classes?\s*\|\s*([\d.]+)\s*hrs?/i);
+  return match ? { totalClasses: match[1], hoursPerClass: match[2] } : { totalClasses: "", hoursPerClass: "2" };
+}
+
+function composeWeeklySchedule(days: string, startTime: string, endTime: string): string {
+  if (!startTime || !endTime) return days ? `Day(s): ${days}` : "";
+  return `Day(s): ${days}  Time: ${startTime} to ${endTime}`;
+}
+
+function parseWeeklySchedule(s: string | null): { scheduleDays: string; startTime: string; endTime: string } {
+  const dayMatch = (s || "").match(/Day\(s\):\s*(\d+)/i);
+  const timeMatch = (s || "").match(/Time:\s*([\d:apm ]+)\s*to\s*([\d:apm ]+)/i);
+  return {
+    scheduleDays: dayMatch ? dayMatch[1] : "2",
+    startTime: timeMatch ? timeMatch[1].trim() : "",
+    endTime: timeMatch ? timeMatch[2].trim() : "",
+  };
+}
 
 function toCsv(rows: TutorAgreement[], tutorMap: Map<number, Tutor>): string {
   const headers = ["Agreement Ref", "Tutor", "Subject", "Start Date", "End Date", "Compensation Type", "Rate/Fee", "Platform Commission %", "Payment Frequency", "Agreement Status", "Tutor Acceptance Status"];
@@ -120,12 +160,19 @@ export default function TutorAgreements() {
   });
 
   const buildPayload = () => ({
-    ...form,
     tutorId: parseInt(form.tutorId),
+    agreementRef: form.agreementRef,
+    subject: form.subject,
     startDate: form.startDate || null,
     endDate: form.endDate || null,
+    sessionsSummary: composeSessionsSummary(form.totalClasses, form.hoursPerClass),
+    weeklySchedule: composeWeeklySchedule(form.scheduleDays, form.startTime, form.endTime),
+    compensationType: form.compensationType,
     rateFee: form.rateFee || "0",
     platformCommissionPercent: form.platformCommissionPercent || "0",
+    paymentFrequency: form.paymentFrequency,
+    agreementStatus: form.agreementStatus,
+    tutorAcceptanceStatus: form.tutorAcceptanceStatus,
     postCourseSupportMonths: form.postCourseSupportMonths ? parseInt(form.postCourseSupportMonths) : null,
   });
 
@@ -143,10 +190,13 @@ export default function TutorAgreements() {
 
   const openEdit = (a: TutorAgreement) => {
     setEditingAgreement(a);
+    const sessions = parseSessionsSummary(a.sessionsSummary);
+    const schedule = parseWeeklySchedule(a.weeklySchedule);
     setForm({
       tutorId: String(a.tutorId), agreementRef: a.agreementRef, subject: a.subject,
       startDate: a.startDate || "", endDate: a.endDate || "",
-      sessionsSummary: a.sessionsSummary || "", weeklySchedule: a.weeklySchedule || "",
+      totalClasses: sessions.totalClasses, hoursPerClass: sessions.hoursPerClass,
+      scheduleDays: schedule.scheduleDays, startTime: schedule.startTime, endTime: schedule.endTime,
       compensationType: a.compensationType, rateFee: a.rateFee,
       platformCommissionPercent: a.platformCommissionPercent,
       paymentFrequency: a.paymentFrequency, agreementStatus: a.agreementStatus,
@@ -191,8 +241,44 @@ export default function TutorAgreements() {
       </div>
       <div><Label>Start Date</Label><Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} data-testid="input-agreement-start" /></div>
       <div><Label>End Date (Completion Deadline)</Label><Input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} data-testid="input-agreement-end" /></div>
-      <div><Label>Total Sessions/Classes</Label><Input value={form.sessionsSummary} onChange={e => setForm({ ...form, sessionsSummary: e.target.value })} placeholder="29 classes | 3 hrs per class" data-testid="input-agreement-sessions" /></div>
-      <div><Label>Weekly Schedule</Label><Input value={form.weeklySchedule} onChange={e => setForm({ ...form, weeklySchedule: e.target.value })} placeholder="Day(s): 2  Time: 2:00 PM to 5:00 PM" data-testid="input-agreement-schedule" /></div>
+      <div>
+        <Label>Total Classes / Sessions</Label>
+        <Input type="number" min="0" value={form.totalClasses} onChange={e => setForm({ ...form, totalClasses: e.target.value })} placeholder="29" data-testid="input-agreement-total-classes" />
+      </div>
+      <div>
+        <Label>Hours per Class</Label>
+        <Select value={form.hoursPerClass} onValueChange={v => setForm({ ...form, hoursPerClass: v })}>
+          <SelectTrigger data-testid="select-agreement-hours-per-class"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {HOURS_PER_CLASS_OPTIONS.map(h => <SelectItem key={h} value={h}>{h} hr{h !== "1" ? "s" : ""}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Days per Week</Label>
+        <Select value={form.scheduleDays} onValueChange={v => setForm({ ...form, scheduleDays: v })}>
+          <SelectTrigger data-testid="select-agreement-schedule-days"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {[1, 2, 3, 4, 5, 6, 7].map(d => <SelectItem key={d} value={String(d)}>{d} day{d !== 1 ? "s" : ""}/week</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label>Start Time</Label>
+          <Select value={form.startTime} onValueChange={v => setForm({ ...form, startTime: v })}>
+            <SelectTrigger data-testid="select-agreement-start-time"><SelectValue placeholder="Select" /></SelectTrigger>
+            <SelectContent>{TIME_SLOTS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>End Time</Label>
+          <Select value={form.endTime} onValueChange={v => setForm({ ...form, endTime: v })}>
+            <SelectTrigger data-testid="select-agreement-end-time"><SelectValue placeholder="Select" /></SelectTrigger>
+            <SelectContent>{TIME_SLOTS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+      </div>
       <div>
         <Label>Compensation Type *</Label>
         <Select value={form.compensationType} onValueChange={v => setForm({ ...form, compensationType: v })}>
