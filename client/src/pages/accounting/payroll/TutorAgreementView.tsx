@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { TutorAgreement, Tutor, CompanySettings } from "@shared/schema";
 import { Loader2, Printer } from "lucide-react";
+import koodaldigixsLogo from "@assets/KoodaldigiXS_Learning_logo.jpg";
 
 const COMPENSATION_LABELS: Record<string, string> = {
   per_session: "Per Session", per_course: "Per Course", per_hour: "Per Hour", revenue_share: "Revenue Share",
@@ -64,6 +65,7 @@ export default function TutorAgreementView() {
         <Card className="border-slate-200 dark:border-slate-700 print:border print:shadow-none">
           <CardContent className="p-8 print:p-6 space-y-6">
             <div className="text-center border-b border-slate-200 dark:border-slate-700 pb-4">
+              <img src={koodaldigixsLogo} alt="KoodaldigiXS Learning" className="h-14 mx-auto mb-2" />
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                 KoodaldigiXS Learning — {company?.companyName || "Maanagarram Hi Tech Solutions"}
               </h2>

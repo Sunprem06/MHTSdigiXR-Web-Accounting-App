@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -17,6 +16,21 @@ const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 const COMPENSATION_LABELS: Record<string, string> = {
   per_session: "Per Session", per_course: "Per Course", per_hour: "Per Hour", revenue_share: "Revenue Share",
 };
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function monthInputToLabel(value: string): string {
+  const [y, m] = value.split("-");
+  if (!y || !m) return "";
+  return `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
+}
+
+function monthLabelToInput(label: string): string {
+  const match = label.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (!match) return "";
+  const idx = MONTH_NAMES.findIndex(m => m.toLowerCase() === match[1].toLowerCase());
+  if (idx === -1) return "";
+  return `${match[2]}-${String(idx + 1).padStart(2, "0")}`;
+}
 
 function round2(n: number) { return Math.round(n * 100) / 100; }
 
@@ -63,14 +77,18 @@ export default function TutorPayslipEntry() {
   });
 
   const [agreementId, setAgreementId] = useState(preselectedAgreementId || "");
-  const [payMonth, setPayMonth] = useState("");
+  const [payMonthInput, setPayMonthInput] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [unitsDelivered, setUnitsDelivered] = useState("0");
   const [revenueAmount, setRevenueAmount] = useState("0");
   const [otherDeduction, setOtherDeduction] = useState("0");
   const [pan, setPan] = useState("");
-  const [deductTds, setDeductTds] = useState(true);
-  const [tdsOverride, setTdsOverride] = useState<string>("auto");
+  const [tdsSelection, setTdsSelection] = useState<string>("auto"); // "auto" | "10" | "20" | "0" (no TDS)
   const [loaded, setLoaded] = useState(false);
+
+  const deductTds = tdsSelection !== "0";
 
   const selectedAgreement = agreements?.find(a => String(a.id) === agreementId);
   const selectedTutor = tutors?.find(t => t.id === selectedAgreement?.tutorId);
@@ -84,13 +102,12 @@ export default function TutorPayslipEntry() {
   useEffect(() => {
     if (isEditMode && existing && !loaded) {
       setAgreementId(String(existing.agreementId));
-      setPayMonth(existing.payMonth);
+      setPayMonthInput(monthLabelToInput(existing.payMonth) || payMonthInput);
       setUnitsDelivered(existing.unitsDelivered || "0");
       setRevenueAmount(existing.revenueAmount || "0");
       setOtherDeduction(existing.otherDeduction || "0");
       setPan(existing.panAtPayment || "");
-      setDeductTds(existing.deductTds);
-      setTdsOverride(existing.tdsRatePercent === 10 || existing.tdsRatePercent === 20 ? String(existing.tdsRatePercent) : "auto");
+      setTdsSelection(!existing.deductTds ? "0" : (existing.tdsRatePercent === 10 || existing.tdsRatePercent === 20 ? String(existing.tdsRatePercent) : "auto"));
       setLoaded(true);
     }
   }, [existing, isEditMode, loaded]);
@@ -104,20 +121,20 @@ export default function TutorPayslipEntry() {
     otherDeduction: parseFloat(otherDeduction) || 0,
     deductTds,
     pan,
-    tdsOverride: tdsOverride === "auto" ? null : parseInt(tdsOverride),
-  }), [selectedAgreement, unitsDelivered, revenueAmount, otherDeduction, deductTds, pan, tdsOverride]);
+    tdsOverride: deductTds && tdsSelection !== "auto" ? parseInt(tdsSelection) : null,
+  }), [selectedAgreement, unitsDelivered, revenueAmount, otherDeduction, deductTds, pan, tdsSelection]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
         agreementId: parseInt(agreementId),
-        payMonth,
+        payMonth: monthInputToLabel(payMonthInput),
         unitsDelivered,
         revenueAmount,
         otherDeduction,
         deductTds,
         panAtPayment: pan,
-        tdsRatePercent: tdsOverride === "auto" ? undefined : parseInt(tdsOverride),
+        tdsRatePercent: deductTds && tdsSelection !== "auto" ? parseInt(tdsSelection) : undefined,
       };
       const res = isEditMode
         ? await apiRequest("PATCH", `/api/accounting/tutor-payslips/${editId}`, payload)
@@ -175,8 +192,8 @@ export default function TutorPayslipEntry() {
               )}
             </div>
             <div>
-              <Label>Pay Month * (e.g. April 2026)</Label>
-              <Input value={payMonth} onChange={e => setPayMonth(e.target.value)} placeholder="April 2026" data-testid="input-pay-month" />
+              <Label>Pay Month *</Label>
+              <Input type="month" value={payMonthInput} onChange={e => setPayMonthInput(e.target.value)} data-testid="input-pay-month" />
             </div>
           </CardContent>
         </Card>
@@ -208,37 +225,32 @@ export default function TutorPayslipEntry() {
         <Card>
           <CardHeader><CardTitle className="text-base">TDS — Sec 194J</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Deduct TDS on this payslip</Label>
+                <Label>TDS Rate</Label>
+                <Select value={tdsSelection} onValueChange={setTdsSelection}>
+                  <SelectTrigger data-testid="select-tds-rate"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto (from PAN validity)</SelectItem>
+                    <SelectItem value="10">10% (With PAN)</SelectItem>
+                    <SelectItem value="20">20% (No PAN — Sec 206AA)</SelectItem>
+                    <SelectItem value="0">No TDS — pay in full</SelectItem>
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  TDS is only legally required once aggregate FY payments to this tutor cross ₹30,000 — turn off if this payment is below that threshold.
+                  TDS is only legally required once aggregate FY payments to this tutor cross ₹30,000 — choose "No TDS" if this payment is below that threshold.
                 </p>
               </div>
-              <Switch checked={deductTds} onCheckedChange={setDeductTds} data-testid="switch-deduct-tds" />
-            </div>
-            {deductTds && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {deductTds && (
                 <div>
                   <Label>PAN at Payment</Label>
-                  <Input value={pan} onChange={e => { setPan(e.target.value.toUpperCase()); setTdsOverride("auto"); }} placeholder="AAAAA9999A" className="uppercase" data-testid="input-payslip-pan" />
+                  <Input value={pan} onChange={e => { setPan(e.target.value.toUpperCase()); if (tdsSelection !== "0") setTdsSelection("auto"); }} placeholder="AAAAA9999A" className="uppercase" data-testid="input-payslip-pan" />
                   <p className={`text-xs mt-1 ${preview.validPan ? "text-green-600" : "text-amber-600"}`}>
                     {preview.validPan ? "Valid PAN — 10% TDS" : "No valid PAN — 20% TDS (Sec 206AA)"}
                   </p>
                 </div>
-                <div>
-                  <Label>TDS Rate</Label>
-                  <Select value={tdsOverride} onValueChange={setTdsOverride}>
-                    <SelectTrigger data-testid="select-tds-rate"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">Auto (from PAN validity)</SelectItem>
-                      <SelectItem value="10">10% (With PAN)</SelectItem>
-                      <SelectItem value="20">20% (No PAN — Sec 206AA)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -258,7 +270,7 @@ export default function TutorPayslipEntry() {
           <Button variant="outline" onClick={() => setLocation("/accounting/payroll/tutor-payslips")}>Cancel</Button>
           <Button
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending || !agreementId || !payMonth}
+            disabled={saveMutation.isPending || !agreementId || !payMonthInput}
             data-testid="button-save-payslip"
           >
             {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
