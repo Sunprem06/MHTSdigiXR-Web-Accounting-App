@@ -1418,18 +1418,18 @@ export async function registerRoutes(
     res.json(years);
   });
 
-  app.post("/api/accounting/financial-years", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+  app.post("/api/accounting/financial-years", requireAuth, requirePermission("financial_years.manage"), async (req, res) => {
     const fy = await storage.createFinancialYear(req.body);
     res.status(201).json(fy);
   });
 
-  app.patch("/api/accounting/financial-years/:id", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+  app.patch("/api/accounting/financial-years/:id", requireAuth, requirePermission("financial_years.manage"), async (req, res) => {
     const updated = await storage.updateFinancialYear(parseInt(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Financial year not found" });
     res.json(updated);
   });
 
-  app.post("/api/accounting/financial-years/:id/activate", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+  app.post("/api/accounting/financial-years/:id/activate", requireAuth, requirePermission("financial_years.manage"), async (req, res) => {
     const updated = await storage.activateFinancialYear(parseInt(req.params.id));
     if (!updated) return res.status(404).json({ message: "Financial year not found" });
     await storage.createAuditLog({
