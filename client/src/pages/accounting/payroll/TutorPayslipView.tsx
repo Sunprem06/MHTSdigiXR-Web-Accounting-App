@@ -59,10 +59,19 @@ export default function TutorPayslipView() {
     queryKey: useSelfService ? ["/api/accounting/my-tutor-profile"] : ["/api/accounting/tutors", payslip?.tutorId],
     enabled: useSelfService ? true : !!payslip?.tutorId,
   });
-  const { data: agreement } = useQuery<TutorAgreement>({
+  // A tutor's own login can't call the admin-only single-agreement endpoint
+  // (requires payroll_tutors.view, which the tutor role doesn't have), so
+  // self-service pulls the tutor's own agreement list instead and finds the
+  // matching one — otherwise Subject/Agreement Ref/Rate all render blank.
+  const { data: adminAgreement } = useQuery<TutorAgreement>({
     queryKey: ["/api/accounting/tutor-agreements", payslip?.agreementId],
     enabled: !useSelfService && !!payslip?.agreementId,
   });
+  const { data: myAgreements } = useQuery<TutorAgreement[]>({
+    queryKey: ["/api/accounting/my-agreements"],
+    enabled: useSelfService,
+  });
+  const agreement = useSelfService ? myAgreements?.find(a => a.id === payslip?.agreementId) : adminAgreement;
   const { data: company } = useQuery<CompanySettings>({ queryKey: ["/api/accounting/company-settings"] });
 
   if (isLoading || !payslip) {
