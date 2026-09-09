@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, Save, Plus, Globe, BookOpen, FileText, Pencil, Mail, Send, ChevronDown, ChevronRight, CheckCircle } from "lucide-react";
 
 interface CompanySettings {
   id?: number;
@@ -104,6 +104,7 @@ export default function Settings() {
   const [fyName, setFyName] = useState("");
   const [fyStart, setFyStart] = useState("");
   const [fyEnd, setFyEnd] = useState("");
+  const [editingFyId, setEditingFyId] = useState<number | null>(null);
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["company", "website", "about", "legal", "smtp", "financial"]));
   const toggleSection = (key: string) => setCollapsed(prev => {
@@ -239,6 +240,39 @@ export default function Settings() {
       setFyStart("");
       setFyEnd("");
       toast({ title: "Financial year created successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateFyMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { name: string; startDate: string; endDate: string } }) => {
+      const res = await apiRequest("PATCH", `/api/accounting/financial-years/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/financial-years"] });
+      setFyOpen(false);
+      setEditingFyId(null);
+      setFyName("");
+      setFyStart("");
+      setFyEnd("");
+      toast({ title: "Financial year updated successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const activateFyMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/accounting/financial-years/${id}/activate`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/financial-years"] });
+      toast({ title: "Financial year activated" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -651,7 +685,7 @@ export default function Settings() {
             <CardTitle>Financial Years</CardTitle>
             <div className="flex items-center gap-2">
               {canManageSettings && (
-                <Button onClick={(e) => { e.stopPropagation(); setFyOpen(true); }} data-testid="button-add-financial-year">
+                <Button onClick={(e) => { e.stopPropagation(); setEditingFyId(null); setFyName(""); setFyStart(""); setFyEnd(""); setFyOpen(true); }} data-testid="button-add-financial-year">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Year
                 </Button>
@@ -676,6 +710,7 @@ export default function Settings() {
                     <TableHead>Start Date</TableHead>
                     <TableHead>End Date</TableHead>
                     <TableHead>Status</TableHead>
+                    {canManageSettings && <TableHead>Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -689,6 +724,29 @@ export default function Settings() {
                           {fy.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
+                      {canManageSettings && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon" variant="ghost"
+                              onClick={() => { setEditingFyId(fy.id); setFyName(fy.name); setFyStart(fy.startDate); setFyEnd(fy.endDate); setFyOpen(true); }}
+                              data-testid={`button-edit-fy-${fy.id}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            {!fy.isActive && (
+                              <Button
+                                size="sm" variant="ghost" className="text-green-700 dark:text-green-400 text-xs"
+                                onClick={() => { if (confirm(`Activate ${fy.name}? This deactivates the currently active year.`)) activateFyMutation.mutate(fy.id); }}
+                                disabled={activateFyMutation.isPending}
+                                data-testid={`button-activate-fy-${fy.id}`}
+                              >
+                                <CheckCircle className="w-3.5 h-3.5 mr-1" />Activate
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -745,7 +803,7 @@ export default function Settings() {
         <Dialog open={fyOpen} onOpenChange={setFyOpen}>
           <DialogContent data-testid="dialog-add-financial-year">
             <DialogHeader>
-              <DialogTitle>Add Financial Year</DialogTitle>
+              <DialogTitle>{editingFyId ? "Edit Financial Year" : "Add Financial Year"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -771,12 +829,16 @@ export default function Settings() {
                 Cancel
               </Button>
               <Button
-                onClick={() => createFyMutation.mutate({ name: fyName, startDate: fyStart, endDate: fyEnd })}
-                disabled={createFyMutation.isPending || !fyName || !fyStart || !fyEnd}
+                onClick={() => {
+                  const data = { name: fyName, startDate: fyStart, endDate: fyEnd };
+                  if (editingFyId) updateFyMutation.mutate({ id: editingFyId, data });
+                  else createFyMutation.mutate(data);
+                }}
+                disabled={createFyMutation.isPending || updateFyMutation.isPending || !fyName || !fyStart || !fyEnd}
                 data-testid="button-submit-fy"
               >
-                {createFyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Create
+                {(createFyMutation.isPending || updateFyMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {editingFyId ? "Save Changes" : "Create"}
               </Button>
             </DialogFooter>
           </DialogContent>
