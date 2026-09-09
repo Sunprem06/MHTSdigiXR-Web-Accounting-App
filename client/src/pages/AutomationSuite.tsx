@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import {
   ArrowRight, CheckCircle2, Shield, Lock, MessageSquare,
   Mail, CalendarClock, BarChart3, UserPlus, RefreshCw, Clock,
-  AlertCircle, Search, Server, HelpCircle,
+  AlertCircle, HelpCircle,
 } from "lucide-react";
 
 const STATS = [
@@ -77,12 +77,12 @@ const WORKFLOWS = [
   { icon: AlertCircle, title: "Execution Monitoring", desc: "Failed runs flagged, set up as part of Hosted/DFY tiers." },
 ];
 
-const COMPLIANCE_CHECKLIST = [
-  "Vendor-agnostic — any inbox, CRM, LMS or messaging API",
-  "Isolated deployment, configured on Hosted SaaS and Done-For-You engagements",
-  "Version pinning available on request, so nothing breaks overnight",
-  "Pre-approved WhatsApp/SMS templates configured when you need proactive messaging",
-  "Execution monitoring included with Hosted SaaS and Done-For-You",
+const ENGAGEMENT_CHECKLIST = [
+  { label: "Email, WhatsApp & SMS", detail: "fully automated" },
+  { label: "CRM, LMS & Payments", detail: "connected and in sync" },
+  { label: "Reporting & Analytics", detail: "real-time dashboards" },
+  { label: "Student Lifecycle", detail: "from enquiry to certification, fully automated" },
+  { label: "3 Engagement Models", detail: "template, installed or managed" },
 ];
 
 const FAQ_ITEMS = [
@@ -133,23 +133,13 @@ export default function AutomationSuite() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative bg-slate-900 dark:bg-slate-950 rounded-3xl p-10 h-72 md:h-80 overflow-hidden"
+            className="relative rounded-3xl overflow-hidden"
           >
-            <div className="absolute top-8 left-8 w-12 h-12 rounded-2xl bg-sky-500 flex items-center justify-center">
-              <Mail className="w-5 h-5 text-white" />
-            </div>
-            <div className="absolute top-6 right-14 w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
-              <Clock className="w-4 h-4 text-sky-300" />
-            </div>
-            <div className="absolute bottom-20 left-14 w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-sky-300" />
-            </div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-2xl bg-sky-500 flex items-center justify-center shadow-lg shadow-sky-500/30">
-              <Search className="w-7 h-7 text-white" />
-            </div>
-            <div className="absolute bottom-10 right-12 w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center">
-              <UserPlus className="w-5 h-5 text-sky-300" />
-            </div>
+            <img
+              src="/images/services/automation-engine.jpg"
+              alt="Inbox, campaigns, reporting, CRM/LMS and WhatsApp/SMS workflows connected to one automation engine"
+              className="w-full h-auto rounded-3xl"
+            />
           </motion.div>
         </section>
       </div>
@@ -287,29 +277,26 @@ export default function AutomationSuite() {
           </div>
         </motion.section>
 
-        {/* Compliance checklist */}
+        {/* What We Set Up */}
         <motion.section id="compliance" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-20">
           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-8 md:p-12 grid md:grid-cols-2 gap-10 items-center">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-900 dark:bg-slate-950 rounded-2xl h-36 flex items-center justify-center">
-                <Lock className="w-8 h-8 text-sky-400" />
-              </div>
-              <div className="bg-slate-800 rounded-2xl h-36 mt-6 flex items-center justify-center">
-                <Server className="w-8 h-8 text-sky-300" />
-              </div>
-            </div>
+            <img
+              src="/images/services/automation-engagement-graphic.jpg"
+              alt="Automate Workflows and Generate Reports panels connected to email, WhatsApp, analytics and CRM/LMS"
+              className="w-full h-auto rounded-2xl"
+            />
             <div>
               <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
-                What We Set Up <span className="text-sky-500">When You Engage Us</span>
+                What We Set Up <span className="text-sky-500">(and You Engage It)</span>
               </h2>
               <p className="text-slate-500 dark:text-slate-400 text-sm mt-3 mb-5 max-w-md">
-                Not everything below is standard on every tier — it's what we configure as part of Hosted SaaS and Done-For-You work.
+                From inbox to insights, we plug in the systems, connect the tools, and hand you a workflow that just works.
               </p>
               <div className="flex flex-col gap-3 text-sm">
-                {COMPLIANCE_CHECKLIST.map((item) => (
-                  <div key={item} className="flex items-start gap-2 text-slate-700 dark:text-slate-300">
+                {ENGAGEMENT_CHECKLIST.map((item) => (
+                  <div key={item.label} className="flex items-start gap-2 text-slate-700 dark:text-slate-300">
                     <CheckCircle2 className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
-                    {item}
+                    <span><strong className="font-semibold text-slate-900 dark:text-white">{item.label}</strong> — {item.detail}</span>
                   </div>
                 ))}
               </div>
