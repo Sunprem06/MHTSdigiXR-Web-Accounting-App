@@ -199,6 +199,42 @@ export const legalPages = pgTable("legal_pages", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Editable-by-non-coder transactional email content. `subject` and `bodyText`
+// support {{variable}} placeholders (see EMAIL_TEMPLATE_VARIABLES below); the
+// surrounding branded HTML wrapper (logo bar, credentials box, login button,
+// footer) stays code-owned so an edit here can never break the layout.
+export const EMAIL_TEMPLATE_KEYS = ["enquiry_welcome", "employee_welcome", "tutor_welcome"] as const;
+export type EmailTemplateKey = typeof EMAIL_TEMPLATE_KEYS[number];
+
+export const EMAIL_TEMPLATE_VARIABLES: Record<EmailTemplateKey, { token: string; description: string }[]> = {
+  enquiry_welcome: [
+    { token: "{{name}}", description: "Name the enquirer entered on the contact form" },
+  ],
+  employee_welcome: [
+    { token: "{{fullName}}", description: "Employee's full name" },
+    { token: "{{username}}", description: "Login username (shown automatically below your message)" },
+    { token: "{{role}}", description: "Friendly role label, e.g. \"Senior Accountant\"" },
+    { token: "{{loginUrl}}", description: "Link to the login page" },
+  ],
+  tutor_welcome: [
+    { token: "{{fullName}}", description: "Tutor's full name" },
+    { token: "{{username}}", description: "Login username (shown automatically below your message)" },
+    { token: "{{role}}", description: "Friendly role label" },
+    { token: "{{loginUrl}}", description: "Link to the login page" },
+  ],
+};
+
+export const emailTemplates = pgTable("email_templates", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  subject: text("subject").notNull(),
+  bodyText: text("body_text").notNull(),
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const parties = pgTable("parties", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -584,6 +620,7 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit
 export const insertFinancialYearSchema = createInsertSchema(financialYears).omit({ id: true });
 export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({ id: true });
 export const insertLegalPageSchema = createInsertSchema(legalPages).omit({ id: true, updatedAt: true });
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, updatedAt: true });
 export const insertVoucherSchema = createInsertSchema(vouchers).omit({ id: true, createdAt: true });
 export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit({ id: true });
 export const insertAuditNoteSchema = createInsertSchema(auditNotes).omit({ id: true, createdAt: true });
@@ -640,6 +677,8 @@ export type CompanySettings = typeof companySettings.$inferSelect;
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type LegalPage = typeof legalPages.$inferSelect;
 export type InsertLegalPage = z.infer<typeof insertLegalPageSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
 export type Voucher = typeof vouchers.$inferSelect;
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
 export type VoucherEntry = typeof voucherEntries.$inferSelect;
