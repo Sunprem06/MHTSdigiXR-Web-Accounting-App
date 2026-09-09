@@ -203,12 +203,17 @@ export const legalPages = pgTable("legal_pages", {
 // support {{variable}} placeholders (see EMAIL_TEMPLATE_VARIABLES below); the
 // surrounding branded HTML wrapper (logo bar, credentials box, login button,
 // footer) stays code-owned so an edit here can never break the layout.
-export const EMAIL_TEMPLATE_KEYS = ["enquiry_welcome", "employee_welcome", "tutor_welcome"] as const;
+export const EMAIL_TEMPLATE_KEYS = ["enquiry_welcome", "employee_welcome", "tutor_welcome", "erp_license_activation"] as const;
 export type EmailTemplateKey = typeof EMAIL_TEMPLATE_KEYS[number];
 
 export const EMAIL_TEMPLATE_VARIABLES: Record<EmailTemplateKey, { token: string; description: string }[]> = {
   enquiry_welcome: [
     { token: "{{name}}", description: "Name the enquirer entered on the contact form" },
+  ],
+  erp_license_activation: [
+    { token: "{{customerName}}", description: "Customer's name as entered on the license" },
+    { token: "{{licenseId}}", description: "The license's internal ID, for reference" },
+    { token: "{{activationCode}}", description: "The one-time activation code (shown automatically below your message too)" },
   ],
   employee_welcome: [
     { token: "{{fullName}}", description: "Employee's full name" },
