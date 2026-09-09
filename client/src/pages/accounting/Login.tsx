@@ -8,6 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Lock, User, AlertCircle, ShieldCheck } from "lucide-react";
 
+// Not every role has dashboard.view (e.g. the tutor self-service role only has
+// payroll_tutors.view_own) — redirecting everyone to "/accounting" regardless of
+// permissions sent those users straight into an Access Denied page. Pick the first
+// landing page this set of permissions can actually see.
+function getDefaultLandingPath(permissions: string[] | undefined | null): string {
+  const perms = permissions || [];
+  if (perms.includes("dashboard.view")) return "/accounting";
+  if (perms.includes("payroll_tutors.view_own")) return "/accounting/payroll/my-payslips";
+  return "/accounting";
+}
+
 function generateCaptcha() {
   const a = Math.floor(Math.random() * 20) + 1;
   const b = Math.floor(Math.random() * 20) + 1;
@@ -34,7 +45,7 @@ export default function AccountingLogin() {
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaError, setCaptchaError] = useState(false);
   const [captcha, setCaptcha] = useState(generateCaptcha);
-  const { login, isLoggingIn, loginError, isAuthenticated } = useAuth();
+  const { login, isLoggingIn, loginError, isAuthenticated, user } = useAuth();
   const [, setLocation] = useLocation();
 
   const refreshCaptcha = useCallback(() => {
@@ -44,8 +55,8 @@ export default function AccountingLogin() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) setLocation("/accounting");
-  }, [isAuthenticated, setLocation]);
+    if (isAuthenticated) setLocation(getDefaultLandingPath(user?.permissions));
+  }, [isAuthenticated, user, setLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +75,7 @@ export default function AccountingLogin() {
         setLocation(`/accounting/force-change-password?token=${encodeURIComponent(data.challengeToken)}`);
         return;
       }
-      setLocation("/accounting");
+      setLocation(getDefaultLandingPath(data?.permissions));
     } catch {
       refreshCaptcha();
     }
