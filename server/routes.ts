@@ -1429,6 +1429,17 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.post("/api/accounting/financial-years/:id/activate", requireAuth, requirePermission("settings.manage"), async (req, res) => {
+    const updated = await storage.activateFinancialYear(parseInt(req.params.id));
+    if (!updated) return res.status(404).json({ message: "Financial year not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "activate", entity: "financial_year",
+      entityId: updated.id, details: `Activated financial year: ${updated.name}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
   // Company Settings
   app.get("/api/accounting/company-settings", requireAuth, async (req, res) => {
     const settings = await storage.getCompanySettings();

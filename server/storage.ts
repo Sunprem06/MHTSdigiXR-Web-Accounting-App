@@ -81,6 +81,7 @@ export interface IStorage {
   getActiveFinancialYear(): Promise<FinancialYear | undefined>;
   createFinancialYear(fy: InsertFinancialYear): Promise<FinancialYear>;
   updateFinancialYear(id: number, data: Partial<InsertFinancialYear>): Promise<FinancialYear | undefined>;
+  activateFinancialYear(id: number): Promise<FinancialYear | undefined>;
 
   getCompanySettings(): Promise<CompanySettings | undefined>;
   upsertCompanySettings(settings: InsertCompanySettings): Promise<CompanySettings>;
@@ -504,6 +505,16 @@ export class DatabaseStorage implements IStorage {
   async updateFinancialYear(id: number, data: Partial<InsertFinancialYear>): Promise<FinancialYear | undefined> {
     const [updated] = await db.update(financialYears).set(data).where(eq(financialYears.id, id)).returning();
     return updated;
+  }
+
+  async activateFinancialYear(id: number): Promise<FinancialYear | undefined> {
+    // Only one financial year may be active at a time — deactivate every other
+    // row before activating the target one, in a single transaction.
+    return await db.transaction(async (tx) => {
+      await tx.update(financialYears).set({ isActive: false }).where(sql`id != ${id}`);
+      const [updated] = await tx.update(financialYears).set({ isActive: true }).where(eq(financialYears.id, id)).returning();
+      return updated;
+    });
   }
 
   async getCompanySettings(): Promise<CompanySettings | undefined> {
