@@ -3,17 +3,31 @@ import { Link } from "wouter";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { TutorPayslip, Tutor } from "@shared/schema";
-import { Eye, Loader2, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import type { TutorPayslip, Tutor, TutorAgreement } from "@shared/schema";
+import { Eye, Loader2, FileText, BookOpen } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   approved: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
   paid: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
 };
 const STATUS_LABELS: Record<string, string> = { approved: "Approved", paid: "Paid" };
+const AGREEMENT_STATUS_LABELS: Record<string, string> = {
+  sent: "Sent", in_progress: "In Progress", yts: "Yet To Start", on_hold: "On Hold",
+  completed: "Completed", cancelled: "Cancelled", signed: "Signed", swapped: "Swapped",
+};
+
+function fmtDate(d: string | null) {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 
 export default function MyPayslips() {
   const { data: tutor } = useQuery<Tutor>({ queryKey: ["/api/accounting/my-tutor-profile"] });
+  const { data: agreements } = useQuery<TutorAgreement[]>({
+    queryKey: ["/api/accounting/my-agreements"],
+    enabled: !!tutor,
+  });
   const { data: payslips, isLoading, error } = useQuery<TutorPayslip[]>({
     queryKey: ["/api/accounting/my-payslips"],
   });
@@ -27,6 +41,30 @@ export default function MyPayslips() {
             {tutor ? `${tutor.tutorCode} — ${tutor.fullName}` : "Your tutor payslip history"}
           </p>
         </div>
+
+        {agreements && agreements.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BookOpen className="w-4 h-4 text-slate-500" />
+                <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">My Courses</h2>
+              </div>
+              <div className="space-y-2">
+                {agreements.map(a => (
+                  <div key={a.id} className="flex items-center justify-between border border-slate-100 dark:border-slate-800 rounded p-3" data-testid={`row-my-agreement-${a.id}`}>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{a.subject}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {a.weeklySchedule || "Schedule not set"} · {fmtDate(a.startDate)} – {fmtDate(a.endDate)}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{AGREEMENT_STATUS_LABELS[a.agreementStatus]}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-sky-500" /></div>

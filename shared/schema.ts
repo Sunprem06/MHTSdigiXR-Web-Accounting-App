@@ -307,10 +307,18 @@ export const expenseClaims = pgTable("expense_claims", {
 });
 
 // ── Payroll: Tutors (KoodaldigiXS Learning independent contractors) ──
-// Sec 194J TDS only (10% w/ valid PAN, 20% w/o — Sec 206AA). PF/ESI/Gratuity
-// never apply to tutors — Clause 15.13 of the Independent Contractor
-// Agreement. Formulas ported from the business's existing payslip tool
-// (KoodaldigiXS_PaySlip_TDS.html) — see tutor-payslip route comments.
+// Sec 194J TDS (10% w/ valid PAN, 20% w/o — Sec 206AA), optional per-payslip
+// (some payments fall under the Sec 194J ₹30,000/FY aggregate threshold and
+// legitimately don't require TDS — the operator chooses per payslip rather
+// than the app auto-tracking the threshold). PF/ESI/Gratuity never apply to
+// tutors — Clause 15.13 of the Individual Tutor Agreement.
+//
+// A tutor (the person) may sign multiple agreements over time — one per
+// course/engagement, each with its own Agreement Ref and compensation terms
+// (confirmed against real signed agreements, e.g. KDXS-TUT-2026-0013 for a
+// single course while the tutor's own code is a separate, lower-numbered
+// sequence). So: tutors (identity) -> tutorAgreements (one row per signed
+// Schedule A) -> tutorPayslips (one per month, against a specific agreement).
 export const TUTOR_STATUSES = ["active", "inactive"] as const;
 export type TutorStatus = typeof TUTOR_STATUSES[number];
 
@@ -318,10 +326,8 @@ export const tutors = pgTable("tutors", {
   id: serial("id").primaryKey(),
   tutorCode: text("tutor_code").notNull().unique(),
   fullName: text("full_name").notNull(),
-  subject: text("subject"),
-  agreementDate: date("agreement_date"),
-  agreementRef: text("agreement_ref"),
   gender: text("gender"),
+  countryCode: text("country_code").default("+91"),
   contactPhone: text("contact_phone"),
   email: text("email").unique(),
   panNumber: text("pan_number"),
@@ -330,9 +336,43 @@ export const tutors = pgTable("tutors", {
   bankIfsc: text("bank_ifsc"),
   gstNumber: text("gst_number"),
   city: text("city").default("Chennai"),
-  defaultRate: decimal("default_rate", { precision: 10, scale: 2 }).default("0"),
   status: text("status").notNull().default("active"),
   loginEmployeeId: integer("login_employee_id").references(() => employees.id),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Matches Schedule A of the Individual Tutor Agreement exactly (Clause 4.1-4.3).
+export const COMPENSATION_TYPES = ["per_session", "per_course", "per_hour", "revenue_share"] as const;
+export type CompensationType = typeof COMPENSATION_TYPES[number];
+
+export const PAYMENT_FREQUENCIES = ["monthly", "on_completion"] as const;
+export type PaymentFrequency = typeof PAYMENT_FREQUENCIES[number];
+
+// Matches the business's existing Tutor Management tracker (Col columns for
+// agreement processing status vs the tutor's own acceptance status).
+export const AGREEMENT_STATUSES = ["sent", "in_progress", "yts", "on_hold", "completed", "cancelled", "signed", "swapped"] as const;
+export type AgreementStatus = typeof AGREEMENT_STATUSES[number];
+
+export const TUTOR_ACCEPTANCE_STATUSES = ["accepted", "rejected", "under_review", "on_hold", "pending_response", "withdrawn"] as const;
+export type TutorAcceptanceStatus = typeof TUTOR_ACCEPTANCE_STATUSES[number];
+
+export const tutorAgreements = pgTable("tutor_agreements", {
+  id: serial("id").primaryKey(),
+  tutorId: integer("tutor_id").references(() => tutors.id).notNull(),
+  agreementRef: text("agreement_ref").notNull().unique(), // KDXS-TUT-YYYY-XXXX
+  subject: text("subject").notNull(),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  sessionsSummary: text("sessions_summary"), // free text, e.g. "29 classes | 3 hrs per class"
+  weeklySchedule: text("weekly_schedule"),   // free text, e.g. "Day(s): 2  Time: 2:00 PM to 5:00 PM"
+  compensationType: text("compensation_type").notNull().default("per_hour"),
+  rateFee: decimal("rate_fee", { precision: 10, scale: 2 }).notNull().default("0"), // meaning depends on compensationType; % for revenue_share
+  platformCommissionPercent: decimal("platform_commission_percent", { precision: 5, scale: 2 }).notNull().default("0"),
+  paymentFrequency: text("payment_frequency").notNull().default("monthly"),
+  agreementStatus: text("agreement_status").notNull().default("in_progress"),
+  tutorAcceptanceStatus: text("tutor_acceptance_status").notNull().default("pending_response"),
+  postCourseSupportMonths: integer("post_course_support_months"), // 3-6, Clause 5A.1
   createdBy: integer("created_by").references(() => employees.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -342,20 +382,22 @@ export type TutorPayslipStatus = typeof TUTOR_PAYSLIP_STATUSES[number];
 
 export const tutorPayslips = pgTable("tutor_payslips", {
   id: serial("id").primaryKey(),
-  tutorId: integer("tutor_id").references(() => tutors.id).notNull(),
+  agreementId: integer("agreement_id").references(() => tutorAgreements.id).notNull(),
+  tutorId: integer("tutor_id").references(() => tutors.id).notNull(), // denormalized from agreement for simpler queries
   payMonth: text("pay_month").notNull(),
-  liveCoachingRate: decimal("live_coaching_rate", { precision: 10, scale: 2 }).default("0"),
-  liveCoachingHours: decimal("live_coaching_hours", { precision: 6, scale: 2 }).default("0"),
-  prerecordedRate: decimal("prerecorded_rate", { precision: 10, scale: 2 }).default("0"),
-  prerecordedHours: decimal("prerecorded_hours", { precision: 6, scale: 2 }).default("0"),
-  contentCreationRate: decimal("content_creation_rate", { precision: 10, scale: 2 }).default("0"),
-  contentCreationHours: decimal("content_creation_hours", { precision: 6, scale: 2 }).default("0"),
-  lwpHours: decimal("lwp_hours", { precision: 6, scale: 2 }).default("0"),
-  otherDeduction: decimal("other_deduction", { precision: 10, scale: 2 }).default("0"),
-  panAtPayment: text("pan_at_payment"),
-  tdsRatePercent: integer("tds_rate_percent").notNull().default(10),
+  // Meaning depends on the agreement's compensationType: session count (per_session),
+  // hours worked (per_hour), % of course delivered 0-100 (per_course). Unused for revenue_share.
+  unitsDelivered: decimal("units_delivered", { precision: 10, scale: 2 }).default("0"),
+  // Only used for revenue_share — that month's gross revenue attributable to this course,
+  // entered manually (this app doesn't track course sales).
+  revenueAmount: decimal("revenue_amount", { precision: 12, scale: 2 }),
   grossEarnings: decimal("gross_earnings", { precision: 12, scale: 2 }).notNull().default("0"),
+  platformCommissionAmount: decimal("platform_commission_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  deductTds: boolean("deduct_tds").notNull().default(true),
+  panAtPayment: text("pan_at_payment"),
+  tdsRatePercent: integer("tds_rate_percent").notNull().default(0),
   tdsAmount: decimal("tds_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  otherDeduction: decimal("other_deduction", { precision: 10, scale: 2 }).default("0"),
   netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull().default("0"),
   status: text("status").notNull().default("draft"),
   preparedBy: integer("prepared_by").references(() => employees.id),
@@ -553,9 +595,11 @@ export const insertExpenseClaimSchema = createInsertSchema(expenseClaims).omit({
 export const insertTutorSchema = createInsertSchema(tutors).omit({ id: true, createdAt: true }).extend({
   panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "PAN must be in the format AAAAA9999A").optional().or(z.literal("")),
 });
-// Note: grossEarnings/tdsAmount/netPay/tdsRatePercent are accepted here for the
-// InsertTutorPayslip type shape, but the server ALWAYS recomputes them from the
-// raw rate/hours/LWP/PAN fields before insert — client-sent totals are never trusted.
+export const insertTutorAgreementSchema = createInsertSchema(tutorAgreements).omit({ id: true, createdAt: true });
+// Note: grossEarnings/tdsAmount/netPay/platformCommissionAmount/tdsRatePercent are accepted
+// here for the InsertTutorPayslip type shape, but the server ALWAYS recomputes them from the
+// raw unitsDelivered/revenueAmount/deductTds/PAN fields before insert — client-sent totals
+// are never trusted.
 export const insertTutorPayslipSchema = createInsertSchema(tutorPayslips).omit({ id: true, createdAt: true });
 export const insertPayrollEmployeeSchema = createInsertSchema(payrollEmployees).omit({ id: true, createdAt: true });
 export const insertPayrollStatutoryConfigVersionSchema = createInsertSchema(payrollStatutoryConfigVersions).omit({ id: true, createdAt: true });
@@ -614,6 +658,8 @@ export type ExpenseClaim = typeof expenseClaims.$inferSelect;
 export type InsertExpenseClaim = z.infer<typeof insertExpenseClaimSchema>;
 export type Tutor = typeof tutors.$inferSelect;
 export type InsertTutor = z.infer<typeof insertTutorSchema>;
+export type TutorAgreement = typeof tutorAgreements.$inferSelect;
+export type InsertTutorAgreement = z.infer<typeof insertTutorAgreementSchema>;
 export type TutorPayslip = typeof tutorPayslips.$inferSelect;
 export type InsertTutorPayslip = z.infer<typeof insertTutorPayslipSchema>;
 export type PayrollEmployee = typeof payrollEmployees.$inferSelect;

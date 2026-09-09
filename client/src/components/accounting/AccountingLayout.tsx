@@ -74,6 +74,7 @@ const navItems: NavItem[] = [
     label: "Payroll", icon: Banknote, requiredPermission: "payroll_tutors.view",
     children: [
       { label: "Tutors", path: "/accounting/payroll/tutors", icon: GraduationCap },
+      { label: "Tutor Agreements", path: "/accounting/payroll/tutor-agreements", icon: FileText },
       { label: "Tutor Payslips", path: "/accounting/payroll/tutor-payslips", icon: Receipt },
       { label: "Employees (Payroll)", path: "/accounting/payroll/employees", icon: Users },
     ],
