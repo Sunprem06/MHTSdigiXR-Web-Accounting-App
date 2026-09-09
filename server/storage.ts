@@ -150,11 +150,13 @@ export interface IStorage {
   getTutorPayslip(id: number): Promise<TutorPayslip | undefined>;
   createTutorPayslip(payslip: InsertTutorPayslip): Promise<TutorPayslip>;
   updateTutorPayslip(id: number, data: Partial<InsertTutorPayslip>): Promise<TutorPayslip | undefined>;
+  deleteTutorPayslip(id: number): Promise<boolean>;
 
   getPayrollEmployees(filters?: { status?: string }): Promise<PayrollEmployee[]>;
   getPayrollEmployee(id: number): Promise<PayrollEmployee | undefined>;
   createPayrollEmployee(employee: InsertPayrollEmployee): Promise<PayrollEmployee>;
   updatePayrollEmployee(id: number, data: Partial<InsertPayrollEmployee>): Promise<PayrollEmployee | undefined>;
+  deletePayrollEmployee(id: number): Promise<boolean>;
 
   getPayrollStatutoryConfigVersions(): Promise<PayrollStatutoryConfigVersion[]>;
   createPayrollStatutoryConfigVersion(version: InsertPayrollStatutoryConfigVersion): Promise<PayrollStatutoryConfigVersion>;
@@ -887,6 +889,11 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteTutorPayslip(id: number): Promise<boolean> {
+    const result = await db.delete(tutorPayslips).where(eq(tutorPayslips.id, id)).returning();
+    return result.length > 0;
+  }
+
   async getPayrollEmployees(filters?: { status?: string }): Promise<PayrollEmployee[]> {
     if (filters?.status) {
       return await db.select().from(payrollEmployees).where(eq(payrollEmployees.status, filters.status)).orderBy(payrollEmployees.fullName);
@@ -907,6 +914,11 @@ export class DatabaseStorage implements IStorage {
   async updatePayrollEmployee(id: number, data: Partial<InsertPayrollEmployee>): Promise<PayrollEmployee | undefined> {
     const [updated] = await db.update(payrollEmployees).set(data).where(eq(payrollEmployees.id, id)).returning();
     return updated;
+  }
+
+  async deletePayrollEmployee(id: number): Promise<boolean> {
+    const result = await db.delete(payrollEmployees).where(eq(payrollEmployees.id, id)).returning();
+    return result.length > 0;
   }
 
   async getPayrollStatutoryConfigVersions(): Promise<PayrollStatutoryConfigVersion[]> {

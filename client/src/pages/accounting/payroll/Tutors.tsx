@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Loader2, FileText } from "lucide-react";
+import { Plus, Pencil, Loader2, FileText, Trash2 } from "lucide-react";
 
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 const COUNTRY_CODES = ["+91", "+1", "+44", "+971", "+65", "+61"];
@@ -74,6 +74,15 @@ export default function Tutors() {
       setEditOpen(false);
       setEditingTutor(null);
       toast({ title: "Tutor updated successfully" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/accounting/tutors/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/tutors"] });
+      toast({ title: "Tutor deleted" });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -246,6 +255,13 @@ export default function Tutors() {
                           {canManage && (
                             <Button size="icon" variant="ghost" onClick={() => openEdit(t)} data-testid={`button-edit-tutor-${t.id}`}>
                               <Pencil className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canManage && (
+                            <Button size="icon" variant="ghost" className="text-red-600"
+                              onClick={() => { if (confirm(`Delete tutor "${t.fullName}"? This cannot be undone.`)) deleteMutation.mutate(t.id); }}
+                              disabled={deleteMutation.isPending} title="Delete" data-testid={`button-delete-tutor-${t.id}`}>
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
                         </div>

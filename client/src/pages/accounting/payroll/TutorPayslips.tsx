@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { TUTOR_PAYSLIP_STATUSES } from "@shared/schema";
 import type { TutorPayslip, Tutor, TutorAgreement } from "@shared/schema";
-import { Plus, Loader2, FileText, Eye, Send, CheckCircle, XCircle, Banknote, Pencil } from "lucide-react";
+import { Plus, Loader2, FileText, Eye, Send, CheckCircle, XCircle, Banknote, Pencil, Trash2 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
@@ -35,6 +35,7 @@ export default function TutorPayslips() {
 
   const canProcess = hasPermission("payroll_tutors.process");
   const canApprove = hasPermission("payroll_tutors.approve");
+  const canManage = hasPermission("payroll_tutors.manage");
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -65,6 +66,15 @@ export default function TutorPayslips() {
   const submitMutation = useStatusMutation("submit", "Payslip submitted for approval");
   const approveMutation = useStatusMutation("approve", "Payslip approved");
   const markPaidMutation = useStatusMutation("mark-paid", "Payslip marked paid and posted to ledger");
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/accounting/tutor-payslips/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/tutor-payslips"] });
+      toast({ title: "Payslip deleted" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
 
   const rejectMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
@@ -189,6 +199,13 @@ export default function TutorPayslips() {
                               onClick={() => { if (confirm("Mark this payslip as paid and post it to the ledger?")) markPaidMutation.mutate(p.id); }}
                               disabled={markPaidMutation.isPending} data-testid={`button-mark-paid-payslip-${p.id}`}>
                               <Banknote className="w-3.5 h-3.5 mr-1" />Mark Paid
+                            </Button>
+                          )}
+                          {canManage && p.status !== "paid" && (
+                            <Button size="icon" variant="ghost" className="text-red-600"
+                              onClick={() => { if (confirm("Delete this payslip? This cannot be undone.")) deleteMutation.mutate(p.id); }}
+                              disabled={deleteMutation.isPending} title="Delete" data-testid={`button-delete-payslip-${p.id}`}>
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
                         </div>

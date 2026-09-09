@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, Plus, Pencil, Loader2 } from "lucide-react";
+import { AlertTriangle, Plus, Pencil, Loader2, Trash2 } from "lucide-react";
 
 const emptyForm = {
   employeeCode: "", fullName: "", designation: "", dateOfJoining: "",
@@ -59,6 +59,15 @@ export default function PayrollEmployees() {
       setEditOpen(false);
       setEditingEmployee(null);
       toast({ title: "Payroll employee master updated" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/accounting/payroll-employees/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/payroll-employees"] });
+      toast({ title: "Payroll employee master deleted" });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -156,11 +165,20 @@ export default function PayrollEmployees() {
                       <TableCell><Badge variant={e.esiApplicable ? "default" : "outline"}>{e.esiApplicable ? "Yes" : "No"}</Badge></TableCell>
                       <TableCell><Badge variant={e.status === "active" ? "default" : "outline"}>{e.status === "active" ? "Active" : "Inactive"}</Badge></TableCell>
                       <TableCell>
-                        {canManage && (
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(e)} data-testid={`button-edit-payroll-employee-${e.id}`}>
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {canManage && (
+                            <Button size="icon" variant="ghost" onClick={() => openEdit(e)} data-testid={`button-edit-payroll-employee-${e.id}`}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canManage && (
+                            <Button size="icon" variant="ghost" className="text-red-600"
+                              onClick={() => { if (confirm(`Delete payroll employee "${e.fullName}"? This cannot be undone.`)) deleteMutation.mutate(e.id); }}
+                              disabled={deleteMutation.isPending} title="Delete" data-testid={`button-delete-payroll-employee-${e.id}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

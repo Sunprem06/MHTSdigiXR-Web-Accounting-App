@@ -1190,6 +1190,23 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.delete("/api/accounting/tutor-payslips/:id", requireAuth, requirePermission("payroll_tutors.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getTutorPayslip(id);
+    if (!existing) return res.status(404).json({ message: "Payslip not found" });
+    if (existing.status === "paid") {
+      return res.status(400).json({ message: "Cannot delete a paid payslip — it has a posted ledger voucher. Reverse the voucher first if this was posted in error." });
+    }
+    const deleted = await storage.deleteTutorPayslip(id);
+    if (!deleted) return res.status(404).json({ message: "Payslip not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "tutor_payslip",
+      entityId: id, details: `Deleted payslip for tutor #${existing.tutorId} — ${existing.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
   app.post("/api/accounting/tutor-payslips/:id/submit", requireAuth, requirePermission("payroll_tutors.process"), async (req, res) => {
     const id = parseInt(req.params.id);
     const payslip = await storage.getTutorPayslip(id);
@@ -1338,6 +1355,20 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json(updated);
+  });
+
+  app.delete("/api/accounting/payroll-employees/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollEmployee(id);
+    if (!existing) return res.status(404).json({ message: "Payroll employee not found" });
+    const deleted = await storage.deletePayrollEmployee(id);
+    if (!deleted) return res.status(404).json({ message: "Payroll employee not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "payroll_employee",
+      entityId: id, details: `Deleted payroll employee master: ${existing.employeeCode}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
   });
 
   // Vouchers
