@@ -74,6 +74,25 @@ function computeTutorPayslip(input: TutorPayslipInputs) {
   return { grossEarnings, platformCommissionAmount, tdsAmount, netPay, tdsRatePercent, validPan, panAtPayment: pan || null };
 }
 
+// A voucher's date must fall within SOME configured Financial Year — not
+// specifically the currently active one. Backdating/catching up entries into a
+// prior year (e.g. FY 2025-26 while FY 2026-27 is active) is normal accounting
+// practice; "active" only means "the default year for new work," not "the only
+// year postings are allowed into." Checked at every voucher-creation call site
+// (manual entry, quotation conversion, tutor payslip mark-paid) — hard block,
+// not just a warning. Returns an error message to send back with 400, or null
+// if the date falls in a defined year / no financial years are configured at
+// all yet (an app that hasn't set one up isn't blocked).
+async function checkFinancialYearForDate(date: string): Promise<string | null> {
+  const allFys = await storage.getFinancialYears();
+  if (allFys.length === 0) return null;
+  const matchingFy = allFys.find(fy => date >= fy.startDate && date <= fy.endDate);
+  if (!matchingFy) {
+    return `Date ${date} doesn't fall within any configured financial year. Add or extend a financial year covering this date in Settings first.`;
+  }
+  return null;
+}
+
 type SmtpConfig = {
   host: string;
   port: number;
@@ -765,11 +784,14 @@ export async function registerRoutes(
     if (quotation.status !== "accepted" && quotation.status !== "sent") {
       return res.status(400).json({ message: "Only approved quotations can be converted to invoices" });
     }
+    const convertDate = new Date().toISOString().split("T")[0];
+    const fyError = await checkFinancialYearForDate(convertDate);
+    if (fyError) return res.status(400).json({ message: fyError });
 
     const voucherNumber = await storage.getNextVoucherNumber("sales");
     const voucher = await storage.createVoucher({
       voucherNumber,
-      date: new Date().toISOString().split("T")[0],
+      date: convertDate,
       type: "sales",
       narration: `From Quotation ${quotation.quotationNumber}`,
       totalAmount: String(quotation.grandTotal),
@@ -1210,6 +1232,9 @@ export async function registerRoutes(
     if (payslip.status !== "approved") return res.status(400).json({ message: "Only approved payslips can be marked paid" });
     const tutor = await storage.getTutor(payslip.tutorId);
     if (!tutor) return res.status(400).json({ message: "Tutor not found" });
+    const payDate = new Date().toISOString().split("T")[0];
+    const fyError = await checkFinancialYearForDate(payDate);
+    if (fyError) return res.status(400).json({ message: fyError });
 
     const ledgerAccounts = await storage.getLedgerAccounts();
     const feesLedger = ledgerAccounts.find(a => a.name === "Tutor Professional Fees");
@@ -1240,7 +1265,7 @@ export async function registerRoutes(
     const voucherNumber = await storage.getNextVoucherNumber("payment");
     const voucher = await storage.createVoucher({
       voucherNumber,
-      date: new Date().toISOString().split("T")[0],
+      date: payDate,
       type: "payment",
       narration: `Tutor payslip — ${tutor.tutorCode} (${tutor.fullName}) — ${payslip.payMonth}`,
       totalAmount: String(gross),
@@ -1339,6 +1364,8 @@ export async function registerRoutes(
     if (!voucherData.date || !voucherData.type || !voucherData.voucherNumber) {
       return res.status(400).json({ message: "Date, type, and voucher number are required" });
     }
+    const fyError = await checkFinancialYearForDate(voucherData.date);
+    if (fyError) return res.status(400).json({ message: fyError });
 
     const totalDebit = entries.reduce((sum: number, e: any) => sum + parseFloat(e.debit || 0), 0);
     const totalCredit = entries.reduce((sum: number, e: any) => sum + parseFloat(e.credit || 0), 0);
