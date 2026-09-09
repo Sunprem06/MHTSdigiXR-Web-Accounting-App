@@ -8,7 +8,8 @@ import {
   BookMarked, ArrowLeftRight, ClipboardList, TrendingUp, PieChart, Scale,
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
   Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen,
-  Layers, DollarSign, Lock, Eye, EyeOff, Loader2, AlertTriangle, Fingerprint
+  Layers, DollarSign, Lock, Eye, EyeOff, Loader2, AlertTriangle, Fingerprint,
+  Banknote, GraduationCap
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -69,6 +70,15 @@ const navItems: NavItem[] = [
       { label: "Applications", path: "/accounting/job-applications", icon: UserCheck },
     ],
   },
+  {
+    label: "Payroll", icon: Banknote, requiredPermission: "payroll_tutors.view",
+    children: [
+      { label: "Tutors", path: "/accounting/payroll/tutors", icon: GraduationCap },
+      { label: "Tutor Payslips", path: "/accounting/payroll/tutor-payslips", icon: Receipt },
+      { label: "Employees (Payroll)", path: "/accounting/payroll/employees", icon: Users },
+    ],
+  },
+  { label: "My Payslips", path: "/accounting/payroll/my-payslips", icon: Receipt, requiredPermission: "payroll_tutors.view_own" },
   {
     label: "Website CMS", icon: Globe, requiredPermission: "content.view",
     children: [

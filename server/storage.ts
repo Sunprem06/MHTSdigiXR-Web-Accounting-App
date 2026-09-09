@@ -22,7 +22,10 @@ import {
   type SmtpSettings, type PasswordResetToken,
   erpLicenses, erpLicenseActivations,
   type InsertErpLicense, type InsertErpLicenseActivation,
-  type ErpLicense, type ErpLicenseActivation
+  type ErpLicense, type ErpLicenseActivation,
+  tutors, tutorPayslips, payrollEmployees, payrollStatutoryConfigVersions,
+  type InsertTutor, type InsertTutorPayslip, type InsertPayrollEmployee, type InsertPayrollStatutoryConfigVersion,
+  type Tutor, type TutorPayslip, type PayrollEmployee, type PayrollStatutoryConfigVersion
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -126,6 +129,27 @@ export interface IStorage {
   createExpenseClaim(claim: InsertExpenseClaim): Promise<ExpenseClaim>;
   updateExpenseClaim(id: number, data: Partial<InsertExpenseClaim>): Promise<ExpenseClaim | undefined>;
   deleteExpenseClaim(id: number): Promise<boolean>;
+
+  getTutors(filters?: { status?: string }): Promise<Tutor[]>;
+  getTutor(id: number): Promise<Tutor | undefined>;
+  getTutorByLoginEmployeeId(employeeId: number): Promise<Tutor | undefined>;
+  createTutor(tutor: InsertTutor): Promise<Tutor>;
+  updateTutor(id: number, data: Partial<InsertTutor>): Promise<Tutor | undefined>;
+  deleteTutor(id: number): Promise<boolean>;
+  getNextTutorCode(): Promise<string>;
+
+  getTutorPayslips(filters?: { tutorId?: number; status?: string }): Promise<TutorPayslip[]>;
+  getTutorPayslip(id: number): Promise<TutorPayslip | undefined>;
+  createTutorPayslip(payslip: InsertTutorPayslip): Promise<TutorPayslip>;
+  updateTutorPayslip(id: number, data: Partial<InsertTutorPayslip>): Promise<TutorPayslip | undefined>;
+
+  getPayrollEmployees(filters?: { status?: string }): Promise<PayrollEmployee[]>;
+  getPayrollEmployee(id: number): Promise<PayrollEmployee | undefined>;
+  createPayrollEmployee(employee: InsertPayrollEmployee): Promise<PayrollEmployee>;
+  updatePayrollEmployee(id: number, data: Partial<InsertPayrollEmployee>): Promise<PayrollEmployee | undefined>;
+
+  getPayrollStatutoryConfigVersions(): Promise<PayrollStatutoryConfigVersion[]>;
+  createPayrollStatutoryConfigVersion(version: InsertPayrollStatutoryConfigVersion): Promise<PayrollStatutoryConfigVersion>;
   getNextClaimNumber(): Promise<string>;
 
   deleteProduct(id: number): Promise<boolean>;
@@ -738,6 +762,102 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(expenseClaims);
     const num = (result?.count || 0) + 1;
     return `EXP-${String(num).padStart(5, "0")}`;
+  }
+
+  async getTutors(filters?: { status?: string }): Promise<Tutor[]> {
+    if (filters?.status) {
+      return await db.select().from(tutors).where(eq(tutors.status, filters.status)).orderBy(tutors.fullName);
+    }
+    return await db.select().from(tutors).orderBy(tutors.fullName);
+  }
+
+  async getTutor(id: number): Promise<Tutor | undefined> {
+    const [tutor] = await db.select().from(tutors).where(eq(tutors.id, id));
+    return tutor;
+  }
+
+  async getTutorByLoginEmployeeId(employeeId: number): Promise<Tutor | undefined> {
+    const [tutor] = await db.select().from(tutors).where(eq(tutors.loginEmployeeId, employeeId));
+    return tutor;
+  }
+
+  async createTutor(tutor: InsertTutor): Promise<Tutor> {
+    const [newTutor] = await db.insert(tutors).values(tutor).returning();
+    return newTutor;
+  }
+
+  async updateTutor(id: number, data: Partial<InsertTutor>): Promise<Tutor | undefined> {
+    const [updated] = await db.update(tutors).set(data).where(eq(tutors.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTutor(id: number): Promise<boolean> {
+    const result = await db.delete(tutors).where(eq(tutors.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getNextTutorCode(): Promise<string> {
+    const year = new Date().getFullYear();
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(tutors)
+      .where(sql`tutor_code LIKE ${`KDXS-TUT-${year}-%`}`);
+    const num = (result?.count || 0) + 1;
+    return `KDXS-TUT-${year}-${String(num).padStart(4, "0")}`;
+  }
+
+  async getTutorPayslips(filters?: { tutorId?: number; status?: string }): Promise<TutorPayslip[]> {
+    let conditions = [];
+    if (filters?.tutorId) conditions.push(eq(tutorPayslips.tutorId, filters.tutorId));
+    if (filters?.status) conditions.push(eq(tutorPayslips.status, filters.status));
+    if (conditions.length > 0) {
+      return await db.select().from(tutorPayslips).where(and(...conditions)).orderBy(desc(tutorPayslips.createdAt));
+    }
+    return await db.select().from(tutorPayslips).orderBy(desc(tutorPayslips.createdAt));
+  }
+
+  async getTutorPayslip(id: number): Promise<TutorPayslip | undefined> {
+    const [payslip] = await db.select().from(tutorPayslips).where(eq(tutorPayslips.id, id));
+    return payslip;
+  }
+
+  async createTutorPayslip(payslip: InsertTutorPayslip): Promise<TutorPayslip> {
+    const [newPayslip] = await db.insert(tutorPayslips).values(payslip).returning();
+    return newPayslip;
+  }
+
+  async updateTutorPayslip(id: number, data: Partial<InsertTutorPayslip>): Promise<TutorPayslip | undefined> {
+    const [updated] = await db.update(tutorPayslips).set(data).where(eq(tutorPayslips.id, id)).returning();
+    return updated;
+  }
+
+  async getPayrollEmployees(filters?: { status?: string }): Promise<PayrollEmployee[]> {
+    if (filters?.status) {
+      return await db.select().from(payrollEmployees).where(eq(payrollEmployees.status, filters.status)).orderBy(payrollEmployees.fullName);
+    }
+    return await db.select().from(payrollEmployees).orderBy(payrollEmployees.fullName);
+  }
+
+  async getPayrollEmployee(id: number): Promise<PayrollEmployee | undefined> {
+    const [employee] = await db.select().from(payrollEmployees).where(eq(payrollEmployees.id, id));
+    return employee;
+  }
+
+  async createPayrollEmployee(employee: InsertPayrollEmployee): Promise<PayrollEmployee> {
+    const [newEmployee] = await db.insert(payrollEmployees).values(employee).returning();
+    return newEmployee;
+  }
+
+  async updatePayrollEmployee(id: number, data: Partial<InsertPayrollEmployee>): Promise<PayrollEmployee | undefined> {
+    const [updated] = await db.update(payrollEmployees).set(data).where(eq(payrollEmployees.id, id)).returning();
+    return updated;
+  }
+
+  async getPayrollStatutoryConfigVersions(): Promise<PayrollStatutoryConfigVersion[]> {
+    return await db.select().from(payrollStatutoryConfigVersions).orderBy(desc(payrollStatutoryConfigVersions.effectiveFrom));
+  }
+
+  async createPayrollStatutoryConfigVersion(version: InsertPayrollStatutoryConfigVersion): Promise<PayrollStatutoryConfigVersion> {
+    const [newVersion] = await db.insert(payrollStatutoryConfigVersions).values(version).returning();
+    return newVersion;
   }
 
   async deleteProduct(id: number): Promise<boolean> {

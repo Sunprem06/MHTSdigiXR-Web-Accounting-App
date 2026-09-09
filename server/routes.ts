@@ -12,6 +12,50 @@ import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
 
+// ── Tutor payslip calculation — Sec 194J (KoodaldigiXS Learning independent contractors) ──
+// Ported line-for-line from the business's existing payslip tool (KoodaldigiXS_PaySlip_TDS.html
+// calc() function). This is the ONLY place these formulas should live — always recomputed
+// server-side from raw inputs, client-submitted totals are never trusted.
+const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+type TutorPayslipInputs = {
+  liveCoachingRate: number; liveCoachingHours: number;
+  prerecordedRate: number; prerecordedHours: number;
+  contentCreationRate: number; contentCreationHours: number;
+  lwpHours: number;
+  otherDeduction: number;
+  panAtPayment: string | null | undefined;
+  tdsRateOverride?: number; // 10 or 20 — only honored if caller explicitly set it
+};
+
+function computeTutorPayslip(input: TutorPayslipInputs) {
+  const a1 = round2(input.liveCoachingRate * input.liveCoachingHours);
+  const a2 = round2(input.prerecordedRate * input.prerecordedHours);
+  const a3 = round2(input.contentCreationRate * input.contentCreationHours);
+  const grossBeforeLwp = a1 + a2 + a3;
+
+  // Primary rate for LWP = first non-zero rate among the three earning types
+  const primaryRate = input.liveCoachingRate || input.prerecordedRate || input.contentCreationRate || 0;
+  const lwpDeduct = round2(input.lwpHours * primaryRate);
+  const grossEarnings = Math.max(0, round2(grossBeforeLwp - lwpDeduct));
+
+  const pan = (input.panAtPayment || "").trim().toUpperCase();
+  const validPan = PAN_REGEX.test(pan);
+  const tdsRatePercent = input.tdsRateOverride === 10 || input.tdsRateOverride === 20
+    ? input.tdsRateOverride
+    : (validPan ? 10 : 20);
+
+  const tdsAmount = round2(grossEarnings * tdsRatePercent / 100);
+  const otherDeduction = round2(Math.max(0, input.otherDeduction || 0));
+  const netPay = Math.max(0, round2(grossEarnings - tdsAmount - otherDeduction));
+
+  return { grossEarnings, tdsAmount, netPay, tdsRatePercent, validPan, panAtPayment: pan || null };
+}
+
 type SmtpConfig = {
   host: string;
   port: number;
@@ -813,6 +857,332 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json({ message: "Deleted successfully" });
+  });
+
+  // ── Payroll: Tutors (independent contractors, Sec 194J) ──
+  app.get("/api/accounting/tutors", requireAuth, requirePermission("payroll_tutors.view"), async (req, res) => {
+    const filters: any = {};
+    if (req.query.status) filters.status = req.query.status;
+    const list = await storage.getTutors(filters);
+    res.json(list);
+  });
+
+  app.get("/api/accounting/tutors/:id", requireAuth, requirePermission("payroll_tutors.view"), async (req, res) => {
+    const tutor = await storage.getTutor(parseInt(req.params.id));
+    if (!tutor) return res.status(404).json({ message: "Tutor not found" });
+    res.json(tutor);
+  });
+
+  app.get("/api/accounting/tutors/:id/payslips", requireAuth, requirePermission("payroll_tutors.view"), async (req, res) => {
+    const list = await storage.getTutorPayslips({ tutorId: parseInt(req.params.id) });
+    res.json(list);
+  });
+
+  app.post("/api/accounting/tutors", requireAuth, requirePermission("payroll_tutors.manage"), async (req, res) => {
+    if (req.body.panNumber && !PAN_REGEX.test(String(req.body.panNumber).toUpperCase())) {
+      return res.status(400).json({ message: "PAN must be in the format AAAAA9999A" });
+    }
+    const tutorCode = req.body.tutorCode || await storage.getNextTutorCode();
+    const tutor = await storage.createTutor({
+      ...req.body,
+      tutorCode,
+      panNumber: req.body.panNumber ? String(req.body.panNumber).toUpperCase() : req.body.panNumber,
+      createdBy: req.user!.id,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "tutor",
+      entityId: tutor.id, details: `Created tutor: ${tutor.tutorCode} (${tutor.fullName})`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(tutor);
+  });
+
+  app.patch("/api/accounting/tutors/:id", requireAuth, requirePermission("payroll_tutors.manage"), async (req, res) => {
+    if (req.body.panNumber && !PAN_REGEX.test(String(req.body.panNumber).toUpperCase())) {
+      return res.status(400).json({ message: "PAN must be in the format AAAAA9999A" });
+    }
+    const data = { ...req.body };
+    if (data.panNumber) data.panNumber = String(data.panNumber).toUpperCase();
+    const updated = await storage.updateTutor(parseInt(req.params.id), data);
+    if (!updated) return res.status(404).json({ message: "Tutor not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "tutor",
+      entityId: updated.id, details: `Updated tutor: ${updated.tutorCode}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/tutors/:id", requireAuth, requirePermission("payroll_tutors.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existingPayslips = await storage.getTutorPayslips({ tutorId: id });
+    if (existingPayslips.length > 0) {
+      return res.status(400).json({ message: "Cannot delete a tutor with payslip history — deactivate instead" });
+    }
+    const deleted = await storage.deleteTutor(id);
+    if (!deleted) return res.status(404).json({ message: "Tutor not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "tutor",
+      entityId: id, details: `Deleted tutor`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
+  // Tutor self-service — scoped to the tutor record linked to the logged-in account
+  app.get("/api/accounting/my-tutor-profile", requireAuth, requirePermission("payroll_tutors.view_own"), async (req, res) => {
+    const tutor = await storage.getTutorByLoginEmployeeId(req.user!.id);
+    if (!tutor) return res.status(404).json({ message: "No tutor profile linked to this account" });
+    res.json(tutor);
+  });
+
+  app.get("/api/accounting/my-payslips", requireAuth, requirePermission("payroll_tutors.view_own"), async (req, res) => {
+    const tutor = await storage.getTutorByLoginEmployeeId(req.user!.id);
+    if (!tutor) return res.status(404).json({ message: "No tutor profile linked to this account" });
+    const list = await storage.getTutorPayslips({ tutorId: tutor.id });
+    // Tutors only ever see finalized states — draft/submitted/rejected are internal
+    // admin workflow states with no self-service UI to render them.
+    res.json(list.filter(p => p.status === "approved" || p.status === "paid"));
+  });
+
+  app.get("/api/accounting/my-payslips/:id", requireAuth, requirePermission("payroll_tutors.view_own"), async (req, res) => {
+    const tutor = await storage.getTutorByLoginEmployeeId(req.user!.id);
+    if (!tutor) return res.status(404).json({ message: "No tutor profile linked to this account" });
+    const payslip = await storage.getTutorPayslip(parseInt(req.params.id));
+    if (!payslip || payslip.tutorId !== tutor.id || (payslip.status !== "approved" && payslip.status !== "paid")) {
+      return res.status(404).json({ message: "Payslip not found" });
+    }
+    res.json(payslip);
+  });
+
+  // Tutor Payslips (admin side)
+  app.get("/api/accounting/tutor-payslips", requireAuth, requirePermission("payroll_tutors.view"), async (req, res) => {
+    const filters: any = {};
+    if (req.query.tutorId) filters.tutorId = parseInt(req.query.tutorId as string);
+    if (req.query.status) filters.status = req.query.status;
+    const list = await storage.getTutorPayslips(filters);
+    res.json(list);
+  });
+
+  app.get("/api/accounting/tutor-payslips/:id", requireAuth, requirePermission("payroll_tutors.view"), async (req, res) => {
+    const payslip = await storage.getTutorPayslip(parseInt(req.params.id));
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    res.json(payslip);
+  });
+
+  function buildTutorPayslipData(body: any, tutor: { panNumber: string | null }) {
+    const inputs: TutorPayslipInputs = {
+      liveCoachingRate: parseFloat(body.liveCoachingRate) || 0,
+      liveCoachingHours: parseFloat(body.liveCoachingHours) || 0,
+      prerecordedRate: parseFloat(body.prerecordedRate) || 0,
+      prerecordedHours: parseFloat(body.prerecordedHours) || 0,
+      contentCreationRate: parseFloat(body.contentCreationRate) || 0,
+      contentCreationHours: parseFloat(body.contentCreationHours) || 0,
+      lwpHours: parseFloat(body.lwpHours) || 0,
+      otherDeduction: parseFloat(body.otherDeduction) || 0,
+      panAtPayment: body.panAtPayment || tutor.panNumber,
+      tdsRateOverride: body.tdsRatePercent === 10 || body.tdsRatePercent === 20 ? body.tdsRatePercent : undefined,
+    };
+    const computed = computeTutorPayslip(inputs);
+    return {
+      liveCoachingRate: String(inputs.liveCoachingRate), liveCoachingHours: String(inputs.liveCoachingHours),
+      prerecordedRate: String(inputs.prerecordedRate), prerecordedHours: String(inputs.prerecordedHours),
+      contentCreationRate: String(inputs.contentCreationRate), contentCreationHours: String(inputs.contentCreationHours),
+      lwpHours: String(inputs.lwpHours), otherDeduction: String(inputs.otherDeduction),
+      panAtPayment: computed.panAtPayment,
+      tdsRatePercent: computed.tdsRatePercent,
+      grossEarnings: String(computed.grossEarnings),
+      tdsAmount: String(computed.tdsAmount),
+      netPay: String(computed.netPay),
+    };
+  }
+
+  app.post("/api/accounting/tutor-payslips", requireAuth, requirePermission("payroll_tutors.process"), async (req, res) => {
+    const tutor = await storage.getTutor(parseInt(req.body.tutorId));
+    if (!tutor) return res.status(400).json({ message: "Tutor not found" });
+    if (!req.body.payMonth) return res.status(400).json({ message: "payMonth is required" });
+
+    const computedData = buildTutorPayslipData(req.body, tutor);
+    const payslip = await storage.createTutorPayslip({
+      ...computedData,
+      tutorId: tutor.id,
+      payMonth: req.body.payMonth,
+      status: "draft",
+      preparedBy: req.user!.id,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "tutor_payslip",
+      entityId: payslip.id, details: `Created draft payslip for ${tutor.tutorCode} — ${payslip.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(payslip);
+  });
+
+  app.patch("/api/accounting/tutor-payslips/:id", requireAuth, requirePermission("payroll_tutors.process"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getTutorPayslip(id);
+    if (!existing) return res.status(404).json({ message: "Payslip not found" });
+    if (existing.status !== "draft" && existing.status !== "rejected") {
+      return res.status(400).json({ message: "Only draft or rejected payslips can be edited" });
+    }
+    const tutor = await storage.getTutor(existing.tutorId);
+    if (!tutor) return res.status(400).json({ message: "Tutor not found" });
+
+    const computedData = buildTutorPayslipData({ ...existing, ...req.body }, tutor);
+    const updated = await storage.updateTutorPayslip(id, {
+      ...computedData,
+      payMonth: req.body.payMonth || existing.payMonth,
+      status: "draft",
+      rejectionReason: null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "tutor_payslip",
+      entityId: id, details: `Updated payslip for ${tutor.tutorCode} — ${existing.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/tutor-payslips/:id/submit", requireAuth, requirePermission("payroll_tutors.process"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getTutorPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "draft") return res.status(400).json({ message: "Only draft payslips can be submitted" });
+    const updated = await storage.updateTutorPayslip(id, { status: "submitted", submittedAt: new Date() });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "submit", entity: "tutor_payslip",
+      entityId: id, details: `Submitted payslip ${id} for approval`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/tutor-payslips/:id/approve", requireAuth, requirePermission("payroll_tutors.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getTutorPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "submitted") return res.status(400).json({ message: "Only submitted payslips can be approved" });
+    const updated = await storage.updateTutorPayslip(id, {
+      status: "approved", approvedBy: req.user!.id, approvedAt: new Date(),
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "approve", entity: "tutor_payslip",
+      entityId: id, details: `Approved payslip ${id}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/tutor-payslips/:id/reject", requireAuth, requirePermission("payroll_tutors.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getTutorPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "submitted") return res.status(400).json({ message: "Only submitted payslips can be rejected" });
+    const reason = req.body?.reason || "";
+    const updated = await storage.updateTutorPayslip(id, {
+      status: "rejected", approvedBy: req.user!.id, approvedAt: new Date(),
+      rejectionReason: reason || null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "reject", entity: "tutor_payslip",
+      entityId: id, details: `Rejected payslip ${id}${reason ? ": " + reason : ""}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/tutor-payslips/:id/mark-paid", requireAuth, requirePermission("payroll_tutors.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getTutorPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "approved") return res.status(400).json({ message: "Only approved payslips can be marked paid" });
+    const tutor = await storage.getTutor(payslip.tutorId);
+    if (!tutor) return res.status(400).json({ message: "Tutor not found" });
+
+    const ledgerAccounts = await storage.getLedgerAccounts();
+    const feesLedger = ledgerAccounts.find(a => a.name === "Tutor Professional Fees");
+    const tdsLedger = ledgerAccounts.find(a => a.name === "TDS Payable");
+    const bankLedger = ledgerAccounts.find(a => a.name === "Bank Account");
+    if (!feesLedger || !tdsLedger || !bankLedger) {
+      return res.status(500).json({ message: "Required ledger accounts are missing — contact an administrator" });
+    }
+
+    const gross = parseFloat(payslip.grossEarnings);
+    const tds = parseFloat(payslip.tdsAmount);
+    const other = parseFloat(payslip.otherDeduction || "0");
+    const net = parseFloat(payslip.netPay);
+
+    // voucherId is a placeholder — storage.createVoucher() overwrites it with the
+    // newly-created voucher's real id for every entry before inserting.
+    const entries = [
+      { ledgerAccountId: feesLedger.id, voucherId: 0, debit: String(gross), credit: "0" },
+      { ledgerAccountId: tdsLedger.id, voucherId: 0, debit: "0", credit: String(tds) },
+      { ledgerAccountId: bankLedger.id, voucherId: 0, debit: "0", credit: String(net + other) },
+    ];
+
+    const voucherNumber = await storage.getNextVoucherNumber("payment");
+    const voucher = await storage.createVoucher({
+      voucherNumber,
+      date: new Date().toISOString().split("T")[0],
+      type: "payment",
+      narration: `Tutor payslip — ${tutor.tutorCode} (${tutor.fullName}) — ${payslip.payMonth}`,
+      totalAmount: String(gross),
+      status: "approved",
+      partyId: null,
+      gstRate: null,
+      taxableAmount: null,
+      cgstAmount: null,
+      sgstAmount: null,
+      igstAmount: null,
+      isInterState: false,
+      createdBy: req.user!.id,
+      approvedBy: req.user!.id,
+    }, entries);
+
+    const updated = await storage.updateTutorPayslip(id, { status: "paid", voucherId: voucher.id });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "mark-paid", entity: "tutor_payslip",
+      entityId: id, details: `Marked payslip ${id} paid — posted voucher ${voucherNumber}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ ...updated, voucher });
+  });
+
+  // ── Payroll: Employees (MHTSdigiXR salaried staff) — STUB ──
+  // Master-data CRUD only. No statutory calculation routes exist here on purpose —
+  // Sec 192 TDS / PF / ESI / Gratuity formulas must be reviewed by a CA first.
+  app.get("/api/accounting/payroll-employees", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const filters: any = {};
+    if (req.query.status) filters.status = req.query.status;
+    const list = await storage.getPayrollEmployees(filters);
+    res.json(list);
+  });
+
+  app.get("/api/accounting/payroll-employees/:id", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const employee = await storage.getPayrollEmployee(parseInt(req.params.id));
+    if (!employee) return res.status(404).json({ message: "Payroll employee not found" });
+    res.json(employee);
+  });
+
+  app.post("/api/accounting/payroll-employees", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const employee = await storage.createPayrollEmployee({ ...req.body, createdBy: req.user!.id });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "payroll_employee",
+      entityId: employee.id, details: `Created payroll employee master: ${employee.employeeCode} (${employee.fullName})`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(employee);
+  });
+
+  app.patch("/api/accounting/payroll-employees/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const updated = await storage.updatePayrollEmployee(parseInt(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ message: "Payroll employee not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "payroll_employee",
+      entityId: updated.id, details: `Updated payroll employee master: ${updated.employeeCode}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
   });
 
   // Vouchers
@@ -2030,6 +2400,27 @@ async function seedDatabase() {
     ];
     for (const account of defaultAccounts) {
       await storage.createLedgerAccount(account);
+    }
+  }
+
+  // Ensure the Tutor Payroll ledger account exists — runs unconditionally (not gated
+  // behind the fresh-install `groups.length === 0` check above) so it also backfills
+  // already-seeded/production databases. TDS Payable and Bank Account are reused from
+  // the chart of accounts seeded above; only this one expense ledger is new.
+  {
+    const existingGroups = await storage.getAccountGroups();
+    const expenseGroup = existingGroups.find(g => g.name === "Direct Expenses") || existingGroups.find(g => g.name === "Indirect Expenses");
+    if (expenseGroup) {
+      const existingAccounts = await storage.getLedgerAccounts();
+      if (!existingAccounts.some(a => a.name === "Tutor Professional Fees")) {
+        await storage.createLedgerAccount({
+          name: "Tutor Professional Fees",
+          groupId: expenseGroup.id,
+          openingBalance: "0",
+          balanceType: "debit",
+          description: "Sec 194J professional fees paid to independent contractor tutors (KoodaldigiXS Learning)",
+        });
+      }
     }
   }
 

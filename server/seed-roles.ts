@@ -13,6 +13,7 @@ const SYSTEM_ROLE_DESCRIPTIONS: Record<string, string> = {
   viewer: "Read-only dashboard and summary access",
   sales_person: "Create quotations and manage customer parties",
   sales_manager: "Approve quotations; manage parties; create invoices",
+  tutor: "Self-service: view and print own payslips only",
 };
 
 export async function seedSystemRoles() {
