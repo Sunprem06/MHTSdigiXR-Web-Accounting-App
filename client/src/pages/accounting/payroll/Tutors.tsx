@@ -14,15 +14,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Loader2, Receipt } from "lucide-react";
+import { Plus, Pencil, Loader2, FileText } from "lucide-react";
 
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+const COUNTRY_CODES = ["+91", "+1", "+44", "+971", "+65", "+61"];
 
 const emptyForm = {
-  fullName: "", subject: "", agreementDate: "", agreementRef: "",
-  gender: "", contactPhone: "", email: "", panNumber: "",
+  tutorCode: "", fullName: "", gender: "", countryCode: "+91", contactPhone: "", email: "", panNumber: "",
   bankName: "", bankAccountNumber: "", bankIfsc: "", gstNumber: "",
-  city: "Chennai", defaultRate: "", status: "active", loginEmployeeId: "",
+  city: "Chennai", status: "active", loginEmployeeId: "",
 };
 
 export default function Tutors() {
@@ -80,20 +80,30 @@ export default function Tutors() {
 
   const buildPayload = () => ({
     ...form,
-    agreementDate: form.agreementDate || null,
-    defaultRate: form.defaultRate || "0",
     loginEmployeeId: form.loginEmployeeId ? parseInt(form.loginEmployeeId) : null,
     panNumber: form.panNumber ? form.panNumber.toUpperCase() : form.panNumber,
   });
 
+  const openAdd = async () => {
+    let suggestedCode = "";
+    try {
+      const res = await apiRequest("GET", "/api/accounting/tutors/next-code");
+      suggestedCode = (await res.json()).tutorCode;
+    } catch {
+      // Non-fatal — the field stays editable, they can type a code manually.
+    }
+    setForm({ ...emptyForm, tutorCode: suggestedCode });
+    setAddOpen(true);
+  };
+
   const openEdit = (t: Tutor) => {
     setEditingTutor(t);
     setForm({
-      fullName: t.fullName, subject: t.subject || "", agreementDate: t.agreementDate || "",
-      agreementRef: t.agreementRef || "", gender: t.gender || "", contactPhone: t.contactPhone || "",
+      tutorCode: t.tutorCode, fullName: t.fullName, gender: t.gender || "",
+      countryCode: t.countryCode || "+91", contactPhone: t.contactPhone || "",
       email: t.email || "", panNumber: t.panNumber || "", bankName: t.bankName || "",
       bankAccountNumber: t.bankAccountNumber || "", bankIfsc: t.bankIfsc || "", gstNumber: t.gstNumber || "",
-      city: t.city || "Chennai", defaultRate: t.defaultRate || "", status: t.status,
+      city: t.city || "Chennai", status: t.status,
       loginEmployeeId: t.loginEmployeeId ? String(t.loginEmployeeId) : "",
     });
     setEditOpen(true);
@@ -101,14 +111,27 @@ export default function Tutors() {
 
   const renderFormFields = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <Label>Tutor Code</Label>
+        <Input value={form.tutorCode} onChange={e => setForm({ ...form, tutorCode: e.target.value })} placeholder="2026001" data-testid="input-tutor-code" />
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Auto-suggested — overwrite with your existing code when backfilling a tutor.</p>
+      </div>
       <div><Label>Full Name *</Label><Input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} data-testid="input-tutor-fullname" /></div>
-      <div><Label>Subject / Course</Label><Input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} data-testid="input-tutor-subject" /></div>
       <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} data-testid="input-tutor-email" /></div>
-      <div><Label>Contact Phone</Label><Input value={form.contactPhone} onChange={e => setForm({ ...form, contactPhone: e.target.value })} data-testid="input-tutor-phone" /></div>
+      <div>
+        <Label>Contact Phone</Label>
+        <div className="flex gap-2">
+          <Select value={form.countryCode} onValueChange={v => setForm({ ...form, countryCode: v })}>
+            <SelectTrigger className="w-24" data-testid="select-tutor-country-code"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {COUNTRY_CODES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Input value={form.contactPhone} onChange={e => setForm({ ...form, contactPhone: e.target.value })} data-testid="input-tutor-phone" />
+        </div>
+      </div>
       <div><Label>Gender</Label><Input value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })} data-testid="input-tutor-gender" /></div>
       <div><Label>City</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} data-testid="input-tutor-city" /></div>
-      <div><Label>Agreement Date</Label><Input type="date" value={form.agreementDate} onChange={e => setForm({ ...form, agreementDate: e.target.value })} data-testid="input-tutor-agreement-date" /></div>
-      <div><Label>Agreement Ref</Label><Input placeholder="KDXS-TUT-2026-0001" value={form.agreementRef} onChange={e => setForm({ ...form, agreementRef: e.target.value })} data-testid="input-tutor-agreement-ref" /></div>
       <div>
         <Label>PAN Number</Label>
         <Input
@@ -121,11 +144,14 @@ export default function Tutors() {
         {panError && <p className="text-xs text-red-600 mt-1">{panError}</p>}
         {!form.panNumber && <p className="text-xs text-amber-600 mt-1">Without a valid PAN, TDS defaults to 20% (Sec 206AA).</p>}
       </div>
-      <div><Label>GST Number</Label><Input value={form.gstNumber} onChange={e => setForm({ ...form, gstNumber: e.target.value })} data-testid="input-tutor-gst" /></div>
+      <div>
+        <Label>Tutor's GST Number (if registered)</Label>
+        <Input value={form.gstNumber} onChange={e => setForm({ ...form, gstNumber: e.target.value })} data-testid="input-tutor-gst" />
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">The tutor's own GSTIN, not MHTS's — leave blank if they aren't GST-registered.</p>
+      </div>
       <div><Label>Bank Name</Label><Input value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} data-testid="input-tutor-bank" /></div>
       <div><Label>Bank Account No.</Label><Input value={form.bankAccountNumber} onChange={e => setForm({ ...form, bankAccountNumber: e.target.value })} data-testid="input-tutor-bank-account" /></div>
       <div><Label>Bank IFSC</Label><Input value={form.bankIfsc} onChange={e => setForm({ ...form, bankIfsc: e.target.value.toUpperCase() })} className="uppercase" data-testid="input-tutor-ifsc" /></div>
-      <div><Label>Default Rate (INR/hr)</Label><Input type="number" min="0" value={form.defaultRate} onChange={e => setForm({ ...form, defaultRate: e.target.value })} data-testid="input-tutor-rate" /></div>
       <div>
         <Label>Status</Label>
         <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
@@ -149,7 +175,7 @@ export default function Tutors() {
             </SelectContent>
           </Select>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Create a login account with the "Tutor" role under Employees first, then link it here so this tutor can view/print their own payslips.
+            Create a login account with the "Tutor" role under Employees first, then link it here so this tutor can view/print their own payslips and courses.
           </p>
         </div>
       )}
@@ -165,7 +191,7 @@ export default function Tutors() {
             <p className="text-slate-500 dark:text-slate-400 mt-1">Independent contractors — KoodaldigiXS Learning (Sec 194J, no PF/ESI)</p>
           </div>
           {canManage && (
-            <Button onClick={() => { setForm(emptyForm); setAddOpen(true); }} data-testid="button-add-tutor">
+            <Button onClick={openAdd} data-testid="button-add-tutor">
               <Plus className="w-4 h-4 mr-2" />Add Tutor
             </Button>
           )}
@@ -183,7 +209,7 @@ export default function Tutors() {
                   <TableRow>
                     <TableHead>Tutor Code</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Subject</TableHead>
+                    <TableHead>Mobile</TableHead>
                     <TableHead>PAN</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
@@ -194,16 +220,16 @@ export default function Tutors() {
                     <TableRow key={t.id} data-testid={`row-tutor-${t.id}`}>
                       <TableCell className="font-mono text-xs">{t.tutorCode}</TableCell>
                       <TableCell className="font-medium">{t.fullName}</TableCell>
-                      <TableCell>{t.subject || "-"}</TableCell>
+                      <TableCell>{t.contactPhone ? `${t.countryCode || "+91"} ${t.contactPhone}` : "-"}</TableCell>
                       <TableCell>{t.panNumber || <span className="text-amber-600">Missing</span>}</TableCell>
                       <TableCell>
                         <Badge variant={t.status === "active" ? "default" : "outline"}>{t.status === "active" ? "Active" : "Inactive"}</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Link href={`/accounting/payroll/tutor-payslips?tutorId=${t.id}`}>
-                            <Button size="icon" variant="ghost" title="Payslip History" data-testid={`button-history-tutor-${t.id}`}>
-                              <Receipt className="w-4 h-4" />
+                          <Link href={`/accounting/payroll/tutor-agreements?tutorId=${t.id}`}>
+                            <Button size="icon" variant="ghost" title="Agreements" data-testid={`button-agreements-tutor-${t.id}`}>
+                              <FileText className="w-4 h-4" />
                             </Button>
                           </Link>
                           {canManage && (

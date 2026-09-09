@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { TUTOR_PAYSLIP_STATUSES } from "@shared/schema";
-import type { TutorPayslip, Tutor } from "@shared/schema";
+import type { TutorPayslip, Tutor, TutorAgreement } from "@shared/schema";
 import { Plus, Loader2, FileText, Eye, Send, CheckCircle, XCircle, Banknote, Pencil } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -46,6 +46,8 @@ export default function TutorPayslips() {
   });
   const { data: tutors } = useQuery<Tutor[]>({ queryKey: ["/api/accounting/tutors"] });
   const tutorMap = new Map(tutors?.map(t => [t.id, t]) || []);
+  const { data: agreements } = useQuery<TutorAgreement[]>({ queryKey: ["/api/accounting/tutor-agreements"] });
+  const agreementMap = new Map(agreements?.map(a => [a.id, a]) || []);
 
   const useStatusMutation = (action: string, successMessage: string) => useMutation({
     mutationFn: async (id: number) => {
@@ -128,6 +130,7 @@ export default function TutorPayslips() {
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                     <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Tutor</th>
+                    <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Agreement</th>
                     <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Month</th>
                     <th className="text-right text-xs font-medium text-slate-500 px-4 py-3">Gross</th>
                     <th className="text-right text-xs font-medium text-slate-500 px-4 py-3">TDS</th>
@@ -140,6 +143,7 @@ export default function TutorPayslips() {
                   {filtered.map(p => (
                     <tr key={p.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0" data-testid={`row-payslip-${p.id}`}>
                       <td className="px-4 py-3 text-sm">{tutorMap.get(p.tutorId)?.fullName || "-"}</td>
+                      <td className="px-4 py-3 text-xs font-mono">{agreementMap.get(p.agreementId)?.agreementRef || "-"}</td>
                       <td className="px-4 py-3 text-sm">{p.payMonth}</td>
                       <td className="px-4 py-3 text-right text-sm">₹{parseFloat(p.grossEarnings).toLocaleString("en-IN")}</td>
                       <td className="px-4 py-3 text-right text-sm text-red-600">₹{parseFloat(p.tdsAmount).toLocaleString("en-IN")}</td>

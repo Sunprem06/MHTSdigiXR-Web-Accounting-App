@@ -23,9 +23,9 @@ import {
   erpLicenses, erpLicenseActivations,
   type InsertErpLicense, type InsertErpLicenseActivation,
   type ErpLicense, type ErpLicenseActivation,
-  tutors, tutorPayslips, payrollEmployees, payrollStatutoryConfigVersions,
-  type InsertTutor, type InsertTutorPayslip, type InsertPayrollEmployee, type InsertPayrollStatutoryConfigVersion,
-  type Tutor, type TutorPayslip, type PayrollEmployee, type PayrollStatutoryConfigVersion
+  tutors, tutorAgreements, tutorPayslips, payrollEmployees, payrollStatutoryConfigVersions,
+  type InsertTutor, type InsertTutorAgreement, type InsertTutorPayslip, type InsertPayrollEmployee, type InsertPayrollStatutoryConfigVersion,
+  type Tutor, type TutorAgreement, type TutorPayslip, type PayrollEmployee, type PayrollStatutoryConfigVersion
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -138,7 +138,14 @@ export interface IStorage {
   deleteTutor(id: number): Promise<boolean>;
   getNextTutorCode(): Promise<string>;
 
-  getTutorPayslips(filters?: { tutorId?: number; status?: string }): Promise<TutorPayslip[]>;
+  getTutorAgreements(filters?: { tutorId?: number }): Promise<TutorAgreement[]>;
+  getTutorAgreement(id: number): Promise<TutorAgreement | undefined>;
+  createTutorAgreement(agreement: InsertTutorAgreement): Promise<TutorAgreement>;
+  updateTutorAgreement(id: number, data: Partial<InsertTutorAgreement>): Promise<TutorAgreement | undefined>;
+  deleteTutorAgreement(id: number): Promise<boolean>;
+  getNextAgreementRef(): Promise<string>;
+
+  getTutorPayslips(filters?: { tutorId?: number; agreementId?: number; status?: string }): Promise<TutorPayslip[]>;
   getTutorPayslip(id: number): Promise<TutorPayslip | undefined>;
   createTutorPayslip(payslip: InsertTutorPayslip): Promise<TutorPayslip>;
   updateTutorPayslip(id: number, data: Partial<InsertTutorPayslip>): Promise<TutorPayslip | undefined>;
@@ -797,16 +804,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextTutorCode(): Promise<string> {
+    // Matches the business's existing numbering (Tutor Details.xlsx): year + 3-digit
+    // sequence, e.g. 2026001. Editable client-side — this is only a suggested default,
+    // not enforced, so existing tutor codes can be entered verbatim when backfilling.
     const year = new Date().getFullYear();
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(tutors)
-      .where(sql`tutor_code LIKE ${`KDXS-TUT-${year}-%`}`);
+      .where(sql`tutor_code LIKE ${`${year}%`}`);
     const num = (result?.count || 0) + 1;
-    return `KDXS-TUT-${year}-${String(num).padStart(4, "0")}`;
+    return `${year}${String(num).padStart(3, "0")}`;
   }
 
-  async getTutorPayslips(filters?: { tutorId?: number; status?: string }): Promise<TutorPayslip[]> {
+  async getTutorAgreements(filters?: { tutorId?: number }): Promise<TutorAgreement[]> {
+    if (filters?.tutorId) {
+      return await db.select().from(tutorAgreements).where(eq(tutorAgreements.tutorId, filters.tutorId)).orderBy(desc(tutorAgreements.createdAt));
+    }
+    return await db.select().from(tutorAgreements).orderBy(desc(tutorAgreements.createdAt));
+  }
+
+  async getTutorAgreement(id: number): Promise<TutorAgreement | undefined> {
+    const [agreement] = await db.select().from(tutorAgreements).where(eq(tutorAgreements.id, id));
+    return agreement;
+  }
+
+  async createTutorAgreement(agreement: InsertTutorAgreement): Promise<TutorAgreement> {
+    const [newAgreement] = await db.insert(tutorAgreements).values(agreement).returning();
+    return newAgreement;
+  }
+
+  async updateTutorAgreement(id: number, data: Partial<InsertTutorAgreement>): Promise<TutorAgreement | undefined> {
+    const [updated] = await db.update(tutorAgreements).set(data).where(eq(tutorAgreements.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTutorAgreement(id: number): Promise<boolean> {
+    const result = await db.delete(tutorAgreements).where(eq(tutorAgreements.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getNextAgreementRef(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `KDXS-TUT-${year}-`;
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(tutorAgreements)
+      .where(sql`agreement_ref LIKE ${`${prefix}%`}`);
+    const num = (result?.count || 0) + 1;
+    return `${prefix}${String(num).padStart(4, "0")}`;
+  }
+
+  async getTutorPayslips(filters?: { tutorId?: number; agreementId?: number; status?: string }): Promise<TutorPayslip[]> {
     let conditions = [];
     if (filters?.tutorId) conditions.push(eq(tutorPayslips.tutorId, filters.tutorId));
+    if (filters?.agreementId) conditions.push(eq(tutorPayslips.agreementId, filters.agreementId));
     if (filters?.status) conditions.push(eq(tutorPayslips.status, filters.status));
     if (conditions.length > 0) {
       return await db.select().from(tutorPayslips).where(and(...conditions)).orderBy(desc(tutorPayslips.createdAt));

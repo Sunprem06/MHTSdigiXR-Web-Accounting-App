@@ -76,6 +76,8 @@ import SiteStatsManagement from "@/pages/accounting/SiteStatsManagement";
 import ServicesManagement from "@/pages/accounting/ServicesManagement";
 import PricingPlansManagement from "@/pages/accounting/PricingPlansManagement";
 import Tutors from "@/pages/accounting/payroll/Tutors";
+import TutorAgreements from "@/pages/accounting/payroll/TutorAgreements";
+import TutorAgreementView from "@/pages/accounting/payroll/TutorAgreementView";
 import TutorPayslips from "@/pages/accounting/payroll/TutorPayslips";
 import TutorPayslipEntry from "@/pages/accounting/payroll/TutorPayslipEntry";
 import TutorPayslipView from "@/pages/accounting/payroll/TutorPayslipView";
@@ -211,6 +213,12 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/payroll/tutors">
         {() => <ProtectedRoute requiredPermission="payroll_tutors.view"><Tutors /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/tutor-agreements/:id/view">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.view"><TutorAgreementView /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/tutor-agreements">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.view"><TutorAgreements /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/payroll/tutor-payslips/new">
         {() => <ProtectedRoute requiredPermission="payroll_tutors.process"><TutorPayslipEntry /></ProtectedRoute>}
