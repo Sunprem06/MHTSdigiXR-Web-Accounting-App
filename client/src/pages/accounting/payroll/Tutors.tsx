@@ -130,7 +130,18 @@ export default function Tutors() {
           <Input value={form.contactPhone} onChange={e => setForm({ ...form, contactPhone: e.target.value })} data-testid="input-tutor-phone" />
         </div>
       </div>
-      <div><Label>Gender</Label><Input value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })} data-testid="input-tutor-gender" /></div>
+      <div>
+        <Label>Gender</Label>
+        <Select value={form.gender || "unspecified"} onValueChange={v => setForm({ ...form, gender: v === "unspecified" ? "" : v })}>
+          <SelectTrigger data-testid="select-tutor-gender"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unspecified">Not specified</SelectItem>
+            <SelectItem value="Male">Male</SelectItem>
+            <SelectItem value="Female">Female</SelectItem>
+            <SelectItem value="Other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div><Label>City</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} data-testid="input-tutor-city" /></div>
       <div>
         <Label>PAN Number</Label>
