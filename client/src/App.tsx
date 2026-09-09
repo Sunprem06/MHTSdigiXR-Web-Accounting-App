@@ -75,6 +75,12 @@ import TestimonialsManagement from "@/pages/accounting/TestimonialsManagement";
 import SiteStatsManagement from "@/pages/accounting/SiteStatsManagement";
 import ServicesManagement from "@/pages/accounting/ServicesManagement";
 import PricingPlansManagement from "@/pages/accounting/PricingPlansManagement";
+import Tutors from "@/pages/accounting/payroll/Tutors";
+import TutorPayslips from "@/pages/accounting/payroll/TutorPayslips";
+import TutorPayslipEntry from "@/pages/accounting/payroll/TutorPayslipEntry";
+import TutorPayslipView from "@/pages/accounting/payroll/TutorPayslipView";
+import PayrollEmployees from "@/pages/accounting/payroll/PayrollEmployees";
+import MyPayslips from "@/pages/accounting/payroll/MyPayslips";
 
 function WebsiteRouter() {
   return (
@@ -202,6 +208,30 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/job-applications">
         {() => <ProtectedRoute requiredPermission="jobs.view"><JobApplicationsPage /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/tutors">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.view"><Tutors /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/tutor-payslips/new">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.process"><TutorPayslipEntry /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/tutor-payslips/:id/edit">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.process"><TutorPayslipEntry /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/tutor-payslips/:id/view">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.view"><TutorPayslipView /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/tutor-payslips">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.view"><TutorPayslips /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/employees">
+        {() => <ProtectedRoute requiredPermission="payroll_employees.view"><PayrollEmployees /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/my-payslips/:id">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.view_own"><TutorPayslipView /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/my-payslips">
+        {() => <ProtectedRoute requiredPermission="payroll_tutors.view_own"><MyPayslips /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/contact-inbox">
         {() => <ProtectedRoute requiredPermission="contacts.view"><ContactInbox /></ProtectedRoute>}

@@ -306,6 +306,103 @@ export const expenseClaims = pgTable("expense_claims", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Payroll: Tutors (KoodaldigiXS Learning independent contractors) ──
+// Sec 194J TDS only (10% w/ valid PAN, 20% w/o — Sec 206AA). PF/ESI/Gratuity
+// never apply to tutors — Clause 15.13 of the Independent Contractor
+// Agreement. Formulas ported from the business's existing payslip tool
+// (KoodaldigiXS_PaySlip_TDS.html) — see tutor-payslip route comments.
+export const TUTOR_STATUSES = ["active", "inactive"] as const;
+export type TutorStatus = typeof TUTOR_STATUSES[number];
+
+export const tutors = pgTable("tutors", {
+  id: serial("id").primaryKey(),
+  tutorCode: text("tutor_code").notNull().unique(),
+  fullName: text("full_name").notNull(),
+  subject: text("subject"),
+  agreementDate: date("agreement_date"),
+  agreementRef: text("agreement_ref"),
+  gender: text("gender"),
+  contactPhone: text("contact_phone"),
+  email: text("email").unique(),
+  panNumber: text("pan_number"),
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  bankIfsc: text("bank_ifsc"),
+  gstNumber: text("gst_number"),
+  city: text("city").default("Chennai"),
+  defaultRate: decimal("default_rate", { precision: 10, scale: 2 }).default("0"),
+  status: text("status").notNull().default("active"),
+  loginEmployeeId: integer("login_employee_id").references(() => employees.id),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const TUTOR_PAYSLIP_STATUSES = ["draft", "submitted", "approved", "paid", "rejected"] as const;
+export type TutorPayslipStatus = typeof TUTOR_PAYSLIP_STATUSES[number];
+
+export const tutorPayslips = pgTable("tutor_payslips", {
+  id: serial("id").primaryKey(),
+  tutorId: integer("tutor_id").references(() => tutors.id).notNull(),
+  payMonth: text("pay_month").notNull(),
+  liveCoachingRate: decimal("live_coaching_rate", { precision: 10, scale: 2 }).default("0"),
+  liveCoachingHours: decimal("live_coaching_hours", { precision: 6, scale: 2 }).default("0"),
+  prerecordedRate: decimal("prerecorded_rate", { precision: 10, scale: 2 }).default("0"),
+  prerecordedHours: decimal("prerecorded_hours", { precision: 6, scale: 2 }).default("0"),
+  contentCreationRate: decimal("content_creation_rate", { precision: 10, scale: 2 }).default("0"),
+  contentCreationHours: decimal("content_creation_hours", { precision: 6, scale: 2 }).default("0"),
+  lwpHours: decimal("lwp_hours", { precision: 6, scale: 2 }).default("0"),
+  otherDeduction: decimal("other_deduction", { precision: 10, scale: 2 }).default("0"),
+  panAtPayment: text("pan_at_payment"),
+  tdsRatePercent: integer("tds_rate_percent").notNull().default(10),
+  grossEarnings: decimal("gross_earnings", { precision: 12, scale: 2 }).notNull().default("0"),
+  tdsAmount: decimal("tds_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("draft"),
+  preparedBy: integer("prepared_by").references(() => employees.id),
+  submittedAt: timestamp("submitted_at"),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  voucherId: integer("voucher_id").references(() => vouchers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Payroll: Employees (MHTSdigiXR salaried staff) — SCHEMA STUB ──
+// Statutory formulas (Sec 192 TDS, PF, ESI, Gratuity) are NOT implemented.
+// The Labour Codes (effective 21 Nov 2025) unified the "wages" definition,
+// cap allowances at 50% of total pay for statutory calc, and extend gratuity
+// eligibility to fixed-term employees after 1 year — central/state rules were
+// still being finalized as of early 2026. A CA must review and sign off on
+// the actual formulas before any real payroll run relies on this table.
+// `payrollStatutoryConfigVersions.config` is deliberately untyped (jsonb)
+// until that review defines its shape, so the config layer stays swappable.
+export const payrollEmployees = pgTable("payroll_employees", {
+  id: serial("id").primaryKey(),
+  employeeCode: text("employee_code").notNull().unique(),
+  fullName: text("full_name").notNull(),
+  designation: text("designation"),
+  dateOfJoining: date("date_of_joining"),
+  panNumber: text("pan_number"),
+  pfApplicable: boolean("pf_applicable").notNull().default(false),
+  esiApplicable: boolean("esi_applicable").notNull().default(false),
+  ctcAnnual: decimal("ctc_annual", { precision: 12, scale: 2 }),
+  loginEmployeeId: integer("login_employee_id").references(() => employees.id),
+  status: text("status").notNull().default("active"),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const payrollStatutoryConfigVersions = pgTable("payroll_statutory_config_versions", {
+  id: serial("id").primaryKey(),
+  effectiveFrom: date("effective_from").notNull(),
+  label: text("label").notNull(),
+  config: jsonb("config").notNull().default({}),
+  isActive: boolean("is_active").notNull().default(false),
+  notes: text("notes"),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const ATTACHMENT_ENTITY_TYPES = ["voucher", "expense_claim", "quotation", "party"] as const;
 export type AttachmentEntityType = typeof ATTACHMENT_ENTITY_TYPES[number];
 
@@ -453,6 +550,15 @@ export const insertPartySchema = createInsertSchema(parties).omit({ id: true, cr
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, createdAt: true });
 export const insertExpenseClaimSchema = createInsertSchema(expenseClaims).omit({ id: true, createdAt: true });
+export const insertTutorSchema = createInsertSchema(tutors).omit({ id: true, createdAt: true }).extend({
+  panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "PAN must be in the format AAAAA9999A").optional().or(z.literal("")),
+});
+// Note: grossEarnings/tdsAmount/netPay/tdsRatePercent are accepted here for the
+// InsertTutorPayslip type shape, but the server ALWAYS recomputes them from the
+// raw rate/hours/LWP/PAN fields before insert — client-sent totals are never trusted.
+export const insertTutorPayslipSchema = createInsertSchema(tutorPayslips).omit({ id: true, createdAt: true });
+export const insertPayrollEmployeeSchema = createInsertSchema(payrollEmployees).omit({ id: true, createdAt: true });
+export const insertPayrollStatutoryConfigVersionSchema = createInsertSchema(payrollStatutoryConfigVersions).omit({ id: true, createdAt: true });
 export const insertJobPostingSchema = createInsertSchema(jobPostings).omit({ id: true, createdAt: true });
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({ id: true, createdAt: true });
 export const insertFaqItemSchema = createInsertSchema(faqItems).omit({ id: true, createdAt: true });
@@ -506,6 +612,14 @@ export type Quotation = typeof quotations.$inferSelect;
 export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
 export type ExpenseClaim = typeof expenseClaims.$inferSelect;
 export type InsertExpenseClaim = z.infer<typeof insertExpenseClaimSchema>;
+export type Tutor = typeof tutors.$inferSelect;
+export type InsertTutor = z.infer<typeof insertTutorSchema>;
+export type TutorPayslip = typeof tutorPayslips.$inferSelect;
+export type InsertTutorPayslip = z.infer<typeof insertTutorPayslipSchema>;
+export type PayrollEmployee = typeof payrollEmployees.$inferSelect;
+export type InsertPayrollEmployee = z.infer<typeof insertPayrollEmployeeSchema>;
+export type PayrollStatutoryConfigVersion = typeof payrollStatutoryConfigVersions.$inferSelect;
+export type InsertPayrollStatutoryConfigVersion = z.infer<typeof insertPayrollStatutoryConfigVersionSchema>;
 export type JobPosting = typeof jobPostings.$inferSelect;
 export type InsertJobPosting = z.infer<typeof insertJobPostingSchema>;
 export type JobApplication = typeof jobApplications.$inferSelect;
@@ -525,7 +639,7 @@ export type InsertErpLicense = z.infer<typeof insertErpLicenseSchema>;
 export type ErpLicenseActivation = typeof erpLicenseActivations.$inferSelect;
 export type InsertErpLicenseActivation = z.infer<typeof insertErpLicenseActivationSchema>;
 
-export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer", "sales_person", "sales_manager"] as const;
+export const ROLES = ["super_admin", "admin", "auditor", "senior_accountant", "accountant", "data_entry", "viewer", "sales_person", "sales_manager", "tutor"] as const;
 export type Role = typeof ROLES[number];
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -538,6 +652,7 @@ export const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
   sales_person: "Sales Person",
   sales_manager: "Sales Manager",
+  tutor: "Tutor (Self-Service)",
 };
 
 export const ALL_PERMISSIONS = [
@@ -558,6 +673,8 @@ export const ALL_PERMISSIONS = [
   "roles.view", "roles.manage",
   "settings.view", "settings.manage",
   "erp_licenses.view", "erp_licenses.manage",
+  "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own",
+  "payroll_employees.view", "payroll_employees.manage",
 ] as const;
 
 export type Permission = typeof ALL_PERMISSIONS[number];
@@ -580,6 +697,8 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   roles: { label: "Roles", permissions: ["roles.view", "roles.manage"] },
   settings: { label: "Settings", permissions: ["settings.view", "settings.manage"] },
   erp_licenses: { label: "ERP Licenses", permissions: ["erp_licenses.view", "erp_licenses.manage"] },
+  payroll_tutors: { label: "Payroll - Tutors", permissions: ["payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own"] },
+  payroll_employees: { label: "Payroll - Employees (Stub)", permissions: ["payroll_employees.view", "payroll_employees.manage"] },
 };
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
@@ -599,6 +718,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "vouchers.view", "vouchers.create", "vouchers.edit", "vouchers.approve",
     "expenses.view", "expenses.create", "expenses.approve",
     "reports.view",
+    // Senior Accountant can prepare/submit payroll but NOT approve/mark-paid —
+    // approval requires super_admin or admin (one-step verification), same as
+    // the quotations.approve split above.
+    "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process",
+    "payroll_employees.view", "payroll_employees.manage",
   ],
   accountant: [
     "dashboard.view",
@@ -623,6 +747,10 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "expenses.view",
     "reports.view",
   ],
+  // Tutor self-service: view-only access to their own payslips. Scoped
+  // server-side to the tutor record linked via tutors.loginEmployeeId —
+  // this permission alone grants no visibility into other tutors' data.
+  tutor: ["payroll_tutors.view_own"],
 };
 
 export const VOUCHER_TYPES = ["sales", "purchase", "payment", "receipt", "journal", "contra", "credit_note", "debit_note"] as const;
