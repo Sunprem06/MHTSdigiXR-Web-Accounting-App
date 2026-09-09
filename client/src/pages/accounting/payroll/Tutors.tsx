@@ -19,11 +19,23 @@ import { Plus, Pencil, Loader2, Receipt } from "lucide-react";
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 
 const emptyForm = {
-  fullName: "", subject: "", agreementDate: "", agreementRef: "",
+  tutorCode: "", fullName: "", subject: "", agreementDate: "", agreementRef: "",
   gender: "", contactPhone: "", email: "", panNumber: "",
   bankName: "", bankAccountNumber: "", bankIfsc: "", gstNumber: "",
   city: "Chennai", defaultRate: "", status: "active", loginEmployeeId: "",
 };
+
+function suggestNextAgreementRef(tutors: Tutor[] | undefined): string {
+  const year = new Date().getFullYear();
+  const prefix = `KDXS-TUT-${year}-`;
+  const maxSeq = (tutors || [])
+    .map(t => t.agreementRef || "")
+    .filter(ref => ref.startsWith(prefix))
+    .map(ref => parseInt(ref.slice(prefix.length), 10))
+    .filter(n => !isNaN(n))
+    .reduce((max, n) => Math.max(max, n), 0);
+  return `${prefix}${String(maxSeq + 1).padStart(4, "0")}`;
+}
 
 export default function Tutors() {
   const { hasPermission } = useAuth();
@@ -86,10 +98,22 @@ export default function Tutors() {
     panNumber: form.panNumber ? form.panNumber.toUpperCase() : form.panNumber,
   });
 
+  const openAdd = async () => {
+    let suggestedCode = "";
+    try {
+      const res = await apiRequest("GET", "/api/accounting/tutors/next-code");
+      suggestedCode = (await res.json()).tutorCode;
+    } catch {
+      // Non-fatal — the field stays editable, they can type a code manually.
+    }
+    setForm({ ...emptyForm, tutorCode: suggestedCode, agreementRef: suggestNextAgreementRef(tutors) });
+    setAddOpen(true);
+  };
+
   const openEdit = (t: Tutor) => {
     setEditingTutor(t);
     setForm({
-      fullName: t.fullName, subject: t.subject || "", agreementDate: t.agreementDate || "",
+      tutorCode: t.tutorCode, fullName: t.fullName, subject: t.subject || "", agreementDate: t.agreementDate || "",
       agreementRef: t.agreementRef || "", gender: t.gender || "", contactPhone: t.contactPhone || "",
       email: t.email || "", panNumber: t.panNumber || "", bankName: t.bankName || "",
       bankAccountNumber: t.bankAccountNumber || "", bankIfsc: t.bankIfsc || "", gstNumber: t.gstNumber || "",
@@ -101,6 +125,11 @@ export default function Tutors() {
 
   const renderFormFields = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <Label>Tutor Code</Label>
+        <Input value={form.tutorCode} onChange={e => setForm({ ...form, tutorCode: e.target.value })} placeholder="2026001" data-testid="input-tutor-code" />
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Auto-suggested — overwrite with your existing code when backfilling a tutor.</p>
+      </div>
       <div><Label>Full Name *</Label><Input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} data-testid="input-tutor-fullname" /></div>
       <div><Label>Subject / Course</Label><Input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} data-testid="input-tutor-subject" /></div>
       <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} data-testid="input-tutor-email" /></div>
@@ -108,7 +137,11 @@ export default function Tutors() {
       <div><Label>Gender</Label><Input value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })} data-testid="input-tutor-gender" /></div>
       <div><Label>City</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} data-testid="input-tutor-city" /></div>
       <div><Label>Agreement Date</Label><Input type="date" value={form.agreementDate} onChange={e => setForm({ ...form, agreementDate: e.target.value })} data-testid="input-tutor-agreement-date" /></div>
-      <div><Label>Agreement Ref</Label><Input placeholder="KDXS-TUT-2026-0001" value={form.agreementRef} onChange={e => setForm({ ...form, agreementRef: e.target.value })} data-testid="input-tutor-agreement-ref" /></div>
+      <div>
+        <Label>Agreement Ref</Label>
+        <Input value={form.agreementRef} onChange={e => setForm({ ...form, agreementRef: e.target.value })} data-testid="input-tutor-agreement-ref" />
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Auto-suggested — edit to match the signed agreement document if different.</p>
+      </div>
       <div>
         <Label>PAN Number</Label>
         <Input
@@ -121,7 +154,11 @@ export default function Tutors() {
         {panError && <p className="text-xs text-red-600 mt-1">{panError}</p>}
         {!form.panNumber && <p className="text-xs text-amber-600 mt-1">Without a valid PAN, TDS defaults to 20% (Sec 206AA).</p>}
       </div>
-      <div><Label>GST Number</Label><Input value={form.gstNumber} onChange={e => setForm({ ...form, gstNumber: e.target.value })} data-testid="input-tutor-gst" /></div>
+      <div>
+        <Label>Tutor's GST Number (if registered)</Label>
+        <Input value={form.gstNumber} onChange={e => setForm({ ...form, gstNumber: e.target.value })} data-testid="input-tutor-gst" />
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">The tutor's own GSTIN, not MHTS's — leave blank if they aren't GST-registered.</p>
+      </div>
       <div><Label>Bank Name</Label><Input value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} data-testid="input-tutor-bank" /></div>
       <div><Label>Bank Account No.</Label><Input value={form.bankAccountNumber} onChange={e => setForm({ ...form, bankAccountNumber: e.target.value })} data-testid="input-tutor-bank-account" /></div>
       <div><Label>Bank IFSC</Label><Input value={form.bankIfsc} onChange={e => setForm({ ...form, bankIfsc: e.target.value.toUpperCase() })} className="uppercase" data-testid="input-tutor-ifsc" /></div>
@@ -165,7 +202,7 @@ export default function Tutors() {
             <p className="text-slate-500 dark:text-slate-400 mt-1">Independent contractors — KoodaldigiXS Learning (Sec 194J, no PF/ESI)</p>
           </div>
           {canManage && (
-            <Button onClick={() => { setForm(emptyForm); setAddOpen(true); }} data-testid="button-add-tutor">
+            <Button onClick={openAdd} data-testid="button-add-tutor">
               <Plus className="w-4 h-4 mr-2" />Add Tutor
             </Button>
           )}

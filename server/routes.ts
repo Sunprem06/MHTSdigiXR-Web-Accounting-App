@@ -867,6 +867,11 @@ export async function registerRoutes(
     res.json(list);
   });
 
+  app.get("/api/accounting/tutors/next-code", requireAuth, requirePermission("payroll_tutors.manage"), async (req, res) => {
+    const tutorCode = await storage.getNextTutorCode();
+    res.json({ tutorCode });
+  });
+
   app.get("/api/accounting/tutors/:id", requireAuth, requirePermission("payroll_tutors.view"), async (req, res) => {
     const tutor = await storage.getTutor(parseInt(req.params.id));
     if (!tutor) return res.status(404).json({ message: "Tutor not found" });

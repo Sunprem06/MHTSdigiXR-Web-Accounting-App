@@ -797,11 +797,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextTutorCode(): Promise<string> {
+    // Matches the business's existing numbering (Tutor Details.xlsx): year + 3-digit
+    // sequence, e.g. 2026001. Editable client-side — this is only a suggested default,
+    // not enforced, so existing tutor codes can be entered verbatim when backfilling.
     const year = new Date().getFullYear();
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(tutors)
-      .where(sql`tutor_code LIKE ${`KDXS-TUT-${year}-%`}`);
+      .where(sql`tutor_code LIKE ${`${year}%`}`);
     const num = (result?.count || 0) + 1;
-    return `KDXS-TUT-${year}-${String(num).padStart(4, "0")}`;
+    return `${year}${String(num).padStart(3, "0")}`;
   }
 
   async getTutorPayslips(filters?: { tutorId?: number; status?: string }): Promise<TutorPayslip[]> {
