@@ -83,22 +83,25 @@ const navItems: NavItem[] = [
     ],
   },
   { label: "My Payslips", path: "/accounting/payroll/my-payslips", icon: Receipt, requiredPermission: "payroll_tutors.view_own" },
-  {
-    label: "Website CMS", icon: Globe, requiredPermission: "content.view",
-    children: [
-      { label: "Services", path: "/accounting/services-management", icon: Layers },
-      { label: "Pricing Plans", path: "/accounting/pricing-plans", icon: DollarSign },
-      { label: "Blog Posts", path: "/accounting/blog-posts", icon: PenLine },
-      { label: "Case Studies", path: "/accounting/case-studies", icon: FolderOpen },
-      { label: "FAQs", path: "/accounting/faqs", icon: HelpCircle },
-      { label: "Testimonials", path: "/accounting/testimonials", icon: MessageSquare },
-      { label: "Site Stats", path: "/accounting/site-stats", icon: Activity },
-    ],
-  },
   { label: "Contact Inbox", path: "/accounting/contact-inbox", icon: Mail, requiredPermission: "contacts.view" },
   { label: "Audit Log", path: "/accounting/audit-log", icon: Shield, requiredPermission: "audit.view" },
   { label: "ERP Licenses", path: "/accounting/erp-licenses", icon: Fingerprint, requiredPermission: "erp_licenses.view" },
-  { label: "Settings", path: "/accounting/settings", icon: Settings, requiredPermission: "settings.view" },
+  {
+    // Website CMS (public-site content editing) lives inside Settings rather
+    // than as its own top-level tab — it's a settings/configuration concern,
+    // not something that should be visible as a standalone nav item.
+    label: "Settings", icon: Settings,
+    children: [
+      { label: "General Settings", path: "/accounting/settings", icon: Settings, requiredPermission: "settings.view" },
+      { label: "Services", path: "/accounting/services-management", icon: Layers, requiredPermission: "content.view" },
+      { label: "Pricing Plans", path: "/accounting/pricing-plans", icon: DollarSign, requiredPermission: "content.view" },
+      { label: "Blog Posts", path: "/accounting/blog-posts", icon: PenLine, requiredPermission: "content.view" },
+      { label: "Case Studies", path: "/accounting/case-studies", icon: FolderOpen, requiredPermission: "content.view" },
+      { label: "FAQs", path: "/accounting/faqs", icon: HelpCircle, requiredPermission: "content.view" },
+      { label: "Testimonials", path: "/accounting/testimonials", icon: MessageSquare, requiredPermission: "content.view" },
+      { label: "Site Stats", path: "/accounting/site-stats", icon: Activity, requiredPermission: "content.view" },
+    ],
+  },
 ];
 
 export function AccountingLayout({ children }: AccountingLayoutProps) {
