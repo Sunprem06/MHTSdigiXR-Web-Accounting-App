@@ -8,16 +8,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Pencil, Trash2, Globe } from "lucide-react";
-import type { Service } from "@shared/schema";
+import { Pencil, Trash2, Globe, Plus } from "lucide-react";
+import type { Service, InsertService } from "@shared/schema";
+
+const EMPTY_SERVICE: InsertService = { title: "", slug: "", description: "", icon: "", image: "", features: [] };
 
 export default function ServicesManagement() {
   const { hasPermission } = useAuth();
   const { toast } = useToast();
   const [editItem, setEditItem] = useState<Service | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [newItem, setNewItem] = useState<InsertService | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { data: items = [], isLoading } = useQuery<Service[]>({ queryKey: ["/api/accounting/services"] });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: InsertService) => {
+      await apiRequest("POST", "/api/accounting/services", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      toast({ title: "Service created" });
+      setCreateDialogOpen(false);
+      setNewItem(null);
+    },
+    onError: () => toast({ title: "Failed to create", variant: "destructive" }),
+  });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<Service> }) => {
@@ -57,6 +75,7 @@ export default function ServicesManagement() {
 
   const canEdit = hasPermission("content.edit");
   const canDelete = hasPermission("content.delete");
+  const canCreate = hasPermission("content.create");
 
   return (
     <AccountingLayout>
@@ -66,6 +85,11 @@ export default function ServicesManagement() {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-services-title">Services Management</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm">Manage your service offerings displayed on the website</p>
           </div>
+          {canCreate && (
+            <Button onClick={() => { setNewItem({ ...EMPTY_SERVICE }); setCreateDialogOpen(true); }} className="bg-sky-500 hover:bg-sky-600 text-white" data-testid="button-add-service">
+              <Plus className="w-4 h-4 mr-2" /> Add Service
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -148,6 +172,53 @@ export default function ServicesManagement() {
                 <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-cancel-service">Cancel</Button>
                 <Button onClick={handleSave} disabled={updateMutation.isPending} className="bg-sky-500 hover:bg-sky-600 text-white" data-testid="button-save-service">
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Service</DialogTitle>
+          </DialogHeader>
+          {newItem && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Title</label>
+                <Input value={newItem.title} onChange={e => setNewItem({ ...newItem, title: e.target.value })} data-testid="input-new-service-title" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Slug</label>
+                <Input value={newItem.slug} onChange={e => setNewItem({ ...newItem, slug: e.target.value })} data-testid="input-new-service-slug" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
+                <Textarea value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} data-testid="input-new-service-description" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Icon Name (lucide icon)</label>
+                <Input value={newItem.icon} onChange={e => setNewItem({ ...newItem, icon: e.target.value })} data-testid="input-new-service-icon" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Image URL</label>
+                <Input value={newItem.image} onChange={e => setNewItem({ ...newItem, image: e.target.value })} data-testid="input-new-service-image" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Features (one per line)</label>
+                <Textarea value={(newItem.features || []).join("\n")} onChange={e => setNewItem({ ...newItem, features: e.target.value.split("\n").filter(f => f.trim()) })} rows={5} data-testid="input-new-service-features" />
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setCreateDialogOpen(false)} data-testid="button-cancel-new-service">Cancel</Button>
+                <Button
+                  onClick={() => newItem && createMutation.mutate(newItem)}
+                  disabled={createMutation.isPending || !newItem?.title || !newItem?.slug || !newItem?.description || !newItem?.icon || !newItem?.image}
+                  className="bg-sky-500 hover:bg-sky-600 text-white"
+                  data-testid="button-save-new-service"
+                >
+                  {createMutation.isPending ? "Creating..." : "Create Service"}
                 </Button>
               </div>
             </div>
