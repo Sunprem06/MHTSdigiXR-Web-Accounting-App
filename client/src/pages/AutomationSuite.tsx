@@ -182,13 +182,19 @@ export default function AutomationSuite() {
             </div>
             <div className="grid md:grid-cols-3 gap-5">
               {TRUST_CARDS.map((c) => (
-                <div key={c.title} className="bg-slate-800 rounded-2xl p-6 text-center">
-                  <div className="w-11 h-11 rounded-xl bg-sky-500 flex items-center justify-center mx-auto mb-4">
+                <motion.div
+                  key={c.title}
+                  whileHover={{ y: -6 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="relative overflow-hidden bg-slate-800 border border-slate-700/60 rounded-2xl p-6 text-center hover:border-sky-500/40 hover:shadow-xl hover:shadow-sky-500/10 transition-colors"
+                >
+                  <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full bg-sky-500/10 blur-2xl" />
+                  <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-sky-500/30">
                     <c.icon className="w-5 h-5 text-white" />
                   </div>
-                  <div className="text-white font-semibold text-sm mb-2">{c.title}</div>
-                  <div className="text-slate-400 text-xs leading-relaxed">{c.desc}</div>
-                </div>
+                  <div className="relative text-white font-semibold text-sm mb-2">{c.title}</div>
+                  <div className="relative text-slate-400 text-xs leading-relaxed">{c.desc}</div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -222,12 +228,14 @@ export default function AutomationSuite() {
             </div>
             <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
               {PRICING_TIERS.map((plan) => (
-                <div
+                <motion.div
                   key={plan.name}
-                  className={`relative rounded-2xl p-8 flex flex-col ${
+                  whileHover={{ y: -10, scale: 1.03 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className={`relative rounded-2xl p-8 flex flex-col cursor-default ${
                     plan.popular
-                      ? "bg-gradient-to-br from-sky-500 to-sky-700 text-white shadow-xl shadow-sky-500/25 md:scale-105"
-                      : "bg-slate-900 dark:bg-slate-950 text-white"
+                      ? "bg-gradient-to-br from-sky-500 to-sky-700 text-white shadow-xl shadow-sky-500/25 md:scale-105 hover:shadow-2xl hover:shadow-sky-500/40"
+                      : "bg-slate-900 dark:bg-slate-950 text-white hover:shadow-2xl hover:shadow-sky-500/20"
                   }`}
                 >
                   {plan.popular && (
@@ -252,7 +260,7 @@ export default function AutomationSuite() {
                   >
                     Get Started <ArrowRight className="w-4 h-4" />
                   </Link>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
