@@ -43,6 +43,7 @@ import AccountingDashboard from "@/pages/accounting/Dashboard";
 import Ledgers from "@/pages/accounting/Ledgers";
 import VoucherList from "@/pages/accounting/VoucherList";
 import VoucherEntry from "@/pages/accounting/VoucherEntry";
+import VoucherView from "@/pages/accounting/VoucherView";
 import Products from "@/pages/accounting/Products";
 import Parties from "@/pages/accounting/Parties";
 import Quotations from "@/pages/accounting/Quotations";
@@ -139,6 +140,9 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/vouchers/new">
         {() => <ProtectedRoute requiredPermission="vouchers.create"><VoucherEntry /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/vouchers/:id">
+        {() => <ProtectedRoute requiredPermission="vouchers.view"><VoucherView /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/quotations">
         {() => <ProtectedRoute requiredPermission="quotations.view"><Quotations /></ProtectedRoute>}

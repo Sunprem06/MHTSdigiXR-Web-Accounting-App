@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AttachmentsPanel } from "@/components/accounting/AttachmentsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS, EXPENSE_STATUSES } from "@shared/schema";
 import type { ExpenseClaim } from "@shared/schema";
-import { Plus, Loader2, X, Save, Receipt, CheckCircle, XCircle, Trash2 } from "lucide-react";
+import { Plus, Loader2, X, Save, Receipt, CheckCircle, XCircle, Trash2, Paperclip } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
@@ -26,6 +28,7 @@ export default function Expenses() {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [attachmentsFor, setAttachmentsFor] = useState<ExpenseClaim | null>(null);
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -193,7 +196,7 @@ export default function Expenses() {
                     <th className="text-left text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Description</th>
                     <th className="text-right text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Amount</th>
                     <th className="text-center text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Status</th>
-                    {(canApprove || canDelete) && <th className="text-right text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Actions</th>}
+                    <th className="text-right text-xs font-medium text-slate-500 dark:text-slate-400 px-4 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -207,27 +210,28 @@ export default function Expenses() {
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${STATUS_COLORS[e.status]}`}>{e.status}</span>
                       </td>
-                      {(canApprove || canDelete) && (
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {canApprove && e.status === "pending" && (
-                              <>
-                                <Button size="icon" variant="ghost" className="text-green-600 dark:text-green-400" onClick={() => updateMutation.mutate({ id: e.id, status: "approved" })} disabled={updateMutation.isPending} data-testid={`button-approve-expense-${e.id}`}>
-                                  <CheckCircle className="w-4 h-4" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="text-red-600 dark:text-red-400" onClick={() => updateMutation.mutate({ id: e.id, status: "rejected", remarks: "Rejected" })} disabled={updateMutation.isPending} data-testid={`button-reject-expense-${e.id}`}>
-                                  <XCircle className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                            {canDelete && e.status === "pending" && (
-                              <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" onClick={() => { if (confirm("Are you sure you want to delete this expense claim?")) deleteMutation.mutate(e.id); }} disabled={deleteMutation.isPending} data-testid={`button-delete-expense-${e.id}`}>
-                                <Trash2 className="w-4 h-4" />
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setAttachmentsFor(e)} data-testid={`button-attachments-expense-${e.id}`}>
+                            <Paperclip className="w-4 h-4" />
+                          </Button>
+                          {canApprove && e.status === "pending" && (
+                            <>
+                              <Button size="icon" variant="ghost" className="text-green-600 dark:text-green-400" onClick={() => updateMutation.mutate({ id: e.id, status: "approved" })} disabled={updateMutation.isPending} data-testid={`button-approve-expense-${e.id}`}>
+                                <CheckCircle className="w-4 h-4" />
                               </Button>
-                            )}
-                          </div>
-                        </td>
-                      )}
+                              <Button size="icon" variant="ghost" className="text-red-600 dark:text-red-400" onClick={() => updateMutation.mutate({ id: e.id, status: "rejected", remarks: "Rejected" })} disabled={updateMutation.isPending} data-testid={`button-reject-expense-${e.id}`}>
+                                <XCircle className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                          {canDelete && e.status === "pending" && (
+                            <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" onClick={() => { if (confirm("Are you sure you want to delete this expense claim?")) deleteMutation.mutate(e.id); }} disabled={deleteMutation.isPending} data-testid={`button-delete-expense-${e.id}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -236,6 +240,17 @@ export default function Expenses() {
           </Card>
         )}
       </div>
+
+      <Dialog open={!!attachmentsFor} onOpenChange={(open) => !open && setAttachmentsFor(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Attachments — {attachmentsFor?.claimNumber}</DialogTitle>
+          </DialogHeader>
+          {attachmentsFor && (
+            <AttachmentsPanel entityType="expense_claim" entityId={attachmentsFor.id} uploadPermission="expenses.create" managePermission="expenses.approve" />
+          )}
+        </DialogContent>
+      </Dialog>
     </AccountingLayout>
   );
 }

@@ -306,6 +306,22 @@ export const expenseClaims = pgTable("expense_claims", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const ATTACHMENT_ENTITY_TYPES = ["voucher", "expense_claim", "quotation", "party"] as const;
+export type AttachmentEntityType = typeof ATTACHMENT_ENTITY_TYPES[number];
+
+export const attachments = pgTable("attachments", {
+  id: serial("id").primaryKey(),
+  entityType: text("entity_type").notNull(),
+  entityId: integer("entity_id").notNull(),
+  originalFileName: text("original_file_name").notNull(),
+  storedFileName: text("stored_file_name").notNull().unique(),
+  filePath: text("file_path").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSizeBytes: integer("file_size_bytes").notNull(),
+  uploadedBy: integer("uploaded_by").references(() => employees.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const auditNotes = pgTable("audit_notes", {
   id: serial("id").primaryKey(),
   auditorId: integer("auditor_id").references(() => employees.id).notNull(),
@@ -432,6 +448,7 @@ export const insertLegalPageSchema = createInsertSchema(legalPages).omit({ id: t
 export const insertVoucherSchema = createInsertSchema(vouchers).omit({ id: true, createdAt: true });
 export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit({ id: true });
 export const insertAuditNoteSchema = createInsertSchema(auditNotes).omit({ id: true, createdAt: true });
+export const insertAttachmentSchema = createInsertSchema(attachments).omit({ id: true, createdAt: true });
 export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, createdAt: true });
@@ -479,6 +496,8 @@ export type VoucherEntry = typeof voucherEntries.$inferSelect;
 export type InsertVoucherEntry = z.infer<typeof insertVoucherEntrySchema>;
 export type AuditNote = typeof auditNotes.$inferSelect;
 export type InsertAuditNote = z.infer<typeof insertAuditNoteSchema>;
+export type Attachment = typeof attachments.$inferSelect;
+export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type Party = typeof parties.$inferSelect;
 export type InsertParty = z.infer<typeof insertPartySchema>;
 export type Product = typeof products.$inferSelect;

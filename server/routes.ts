@@ -10,6 +10,7 @@ import { requireAuth, requirePermission, requireRole } from "./auth";
 import { rateLimiter } from "./middleware/security.js";
 import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
+import { registerAttachmentRoutes } from "./attachments-routes";
 
 type SmtpConfig = {
   host: string;
@@ -66,6 +67,7 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   registerChatRoutes(app);
+  registerAttachmentRoutes(app);
 
   app.get(api.services.list.path, async (req, res) => {
     const services = await storage.getServices();

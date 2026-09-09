@@ -3,6 +3,7 @@ import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AttachmentsPanel } from "@/components/accounting/AttachmentsPanel";
 import { useRoute } from "wouter";
 import type { Quotation, Party, Product, CompanySettings } from "@shared/schema";
 import { Loader2, Printer, ArrowLeft } from "lucide-react";
@@ -182,6 +183,8 @@ export default function QuotationView() {
             </div>
           </CardContent>
         </Card>
+
+        <AttachmentsPanel entityType="quotation" entityId={quotation.id} uploadPermission="quotations.create" managePermission="quotations.approve" />
       </div>
     </AccountingLayout>
   );

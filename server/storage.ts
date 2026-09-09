@@ -2,7 +2,7 @@ import { db } from "./db";
 import {
   contactMessages, posts, services, caseStudies, pricingPlans, legalPages,
   employees, auditLogs, accountGroups, ledgerAccounts,
-  financialYears, companySettings, vouchers, voucherEntries, auditNotes,
+  financialYears, companySettings, vouchers, voucherEntries, auditNotes, attachments,
   parties, products, quotations, expenseClaims, roles,
   jobPostings, jobApplications, faqItems, testimonials, siteStats,
   smtpSettings, passwordResetTokens,
@@ -10,13 +10,13 @@ import {
   type InsertPricingPlan, type InsertLegalPage,
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
   type InsertFinancialYear, type InsertCompanySettings, type InsertVoucher, type InsertVoucherEntry,
-  type InsertAuditNote, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
+  type InsertAuditNote, type InsertAttachment, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
   type InsertDbRole, type InsertJobPosting, type InsertJobApplication,
   type InsertFaqItem, type InsertTestimonial, type InsertSiteStat,
   type InsertSmtpSettings, type InsertPasswordResetToken,
   type ContactMessage, type Post, type Service, type CaseStudy, type PricingPlan, type LegalPage,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
-  type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote,
+  type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote, type Attachment,
   type Party, type Product, type Quotation, type ExpenseClaim, type DbRole,
   type JobPosting, type JobApplication, type FaqItem, type Testimonial, type SiteStat,
   type SmtpSettings, type PasswordResetToken,
@@ -97,6 +97,11 @@ export interface IStorage {
 
   getAuditNotes(entity?: string, entityId?: number): Promise<AuditNote[]>;
   createAuditNote(note: InsertAuditNote): Promise<AuditNote>;
+
+  getAttachmentsByEntity(entityType: string, entityId: number): Promise<Attachment[]>;
+  getAttachment(id: number): Promise<Attachment | undefined>;
+  createAttachment(attachment: InsertAttachment): Promise<Attachment>;
+  deleteAttachment(id: number): Promise<boolean>;
 
   getParties(type?: string): Promise<Party[]>;
   getParty(id: number): Promise<Party | undefined>;
@@ -583,6 +588,27 @@ export class DatabaseStorage implements IStorage {
   async createAuditNote(note: InsertAuditNote): Promise<AuditNote> {
     const [newNote] = await db.insert(auditNotes).values(note).returning();
     return newNote;
+  }
+
+  async getAttachmentsByEntity(entityType: string, entityId: number): Promise<Attachment[]> {
+    return await db.select().from(attachments)
+      .where(and(eq(attachments.entityType, entityType), eq(attachments.entityId, entityId)))
+      .orderBy(desc(attachments.createdAt));
+  }
+
+  async getAttachment(id: number): Promise<Attachment | undefined> {
+    const [attachment] = await db.select().from(attachments).where(eq(attachments.id, id));
+    return attachment;
+  }
+
+  async createAttachment(attachment: InsertAttachment): Promise<Attachment> {
+    const [created] = await db.insert(attachments).values(attachment).returning();
+    return created;
+  }
+
+  async deleteAttachment(id: number): Promise<boolean> {
+    const result = await db.delete(attachments).where(eq(attachments.id, id)).returning();
+    return result.length > 0;
   }
 
   async getParties(type?: string): Promise<Party[]> {
