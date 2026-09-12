@@ -458,22 +458,29 @@ export const tutorPayslips = pgTable("tutor_payslips", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// ── Payroll: Employees (MHTSdigiXR salaried staff) — SCHEMA STUB ──
-// Statutory formulas (Sec 192 TDS, PF, ESI, Gratuity) are NOT implemented.
-// The Labour Codes (effective 21 Nov 2025) unified the "wages" definition,
-// cap allowances at 50% of total pay for statutory calc, and extend gratuity
-// eligibility to fixed-term employees after 1 year — central/state rules were
-// still being finalized as of early 2026. A CA must review and sign off on
-// the actual formulas before any real payroll run relies on this table.
+// ── Payroll: Employees (MHTSdigiXR salaried staff) ──
+// Master data for salaried staff, extended by payrollCompensationStructures
+// (effective-dated CTC) and payrollPayslips (generated payslips) below.
+// Sec 192 TDS / PF / ESI / Gratuity FORMULAS are still not implemented — the
+// Labour Codes (effective 21 Nov 2025) were still being finalized per state as
+// of early 2026, and a CA must review and sign off on that calculation math
+// before any real payroll run relies on it. What IS implemented (Step 2):
+// compensation structures and the No-PF/ESI payslip format, whose only
+// deduction (Professional Tax) is manually entered per payslip, never
+// auto-calculated from a slab table — see payrollPayslips below.
 // `payrollStatutoryConfigVersions.config` is deliberately untyped (jsonb)
-// until that review defines its shape, so the config layer stays swappable.
+// until the CA review defines its shape, so the config layer stays swappable.
 export const payrollEmployees = pgTable("payroll_employees", {
   id: serial("id").primaryKey(),
   employeeCode: text("employee_code").notNull().unique(),
   fullName: text("full_name").notNull(),
   designation: text("designation"),
+  department: text("department"),
   dateOfJoining: date("date_of_joining"),
   panNumber: text("pan_number"),
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  bankIfsc: text("bank_ifsc"),
   pfApplicable: boolean("pf_applicable").notNull().default(false),
   esiApplicable: boolean("esi_applicable").notNull().default(false),
   ctcAnnual: decimal("ctc_annual", { precision: 12, scale: 2 }),
@@ -491,6 +498,77 @@ export const payrollStatutoryConfigVersions = pgTable("payroll_statutory_config_
   isActive: boolean("is_active").notNull().default(false),
   notes: text("notes"),
   createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// One row per compensation event (joining, annual revision) for a payroll
+// employee — mirrors the tutorAgreements pattern of effective-dated records
+// rather than a single mutable "current salary" field, so a past payslip stays
+// correct after a later raise. Components match the business's actual Offer
+// Letter Annexure A format (Basic/HRA/Conveyance/Medical/Other Allowances).
+// The "current" structure for any date is the row with the latest
+// effectiveFrom <= that date — there is no separate status flag to keep in
+// sync, it's purely date-derived (see storage.getCurrentPayrollCompensationStructure).
+export const payrollCompensationStructures = pgTable("payroll_compensation_structures", {
+  id: serial("id").primaryKey(),
+  payrollEmployeeId: integer("payroll_employee_id").references(() => payrollEmployees.id).notNull(),
+  effectiveFrom: date("effective_from").notNull(),
+  reason: text("reason"), // e.g. "Joining", "Annual Increment", free text
+  refNo: text("ref_no"), // e.g. MHTS/CR/2025/001 — for traceability to the printed compensation letter, not enforced unique
+  basicAnnual: decimal("basic_annual", { precision: 12, scale: 2 }).notNull().default("0"),
+  hraAnnual: decimal("hra_annual", { precision: 12, scale: 2 }).notNull().default("0"),
+  conveyanceAnnual: decimal("conveyance_annual", { precision: 12, scale: 2 }).notNull().default("0"),
+  medicalAnnual: decimal("medical_annual", { precision: 12, scale: 2 }).notNull().default("0"),
+  otherAllowancesAnnual: decimal("other_allowances_annual", { precision: 12, scale: 2 }).notNull().default("0"),
+  ctcAnnual: decimal("ctc_annual", { precision: 12, scale: 2 }).notNull().default("0"), // sum of the components above, computed server-side on save
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Two payslip formats (per the business's actual documents): "no_pf_esi" (this
+// employee isn't PF/ESI-covered — the current default for MHTSdigiXR's
+// headcount) and "with_pf_esi" (PF/ESI deduction lines, gated on the
+// business's own headcount thresholds, added in a later step once real
+// PF/ESI reference figures are confirmed — not built yet).
+export const PAYSLIP_FORMATS = ["no_pf_esi", "with_pf_esi"] as const;
+export type PayslipFormat = typeof PAYSLIP_FORMATS[number];
+
+export const PAYROLL_PAYSLIP_STATUSES = ["draft", "submitted", "approved", "paid", "rejected"] as const;
+export type PayrollPayslipStatus = typeof PAYROLL_PAYSLIP_STATUSES[number];
+
+// One row per employee per month. Earnings are FROZEN at generation time from
+// whichever compensationStructure was effective as of that pay month (never
+// live-recomputed later) — same convention as tutorPayslips storing its own
+// frozen grossEarnings/netPay rather than re-deriving from the agreement's
+// current rate. Format 1 (no_pf_esi) is the only format implemented — its
+// only deduction is Professional Tax, entered manually per payslip (never
+// auto-calculated from a slab table — see the standing rule at payrollEmployees).
+export const payrollPayslips = pgTable("payroll_payslips", {
+  id: serial("id").primaryKey(),
+  payrollEmployeeId: integer("payroll_employee_id").references(() => payrollEmployees.id).notNull(),
+  compensationStructureId: integer("compensation_structure_id").references(() => payrollCompensationStructures.id).notNull(),
+  payMonth: text("pay_month").notNull(), // e.g. "April 2026" — matches tutorPayslips.payMonth convention
+  payslipFormat: text("payslip_format").notNull().default("no_pf_esi"),
+  standardWorkingDays: integer("standard_working_days").notNull().default(26),
+  lopDays: decimal("lop_days", { precision: 4, scale: 1 }).notNull().default("0"),
+  // Earnings per component, pro-rated for LOP and rounded individually — matches
+  // how the business's own payslips/F&F statement break down pro-rata earnings.
+  basicEarned: decimal("basic_earned", { precision: 10, scale: 2 }).notNull().default("0"),
+  hraEarned: decimal("hra_earned", { precision: 10, scale: 2 }).notNull().default("0"),
+  conveyanceEarned: decimal("conveyance_earned", { precision: 10, scale: 2 }).notNull().default("0"),
+  medicalEarned: decimal("medical_earned", { precision: 10, scale: 2 }).notNull().default("0"),
+  otherAllowancesEarned: decimal("other_allowances_earned", { precision: 10, scale: 2 }).notNull().default("0"),
+  grossEarnings: decimal("gross_earnings", { precision: 12, scale: 2 }).notNull().default("0"),
+  professionalTax: decimal("professional_tax", { precision: 10, scale: 2 }).notNull().default("0"), // manual entry, not auto-calculated
+  totalDeductions: decimal("total_deductions", { precision: 12, scale: 2 }).notNull().default("0"),
+  netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("draft"),
+  preparedBy: integer("prepared_by").references(() => employees.id),
+  submittedAt: timestamp("submitted_at"),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  voucherId: integer("voucher_id").references(() => vouchers.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -653,6 +731,15 @@ export const insertTutorAgreementSchema = createInsertSchema(tutorAgreements).om
 export const insertTutorPayslipSchema = createInsertSchema(tutorPayslips).omit({ id: true, createdAt: true });
 export const insertPayrollEmployeeSchema = createInsertSchema(payrollEmployees).omit({ id: true, createdAt: true });
 export const insertPayrollStatutoryConfigVersionSchema = createInsertSchema(payrollStatutoryConfigVersions).omit({ id: true, createdAt: true });
+// Note: ctcAnnual is accepted here for the InsertPayrollCompensationStructure type shape,
+// but the server ALWAYS recomputes it as the sum of the component fields before insert —
+// client-sent totals are never trusted (same convention as tutor payslips).
+export const insertPayrollCompensationStructureSchema = createInsertSchema(payrollCompensationStructures).omit({ id: true, createdAt: true });
+// Note: earnings/grossEarnings/totalDeductions/netPay are accepted here for the
+// InsertPayrollPayslip type shape, but the server ALWAYS recomputes them from the
+// compensation structure + standardWorkingDays/lopDays/professionalTax before
+// insert — client-sent totals are never trusted (same convention as tutor payslips).
+export const insertPayrollPayslipSchema = createInsertSchema(payrollPayslips).omit({ id: true, createdAt: true });
 export const insertJobPostingSchema = createInsertSchema(jobPostings).omit({ id: true, createdAt: true });
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({ id: true, createdAt: true });
 export const insertFaqItemSchema = createInsertSchema(faqItems).omit({ id: true, createdAt: true });
@@ -718,6 +805,10 @@ export type PayrollEmployee = typeof payrollEmployees.$inferSelect;
 export type InsertPayrollEmployee = z.infer<typeof insertPayrollEmployeeSchema>;
 export type PayrollStatutoryConfigVersion = typeof payrollStatutoryConfigVersions.$inferSelect;
 export type InsertPayrollStatutoryConfigVersion = z.infer<typeof insertPayrollStatutoryConfigVersionSchema>;
+export type PayrollCompensationStructure = typeof payrollCompensationStructures.$inferSelect;
+export type InsertPayrollCompensationStructure = z.infer<typeof insertPayrollCompensationStructureSchema>;
+export type PayrollPayslip = typeof payrollPayslips.$inferSelect;
+export type InsertPayrollPayslip = z.infer<typeof insertPayrollPayslipSchema>;
 export type JobPosting = typeof jobPostings.$inferSelect;
 export type InsertJobPosting = z.infer<typeof insertJobPostingSchema>;
 export type JobApplication = typeof jobApplications.$inferSelect;
@@ -772,7 +863,7 @@ export const ALL_PERMISSIONS = [
   "settings.view", "settings.manage",
   "erp_licenses.view", "erp_licenses.manage",
   "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own",
-  "payroll_employees.view", "payroll_employees.manage", "payroll_employees.view_own",
+  "payroll_employees.view", "payroll_employees.manage", "payroll_employees.process", "payroll_employees.approve", "payroll_employees.view_own",
   // Deliberately separate from settings.manage (which is super_admin-only) so
   // Admin can also activate/manage financial years without the broader settings access.
   "financial_years.manage",
@@ -799,7 +890,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   settings: { label: "Settings", permissions: ["settings.view", "settings.manage"] },
   erp_licenses: { label: "ERP Licenses", permissions: ["erp_licenses.view", "erp_licenses.manage"] },
   payroll_tutors: { label: "Payroll - Tutors", permissions: ["payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own"] },
-  payroll_employees: { label: "Payroll - Employees (Stub)", permissions: ["payroll_employees.view", "payroll_employees.manage", "payroll_employees.view_own"] },
+  payroll_employees: { label: "Payroll - Employees", permissions: ["payroll_employees.view", "payroll_employees.manage", "payroll_employees.process", "payroll_employees.approve", "payroll_employees.view_own"] },
   financial_years: { label: "Financial Years", permissions: ["financial_years.manage"] },
 };
 
@@ -824,7 +915,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     // approval requires super_admin or admin (one-step verification), same as
     // the quotations.approve split above.
     "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process",
-    "payroll_employees.view", "payroll_employees.manage",
+    "payroll_employees.view", "payroll_employees.manage", "payroll_employees.process",
     "payroll_employees.view_own",
   ],
   accountant: [

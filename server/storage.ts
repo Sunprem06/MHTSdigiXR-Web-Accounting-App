@@ -23,9 +23,11 @@ import {
   erpLicenses, erpLicenseActivations,
   type InsertErpLicense, type InsertErpLicenseActivation,
   type ErpLicense, type ErpLicenseActivation,
-  tutors, tutorAgreements, tutorPayslips, payrollEmployees, payrollStatutoryConfigVersions,
+  tutors, tutorAgreements, tutorPayslips, payrollEmployees, payrollStatutoryConfigVersions, payrollCompensationStructures, payrollPayslips,
   type InsertTutor, type InsertTutorAgreement, type InsertTutorPayslip, type InsertPayrollEmployee, type InsertPayrollStatutoryConfigVersion,
+  type InsertPayrollCompensationStructure, type InsertPayrollPayslip,
   type Tutor, type TutorAgreement, type TutorPayslip, type PayrollEmployee, type PayrollStatutoryConfigVersion,
+  type PayrollCompensationStructure, type PayrollPayslip,
   emailTemplates, type InsertEmailTemplate, type EmailTemplate,
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
@@ -164,6 +166,21 @@ export interface IStorage {
   createPayrollEmployee(employee: InsertPayrollEmployee): Promise<PayrollEmployee>;
   updatePayrollEmployee(id: number, data: Partial<InsertPayrollEmployee>): Promise<PayrollEmployee | undefined>;
   deletePayrollEmployee(id: number): Promise<boolean>;
+
+  getPayrollCompensationStructures(filters?: { payrollEmployeeId?: number }): Promise<PayrollCompensationStructure[]>;
+  getPayrollCompensationStructure(id: number): Promise<PayrollCompensationStructure | undefined>;
+  // The structure that applies on a given date — the row with the latest effectiveFrom
+  // that is still <= asOfDate (defaults to today). Returns undefined if none applies yet.
+  getCurrentPayrollCompensationStructure(payrollEmployeeId: number, asOfDate?: string): Promise<PayrollCompensationStructure | undefined>;
+  createPayrollCompensationStructure(structure: InsertPayrollCompensationStructure): Promise<PayrollCompensationStructure>;
+  updatePayrollCompensationStructure(id: number, data: Partial<InsertPayrollCompensationStructure>): Promise<PayrollCompensationStructure | undefined>;
+  deletePayrollCompensationStructure(id: number): Promise<boolean>;
+
+  getPayrollPayslips(filters?: { payrollEmployeeId?: number; status?: string }): Promise<PayrollPayslip[]>;
+  getPayrollPayslip(id: number): Promise<PayrollPayslip | undefined>;
+  createPayrollPayslip(payslip: InsertPayrollPayslip): Promise<PayrollPayslip>;
+  updatePayrollPayslip(id: number, data: Partial<InsertPayrollPayslip>): Promise<PayrollPayslip | undefined>;
+  deletePayrollPayslip(id: number): Promise<boolean>;
 
   getPayrollStatutoryConfigVersions(): Promise<PayrollStatutoryConfigVersion[]>;
   createPayrollStatutoryConfigVersion(version: InsertPayrollStatutoryConfigVersion): Promise<PayrollStatutoryConfigVersion>;
@@ -965,6 +982,90 @@ export class DatabaseStorage implements IStorage {
 
   async deletePayrollEmployee(id: number): Promise<boolean> {
     const result = await db.delete(payrollEmployees).where(eq(payrollEmployees.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getPayrollCompensationStructures(filters?: { payrollEmployeeId?: number }): Promise<PayrollCompensationStructure[]> {
+    if (filters?.payrollEmployeeId) {
+      return await db.select().from(payrollCompensationStructures)
+        .where(eq(payrollCompensationStructures.payrollEmployeeId, filters.payrollEmployeeId))
+        .orderBy(desc(payrollCompensationStructures.effectiveFrom));
+    }
+    return await db.select().from(payrollCompensationStructures).orderBy(desc(payrollCompensationStructures.effectiveFrom));
+  }
+
+  async getPayrollCompensationStructure(id: number): Promise<PayrollCompensationStructure | undefined> {
+    const [structure] = await db.select().from(payrollCompensationStructures).where(eq(payrollCompensationStructures.id, id));
+    return structure;
+  }
+
+  async getCurrentPayrollCompensationStructure(payrollEmployeeId: number, asOfDate?: string): Promise<PayrollCompensationStructure | undefined> {
+    const cutoff = asOfDate || new Date().toISOString().split("T")[0];
+    const [structure] = await db.select().from(payrollCompensationStructures)
+      .where(and(
+        eq(payrollCompensationStructures.payrollEmployeeId, payrollEmployeeId),
+        lte(payrollCompensationStructures.effectiveFrom, cutoff),
+      ))
+      .orderBy(desc(payrollCompensationStructures.effectiveFrom))
+      .limit(1);
+    return structure;
+  }
+
+  async createPayrollCompensationStructure(structure: InsertPayrollCompensationStructure): Promise<PayrollCompensationStructure> {
+    const [newStructure] = await db.insert(payrollCompensationStructures).values(structure).returning();
+    await this.syncPayrollEmployeeCtc(newStructure.payrollEmployeeId);
+    return newStructure;
+  }
+
+  async updatePayrollCompensationStructure(id: number, data: Partial<InsertPayrollCompensationStructure>): Promise<PayrollCompensationStructure | undefined> {
+    const [updated] = await db.update(payrollCompensationStructures).set(data).where(eq(payrollCompensationStructures.id, id)).returning();
+    if (updated) await this.syncPayrollEmployeeCtc(updated.payrollEmployeeId);
+    return updated;
+  }
+
+  async deletePayrollCompensationStructure(id: number): Promise<boolean> {
+    const [existing] = await db.select().from(payrollCompensationStructures).where(eq(payrollCompensationStructures.id, id));
+    const result = await db.delete(payrollCompensationStructures).where(eq(payrollCompensationStructures.id, id)).returning();
+    if (existing) await this.syncPayrollEmployeeCtc(existing.payrollEmployeeId);
+    return result.length > 0;
+  }
+
+  // payrollEmployees.ctcAnnual is a denormalized read cache of "whatever compensation
+  // structure is currently effective" — kept in sync here after every write so existing
+  // call sites reading it directly (e.g. the payroll employees list) don't need a join.
+  // The structures table is always the source of truth.
+  private async syncPayrollEmployeeCtc(payrollEmployeeId: number): Promise<void> {
+    const current = await this.getCurrentPayrollCompensationStructure(payrollEmployeeId);
+    await db.update(payrollEmployees).set({ ctcAnnual: current?.ctcAnnual ?? null }).where(eq(payrollEmployees.id, payrollEmployeeId));
+  }
+
+  async getPayrollPayslips(filters?: { payrollEmployeeId?: number; status?: string }): Promise<PayrollPayslip[]> {
+    const conditions = [];
+    if (filters?.payrollEmployeeId) conditions.push(eq(payrollPayslips.payrollEmployeeId, filters.payrollEmployeeId));
+    if (filters?.status) conditions.push(eq(payrollPayslips.status, filters.status));
+    if (conditions.length > 0) {
+      return await db.select().from(payrollPayslips).where(and(...conditions)).orderBy(desc(payrollPayslips.createdAt));
+    }
+    return await db.select().from(payrollPayslips).orderBy(desc(payrollPayslips.createdAt));
+  }
+
+  async getPayrollPayslip(id: number): Promise<PayrollPayslip | undefined> {
+    const [payslip] = await db.select().from(payrollPayslips).where(eq(payrollPayslips.id, id));
+    return payslip;
+  }
+
+  async createPayrollPayslip(payslip: InsertPayrollPayslip): Promise<PayrollPayslip> {
+    const [newPayslip] = await db.insert(payrollPayslips).values(payslip).returning();
+    return newPayslip;
+  }
+
+  async updatePayrollPayslip(id: number, data: Partial<InsertPayrollPayslip>): Promise<PayrollPayslip | undefined> {
+    const [updated] = await db.update(payrollPayslips).set(data).where(eq(payrollPayslips.id, id)).returning();
+    return updated;
+  }
+
+  async deletePayrollPayslip(id: number): Promise<boolean> {
+    const result = await db.delete(payrollPayslips).where(eq(payrollPayslips.id, id)).returning();
     return result.length > 0;
   }
 

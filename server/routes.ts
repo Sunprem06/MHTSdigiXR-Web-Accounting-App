@@ -74,6 +74,65 @@ function computeTutorPayslip(input: TutorPayslipInputs) {
   return { grossEarnings, platformCommissionAmount, tdsAmount, netPay, tdsRatePercent, validPan, panAtPayment: pan || null };
 }
 
+// ── Payroll compensation structure — CTC total is always the sum of the named
+// components, recomputed server-side (same "never trust client totals" convention
+// as computeTutorPayslip above). Matches the business's actual Offer Letter
+// Annexure A layout: Basic + HRA + Conveyance + Medical + Other Allowances.
+function computeCompensationCtc(input: { basicAnnual: number; hraAnnual: number; conveyanceAnnual: number; medicalAnnual: number; otherAllowancesAnnual: number }): number {
+  return round2(
+    Math.max(0, input.basicAnnual || 0) +
+    Math.max(0, input.hraAnnual || 0) +
+    Math.max(0, input.conveyanceAnnual || 0) +
+    Math.max(0, input.medicalAnnual || 0) +
+    Math.max(0, input.otherAllowancesAnnual || 0)
+  );
+}
+
+const PAY_MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+// payMonth is stored as a label ("April 2026", matching tutorPayslips.payMonth) —
+// this resolves it to that month's first day, to look up which compensation
+// structure was effective then.
+function parsePayMonthToDate(payMonth: string): string | null {
+  const match = payMonth.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (!match) return null;
+  const idx = PAY_MONTH_NAMES.findIndex(m => m.toLowerCase() === match[1].toLowerCase());
+  if (idx === -1) return null;
+  return `${match[2]}-${String(idx + 1).padStart(2, "0")}-01`;
+}
+
+// ── Payroll payslip — Format 1 (No PF/ESI) ──
+// Each earning component is pro-rated for LOP days and rounded individually
+// (not the CTC total divided by 12) — matches how the business's own monthly
+// payslips and Full & Final Settlement statement break down pro-rata earnings.
+// Professional Tax is the ONLY deduction in this format, entered manually per
+// payslip — never derived from a slab table (see the standing rule at
+// payrollEmployees in shared/schema.ts). This is the only place these numbers
+// should be computed — always recomputed server-side, client totals are never trusted.
+function computePayrollPayslipNoPfEsi(input: {
+  basicAnnual: number; hraAnnual: number; conveyanceAnnual: number; medicalAnnual: number; otherAllowancesAnnual: number;
+  standardWorkingDays: number; lopDays: number; professionalTax: number;
+}) {
+  const factor = input.standardWorkingDays > 0
+    ? Math.max(0, Math.min(1, (input.standardWorkingDays - input.lopDays) / input.standardWorkingDays))
+    : 1;
+  // Rounded to the nearest whole rupee (not paise) — every one of the business's
+  // actual payslip/compensation documents shows whole-rupee amounts only.
+  const earned = (annual: number) => Math.round(Math.round((annual || 0) / 12) * factor);
+
+  const basicEarned = earned(input.basicAnnual);
+  const hraEarned = earned(input.hraAnnual);
+  const conveyanceEarned = earned(input.conveyanceAnnual);
+  const medicalEarned = earned(input.medicalAnnual);
+  const otherAllowancesEarned = earned(input.otherAllowancesAnnual);
+  const grossEarnings = basicEarned + hraEarned + conveyanceEarned + medicalEarned + otherAllowancesEarned;
+  const professionalTax = Math.round(Math.max(0, input.professionalTax || 0));
+  const totalDeductions = professionalTax;
+  const netPay = Math.max(0, grossEarnings - totalDeductions);
+
+  return { basicEarned, hraEarned, conveyanceEarned, medicalEarned, otherAllowancesEarned, grossEarnings, professionalTax, totalDeductions, netPay };
+}
+
 // A voucher's date must fall within SOME configured Financial Year — not
 // specifically the currently active one. Backdating/catching up entries into a
 // prior year (e.g. FY 2025-26 while FY 2026-27 is active) is normal accounting
@@ -1529,6 +1588,368 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json({ message: "Deleted successfully" });
+  });
+
+  // Payroll: Compensation Structures — effective-dated, reused by payslip generation (Step 2b/2c)
+  app.get("/api/accounting/payroll-compensation-structures", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const filters: any = {};
+    if (req.query.payrollEmployeeId) filters.payrollEmployeeId = parseInt(req.query.payrollEmployeeId as string);
+    const list = await storage.getPayrollCompensationStructures(filters);
+    res.json(list);
+  });
+
+  app.get("/api/accounting/payroll-compensation-structures/:id", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const structure = await storage.getPayrollCompensationStructure(parseInt(req.params.id));
+    if (!structure) return res.status(404).json({ message: "Compensation structure not found" });
+    res.json(structure);
+  });
+
+  app.post("/api/accounting/payroll-compensation-structures", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const payrollEmployeeId = parseInt(req.body.payrollEmployeeId);
+    const employee = await storage.getPayrollEmployee(payrollEmployeeId);
+    if (!employee) return res.status(400).json({ message: "Payroll employee not found" });
+    if (!req.body.effectiveFrom) return res.status(400).json({ message: "Effective From date is required" });
+
+    const existingForDate = (await storage.getPayrollCompensationStructures({ payrollEmployeeId }))
+      .find(s => s.effectiveFrom === req.body.effectiveFrom);
+    if (existingForDate) {
+      return res.status(400).json({ message: `A compensation structure already exists effective ${req.body.effectiveFrom} for this employee` });
+    }
+
+    const basicAnnual = parseFloat(req.body.basicAnnual) || 0;
+    const hraAnnual = parseFloat(req.body.hraAnnual) || 0;
+    const conveyanceAnnual = parseFloat(req.body.conveyanceAnnual) || 0;
+    const medicalAnnual = parseFloat(req.body.medicalAnnual) || 0;
+    const otherAllowancesAnnual = parseFloat(req.body.otherAllowancesAnnual) || 0;
+    const ctcAnnual = computeCompensationCtc({ basicAnnual, hraAnnual, conveyanceAnnual, medicalAnnual, otherAllowancesAnnual });
+
+    const structure = await storage.createPayrollCompensationStructure({
+      payrollEmployeeId, effectiveFrom: req.body.effectiveFrom,
+      reason: req.body.reason || null, refNo: req.body.refNo || null,
+      basicAnnual: String(basicAnnual), hraAnnual: String(hraAnnual), conveyanceAnnual: String(conveyanceAnnual),
+      medicalAnnual: String(medicalAnnual), otherAllowancesAnnual: String(otherAllowancesAnnual),
+      ctcAnnual: String(ctcAnnual),
+      createdBy: req.user!.id,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "payroll_compensation_structure",
+      entityId: structure.id, details: `Set compensation for ${employee.employeeCode} effective ${structure.effectiveFrom}: CTC Rs.${structure.ctcAnnual}/yr`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(structure);
+  });
+
+  app.patch("/api/accounting/payroll-compensation-structures/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollCompensationStructure(id);
+    if (!existing) return res.status(404).json({ message: "Compensation structure not found" });
+
+    const basicAnnual = req.body.basicAnnual !== undefined ? parseFloat(req.body.basicAnnual) || 0 : parseFloat(existing.basicAnnual);
+    const hraAnnual = req.body.hraAnnual !== undefined ? parseFloat(req.body.hraAnnual) || 0 : parseFloat(existing.hraAnnual);
+    const conveyanceAnnual = req.body.conveyanceAnnual !== undefined ? parseFloat(req.body.conveyanceAnnual) || 0 : parseFloat(existing.conveyanceAnnual);
+    const medicalAnnual = req.body.medicalAnnual !== undefined ? parseFloat(req.body.medicalAnnual) || 0 : parseFloat(existing.medicalAnnual);
+    const otherAllowancesAnnual = req.body.otherAllowancesAnnual !== undefined ? parseFloat(req.body.otherAllowancesAnnual) || 0 : parseFloat(existing.otherAllowancesAnnual);
+    const ctcAnnual = computeCompensationCtc({ basicAnnual, hraAnnual, conveyanceAnnual, medicalAnnual, otherAllowancesAnnual });
+
+    const updated = await storage.updatePayrollCompensationStructure(id, {
+      effectiveFrom: req.body.effectiveFrom ?? existing.effectiveFrom,
+      reason: req.body.reason !== undefined ? req.body.reason || null : existing.reason,
+      refNo: req.body.refNo !== undefined ? req.body.refNo || null : existing.refNo,
+      basicAnnual: String(basicAnnual), hraAnnual: String(hraAnnual), conveyanceAnnual: String(conveyanceAnnual),
+      medicalAnnual: String(medicalAnnual), otherAllowancesAnnual: String(otherAllowancesAnnual),
+      ctcAnnual: String(ctcAnnual),
+    });
+    if (!updated) return res.status(404).json({ message: "Compensation structure not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "payroll_compensation_structure",
+      entityId: updated.id, details: `Updated compensation structure effective ${updated.effectiveFrom}: CTC Rs.${updated.ctcAnnual}/yr`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/payroll-compensation-structures/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollCompensationStructure(id);
+    if (!existing) return res.status(404).json({ message: "Compensation structure not found" });
+    const deleted = await storage.deletePayrollCompensationStructure(id);
+    if (!deleted) return res.status(404).json({ message: "Compensation structure not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "payroll_compensation_structure",
+      entityId: id, details: `Deleted compensation structure effective ${existing.effectiveFrom}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
+  // Payroll: Payslips — Format 1 (No PF/ESI) only; "with_pf_esi" is not built yet
+  type PayrollPayslipComputedFields = {
+    compensationStructureId: number;
+    payMonth: string;
+    payslipFormat: "no_pf_esi";
+    standardWorkingDays: number;
+    lopDays: string;
+    basicEarned: string; hraEarned: string; conveyanceEarned: string; medicalEarned: string; otherAllowancesEarned: string;
+    grossEarnings: string;
+    professionalTax: string;
+    totalDeductions: string;
+    netPay: string;
+  };
+  async function buildPayrollPayslipData(payrollEmployeeId: number, body: any): Promise<{ error: string; data?: undefined } | { error?: undefined; data: PayrollPayslipComputedFields }> {
+    if (!body.payMonth) return { error: "Pay Month is required" };
+    const asOfDate = parsePayMonthToDate(body.payMonth);
+    if (!asOfDate) return { error: "Invalid Pay Month" };
+    const structure = await storage.getCurrentPayrollCompensationStructure(payrollEmployeeId, asOfDate);
+    if (!structure) return { error: `No compensation structure is effective for ${body.payMonth} — set one up first` };
+
+    const standardWorkingDays = parseInt(body.standardWorkingDays) || 26;
+    const lopDays = parseFloat(body.lopDays) || 0;
+    const professionalTax = parseFloat(body.professionalTax) || 0;
+    const computed = computePayrollPayslipNoPfEsi({
+      basicAnnual: parseFloat(structure.basicAnnual), hraAnnual: parseFloat(structure.hraAnnual),
+      conveyanceAnnual: parseFloat(structure.conveyanceAnnual), medicalAnnual: parseFloat(structure.medicalAnnual),
+      otherAllowancesAnnual: parseFloat(structure.otherAllowancesAnnual),
+      standardWorkingDays, lopDays, professionalTax,
+    });
+    return {
+      data: {
+        compensationStructureId: structure.id,
+        payMonth: body.payMonth,
+        payslipFormat: "no_pf_esi" as const,
+        standardWorkingDays,
+        lopDays: String(lopDays),
+        basicEarned: String(computed.basicEarned), hraEarned: String(computed.hraEarned),
+        conveyanceEarned: String(computed.conveyanceEarned), medicalEarned: String(computed.medicalEarned),
+        otherAllowancesEarned: String(computed.otherAllowancesEarned),
+        grossEarnings: String(computed.grossEarnings),
+        professionalTax: String(computed.professionalTax),
+        totalDeductions: String(computed.totalDeductions),
+        netPay: String(computed.netPay),
+      },
+    };
+  }
+
+  app.get("/api/accounting/payroll-payslips", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const filters: any = {};
+    if (req.query.payrollEmployeeId) filters.payrollEmployeeId = parseInt(req.query.payrollEmployeeId as string);
+    if (req.query.status) filters.status = req.query.status;
+    const list = await storage.getPayrollPayslips(filters);
+    res.json(list);
+  });
+
+  app.get("/api/accounting/payroll-payslips/:id", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const payslip = await storage.getPayrollPayslip(parseInt(req.params.id));
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    res.json(payslip);
+  });
+
+  app.post("/api/accounting/payroll-payslips", requireAuth, requirePermission("payroll_employees.process"), async (req, res) => {
+    const employee = await storage.getPayrollEmployee(parseInt(req.body.payrollEmployeeId));
+    if (!employee) return res.status(400).json({ message: "Payroll employee not found" });
+
+    const existingForMonth = (await storage.getPayrollPayslips({ payrollEmployeeId: employee.id }))
+      .find(p => p.payMonth === req.body.payMonth);
+    if (existingForMonth) {
+      return res.status(400).json({ message: `A payslip already exists for ${req.body.payMonth} for this employee` });
+    }
+
+    const built = await buildPayrollPayslipData(employee.id, req.body);
+    if (built.error) return res.status(400).json({ message: built.error });
+
+    const payslip = await storage.createPayrollPayslip({
+      ...built.data!,
+      payrollEmployeeId: employee.id,
+      status: "draft",
+      preparedBy: req.user!.id,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "payroll_payslip",
+      entityId: payslip.id, details: `Created draft payslip for ${employee.employeeCode} — ${payslip.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(payslip);
+  });
+
+  app.patch("/api/accounting/payroll-payslips/:id", requireAuth, requirePermission("payroll_employees.process"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollPayslip(id);
+    if (!existing) return res.status(404).json({ message: "Payslip not found" });
+    if (existing.status !== "draft" && existing.status !== "rejected") {
+      return res.status(400).json({ message: "Only draft or rejected payslips can be edited" });
+    }
+    const employee = await storage.getPayrollEmployee(existing.payrollEmployeeId);
+    if (!employee) return res.status(400).json({ message: "Payroll employee not found" });
+
+    const mergedBody = { ...existing, ...req.body };
+    if (mergedBody.payMonth !== existing.payMonth) {
+      const existingForMonth = (await storage.getPayrollPayslips({ payrollEmployeeId: employee.id }))
+        .find(p => p.payMonth === mergedBody.payMonth && p.id !== id);
+      if (existingForMonth) {
+        return res.status(400).json({ message: `A payslip already exists for ${mergedBody.payMonth} for this employee` });
+      }
+    }
+
+    const built = await buildPayrollPayslipData(employee.id, mergedBody);
+    if (built.error) return res.status(400).json({ message: built.error });
+
+    const updated = await storage.updatePayrollPayslip(id, {
+      ...built.data!,
+      status: "draft",
+      rejectionReason: null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "payroll_payslip",
+      entityId: id, details: `Updated payslip for ${employee.employeeCode} — ${updated!.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/payroll-payslips/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollPayslip(id);
+    if (!existing) return res.status(404).json({ message: "Payslip not found" });
+    if (existing.status === "paid") {
+      return res.status(400).json({ message: "Cannot delete a paid payslip — it has a posted ledger voucher. Reverse the voucher first if this was posted in error." });
+    }
+    const deleted = await storage.deletePayrollPayslip(id);
+    if (!deleted) return res.status(404).json({ message: "Payslip not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "payroll_payslip",
+      entityId: id, details: `Deleted payslip for payroll employee #${existing.payrollEmployeeId} — ${existing.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
+  app.post("/api/accounting/payroll-payslips/:id/submit", requireAuth, requirePermission("payroll_employees.process"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getPayrollPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "draft") return res.status(400).json({ message: "Only draft payslips can be submitted" });
+    const updated = await storage.updatePayrollPayslip(id, { status: "submitted", submittedAt: new Date() });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "submit", entity: "payroll_payslip",
+      entityId: id, details: `Submitted payslip ${id} for approval`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/payroll-payslips/:id/approve", requireAuth, requirePermission("payroll_employees.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getPayrollPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "submitted") return res.status(400).json({ message: "Only submitted payslips can be approved" });
+    const updated = await storage.updatePayrollPayslip(id, {
+      status: "approved", approvedBy: req.user!.id, approvedAt: new Date(),
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "approve", entity: "payroll_payslip",
+      entityId: id, details: `Approved payslip ${id}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/payroll-payslips/:id/reject", requireAuth, requirePermission("payroll_employees.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getPayrollPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "submitted") return res.status(400).json({ message: "Only submitted payslips can be rejected" });
+    const reason = req.body?.reason || "";
+    const updated = await storage.updatePayrollPayslip(id, {
+      status: "rejected", approvedBy: req.user!.id, approvedAt: new Date(),
+      rejectionReason: reason || null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "reject", entity: "payroll_payslip",
+      entityId: id, details: `Rejected payslip ${id}${reason ? ": " + reason : ""}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/payroll-payslips/:id/mark-paid", requireAuth, requirePermission("payroll_employees.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getPayrollPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "approved") return res.status(400).json({ message: "Only approved payslips can be marked paid" });
+    const employee = await storage.getPayrollEmployee(payslip.payrollEmployeeId);
+    if (!employee) return res.status(400).json({ message: "Payroll employee not found" });
+    const payDate = new Date().toISOString().split("T")[0];
+    const fyError = await checkFinancialYearForDate(payDate);
+    if (fyError) return res.status(400).json({ message: fyError });
+
+    const ledgerAccounts = await storage.getLedgerAccounts();
+    const salaryLedger = ledgerAccounts.find(a => a.name === "Salary & Wages");
+    const ptLedger = ledgerAccounts.find(a => a.name === "Professional Tax");
+    const bankLedger = ledgerAccounts.find(a => a.name === "Bank Account");
+    if (!salaryLedger || !ptLedger || !bankLedger) {
+      return res.status(500).json({ message: "Required ledger accounts are missing — contact an administrator" });
+    }
+
+    const gross = parseFloat(payslip.grossEarnings);
+    const pt = parseFloat(payslip.professionalTax);
+    const net = parseFloat(payslip.netPay);
+
+    // voucherId is a placeholder — storage.createVoucher() overwrites it with the
+    // newly-created voucher's real id for every entry before inserting.
+    const entries = [
+      { ledgerAccountId: salaryLedger.id, voucherId: 0, debit: String(gross), credit: "0" },
+      { ledgerAccountId: bankLedger.id, voucherId: 0, debit: "0", credit: String(net) },
+    ];
+    if (pt > 0) {
+      entries.push({ ledgerAccountId: ptLedger.id, voucherId: 0, debit: "0", credit: String(pt) });
+    }
+
+    const voucherNumber = await storage.getNextVoucherNumber("payment");
+    const voucher = await storage.createVoucher({
+      voucherNumber,
+      date: payDate,
+      type: "payment",
+      narration: `Payroll payslip — ${employee.employeeCode} (${employee.fullName}) — ${payslip.payMonth}`,
+      totalAmount: String(gross),
+      status: "approved",
+      partyId: null,
+      gstRate: null,
+      taxableAmount: null,
+      cgstAmount: null,
+      sgstAmount: null,
+      igstAmount: null,
+      isInterState: false,
+      createdBy: req.user!.id,
+      approvedBy: req.user!.id,
+    }, entries);
+
+    const updated = await storage.updatePayrollPayslip(id, { status: "paid", voucherId: voucher.id });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "mark-paid", entity: "payroll_payslip",
+      entityId: id, details: `Marked payslip ${id} paid — posted voucher ${voucherNumber}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ ...updated, voucher });
+  });
+
+  // Payroll Employee self-service payslips — mirrors /my-payslips for tutors,
+  // scoped to the payroll profile linked via payrollEmployees.loginEmployeeId.
+  app.get("/api/accounting/my-payroll-payslips", requireAuth, requirePermission("payroll_employees.view_own"), async (req, res) => {
+    const profile = await storage.getPayrollEmployeeByLoginEmployeeId(req.user!.id);
+    if (!profile) return res.status(404).json({ message: "No payroll profile linked to this account" });
+    const list = await storage.getPayrollPayslips({ payrollEmployeeId: profile.id });
+    // Only finalized states — draft/submitted/rejected are internal admin workflow
+    // states with no self-service UI to render them (same convention as tutors).
+    res.json(list.filter(p => p.status === "approved" || p.status === "paid"));
+  });
+
+  app.get("/api/accounting/my-payroll-payslips/:id", requireAuth, requirePermission("payroll_employees.view_own"), async (req, res) => {
+    const profile = await storage.getPayrollEmployeeByLoginEmployeeId(req.user!.id);
+    if (!profile) return res.status(404).json({ message: "No payroll profile linked to this account" });
+    const payslip = await storage.getPayrollPayslip(parseInt(req.params.id));
+    if (!payslip || payslip.payrollEmployeeId !== profile.id || (payslip.status !== "approved" && payslip.status !== "paid")) {
+      return res.status(404).json({ message: "Payslip not found" });
+    }
+    res.json(payslip);
   });
 
   // Vouchers

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { useAuth } from "@/hooks/use-auth";
 import type { PayrollEmployee, Employee } from "@shared/schema";
@@ -14,11 +15,12 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, Plus, Pencil, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Pencil, Loader2, Trash2, IndianRupee, Receipt } from "lucide-react";
 
 const emptyForm = {
-  employeeCode: "", fullName: "", designation: "", dateOfJoining: "",
-  panNumber: "", pfApplicable: false, esiApplicable: false, ctcAnnual: "", status: "active",
+  employeeCode: "", fullName: "", designation: "", department: "", dateOfJoining: "",
+  panNumber: "", bankName: "", bankAccountNumber: "", bankIfsc: "",
+  pfApplicable: false, esiApplicable: false, status: "active",
   loginEmployeeId: "",
 };
 
@@ -91,17 +93,17 @@ export default function PayrollEmployees() {
   const buildPayload = () => ({
     ...form,
     dateOfJoining: form.dateOfJoining || null,
-    ctcAnnual: form.ctcAnnual || null,
     loginEmployeeId: form.loginEmployeeId ? parseInt(form.loginEmployeeId) : null,
   });
 
   const openEdit = (e: PayrollEmployee) => {
     setEditingEmployee(e);
     setForm({
-      employeeCode: e.employeeCode, fullName: e.fullName, designation: e.designation || "",
+      employeeCode: e.employeeCode, fullName: e.fullName, designation: e.designation || "", department: e.department || "",
       dateOfJoining: e.dateOfJoining || "", panNumber: e.panNumber || "",
+      bankName: e.bankName || "", bankAccountNumber: e.bankAccountNumber || "", bankIfsc: e.bankIfsc || "",
       pfApplicable: e.pfApplicable, esiApplicable: e.esiApplicable,
-      ctcAnnual: e.ctcAnnual || "", status: e.status,
+      status: e.status,
       loginEmployeeId: e.loginEmployeeId ? String(e.loginEmployeeId) : "",
     });
     setEditOpen(true);
@@ -112,9 +114,12 @@ export default function PayrollEmployees() {
       <div><Label>Employee Code *</Label><Input value={form.employeeCode} onChange={e => setForm({ ...form, employeeCode: e.target.value })} data-testid="input-pe-code" /></div>
       <div><Label>Full Name *</Label><Input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} data-testid="input-pe-name" /></div>
       <div><Label>Designation</Label><Input value={form.designation} onChange={e => setForm({ ...form, designation: e.target.value })} data-testid="input-pe-designation" /></div>
+      <div><Label>Department</Label><Input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} data-testid="input-pe-department" /></div>
       <div><Label>Date of Joining</Label><Input type="date" value={form.dateOfJoining} onChange={e => setForm({ ...form, dateOfJoining: e.target.value })} data-testid="input-pe-doj" /></div>
       <div><Label>PAN Number</Label><Input value={form.panNumber} onChange={e => setForm({ ...form, panNumber: e.target.value.toUpperCase() })} className="uppercase" data-testid="input-pe-pan" /></div>
-      <div><Label>Annual CTC (INR)</Label><Input type="number" min="0" value={form.ctcAnnual} onChange={e => setForm({ ...form, ctcAnnual: e.target.value })} data-testid="input-pe-ctc" /></div>
+      <div><Label>Bank Name</Label><Input value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} data-testid="input-pe-bank-name" /></div>
+      <div><Label>Bank Account Number</Label><Input value={form.bankAccountNumber} onChange={e => setForm({ ...form, bankAccountNumber: e.target.value })} data-testid="input-pe-bank-account" /></div>
+      <div><Label>Bank IFSC</Label><Input value={form.bankIfsc} onChange={e => setForm({ ...form, bankIfsc: e.target.value.toUpperCase() })} className="uppercase" data-testid="input-pe-bank-ifsc" /></div>
       <div className="flex items-center justify-between"><Label>PF Applicable</Label><Switch checked={form.pfApplicable} onCheckedChange={v => setForm({ ...form, pfApplicable: v })} data-testid="switch-pe-pf" /></div>
       <div className="flex items-center justify-between"><Label>ESI Applicable</Label><Switch checked={form.esiApplicable} onCheckedChange={v => setForm({ ...form, esiApplicable: v })} data-testid="switch-pe-esi" /></div>
       <div>
@@ -153,7 +158,7 @@ export default function PayrollEmployees() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">Employees (Payroll)</h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-1">MHTSdigiXR salaried staff — master data only</p>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">MHTSdigiXR salaried staff</p>
           </div>
           {canManage && (
             <Button onClick={() => { setForm(emptyForm); setAddOpen(true); }} data-testid="button-add-payroll-employee">
@@ -165,12 +170,13 @@ export default function PayrollEmployees() {
         <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4" data-testid="banner-ca-review-required">
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-amber-800 dark:text-amber-300">
-            <p className="font-semibold">Statutory pay-run calculations are not implemented.</p>
+            <p className="font-semibold">PF, ESI, and Sec 192 TDS calculations are not implemented.</p>
             <p className="mt-1">
-              This page stores employee master data only. Sec 192 salary TDS, PF, ESI, and Gratuity formulas
-              require review and sign-off by a Chartered Accountant before any real payroll run relies on this
-              data — the Labour Codes (effective 21 Nov 2025) were still being finalized per state as of early
-              2026. No payslip, pay-run, or calculation feature exists here yet.
+              Compensation structures and the No-PF/ESI payslip format are live (its only deduction,
+              Professional Tax, is entered manually — never auto-calculated). PF, ESI, and Sec 192 salary TDS
+              formulas still require review and sign-off by a Chartered Accountant before any payslip that
+              needs them relies on this app — the Labour Codes (effective 21 Nov 2025) were still being
+              finalized per state as of early 2026.
             </p>
           </div>
         </div>
@@ -188,6 +194,7 @@ export default function PayrollEmployees() {
                     <TableHead>Code</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Designation</TableHead>
+                    <TableHead>Current CTC</TableHead>
                     <TableHead>PF</TableHead>
                     <TableHead>ESI</TableHead>
                     <TableHead>Status</TableHead>
@@ -200,11 +207,22 @@ export default function PayrollEmployees() {
                       <TableCell className="font-mono text-xs">{e.employeeCode}</TableCell>
                       <TableCell className="font-medium">{e.fullName}</TableCell>
                       <TableCell>{e.designation || "-"}</TableCell>
+                      <TableCell>{e.ctcAnnual ? `₹${parseFloat(e.ctcAnnual).toLocaleString("en-IN")}/yr` : <span className="text-slate-400">Not set</span>}</TableCell>
                       <TableCell><Badge variant={e.pfApplicable ? "default" : "outline"}>{e.pfApplicable ? "Yes" : "No"}</Badge></TableCell>
                       <TableCell><Badge variant={e.esiApplicable ? "default" : "outline"}>{e.esiApplicable ? "Yes" : "No"}</Badge></TableCell>
                       <TableCell><Badge variant={e.status === "active" ? "default" : "outline"}>{e.status === "active" ? "Active" : "Inactive"}</Badge></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Link href={`/accounting/payroll/compensation?payrollEmployeeId=${e.id}`}>
+                            <Button size="icon" variant="ghost" className="text-emerald-600" title="Compensation" data-testid={`button-compensation-payroll-employee-${e.id}`}>
+                              <IndianRupee className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                          <Link href={`/accounting/payroll/payslips?payrollEmployeeId=${e.id}`}>
+                            <Button size="icon" variant="ghost" className="text-sky-600" title="Payslips" data-testid={`button-payslips-payroll-employee-${e.id}`}>
+                              <Receipt className="w-4 h-4" />
+                            </Button>
+                          </Link>
                           {canManage && (
                             <Button size="icon" variant="ghost" onClick={() => openEdit(e)} data-testid={`button-edit-payroll-employee-${e.id}`}>
                               <Pencil className="w-4 h-4" />

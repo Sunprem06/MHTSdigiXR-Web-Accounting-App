@@ -92,7 +92,9 @@ export default function AccountingDashboard() {
                 <div><p className="text-xs text-gray-400 dark:text-slate-500">Date of Joining</p><p className="text-sm font-medium text-gray-800 dark:text-white">{payrollProfile.dateOfJoining || "-"}</p></div>
                 <div><p className="text-xs text-gray-400 dark:text-slate-500">Status</p><p className="text-sm font-medium text-gray-800 dark:text-white capitalize">{payrollProfile.status}</p></div>
               </div>
-              <p className="text-sm text-gray-500 dark:text-slate-400">Payslips will appear here once compensation is set up.</p>
+              <Button onClick={() => nav("/accounting/payroll/my-payroll-payslips")} className="bg-sky-500 hover:bg-sky-600 text-white rounded-full" data-testid="button-view-my-payroll-payslips">
+                View My Payslips
+              </Button>
             </div>
           )}
         </>}
