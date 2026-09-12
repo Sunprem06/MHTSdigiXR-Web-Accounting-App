@@ -112,6 +112,14 @@ export const employees = pgTable("employees", {
   role: text("role").notNull().default("viewer"),
   permissions: jsonb("permissions"),
   phone: text("phone"),
+  // Canonical person number for anyone with ERP login access — same numbering
+  // shape as tutors.tutorCode (year + 3-digit sequence), auto-suggested but
+  // editable so real historical codes can be entered verbatim. Deliberately NOT
+  // .unique() yet: `db:push` would try to add that constraint immediately and
+  // interactively prompt on a non-empty table. Run `npm run backfill-employee-codes
+  // -- --apply` first, then add .unique() here in a follow-up change once every
+  // row has a code (see migrations/0002 and 0003_employee_code_unique.sql).
+  employeeCode: text("employee_code"),
   isActive: boolean("is_active").notNull().default(true),
   lastLogin: timestamp("last_login"),
   passwordChangedAt: timestamp("password_changed_at").defaultNow().notNull(),
@@ -764,7 +772,7 @@ export const ALL_PERMISSIONS = [
   "settings.view", "settings.manage",
   "erp_licenses.view", "erp_licenses.manage",
   "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own",
-  "payroll_employees.view", "payroll_employees.manage",
+  "payroll_employees.view", "payroll_employees.manage", "payroll_employees.view_own",
   // Deliberately separate from settings.manage (which is super_admin-only) so
   // Admin can also activate/manage financial years without the broader settings access.
   "financial_years.manage",
@@ -791,7 +799,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   settings: { label: "Settings", permissions: ["settings.view", "settings.manage"] },
   erp_licenses: { label: "ERP Licenses", permissions: ["erp_licenses.view", "erp_licenses.manage"] },
   payroll_tutors: { label: "Payroll - Tutors", permissions: ["payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own"] },
-  payroll_employees: { label: "Payroll - Employees (Stub)", permissions: ["payroll_employees.view", "payroll_employees.manage"] },
+  payroll_employees: { label: "Payroll - Employees (Stub)", permissions: ["payroll_employees.view", "payroll_employees.manage", "payroll_employees.view_own"] },
   financial_years: { label: "Financial Years", permissions: ["financial_years.manage"] },
 };
 
@@ -801,7 +809,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   // the user that ONLY super_admin should be able to create/revoke ERP licenses or see
   // activation codes, not every admin.
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.") && !p.startsWith("erp_licenses.")),
-  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes"],
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own"],
   senior_accountant: [
     "dashboard.view",
     "ledgers.view", "ledgers.create", "ledgers.edit",
@@ -817,6 +825,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     // the quotations.approve split above.
     "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process",
     "payroll_employees.view", "payroll_employees.manage",
+    "payroll_employees.view_own",
   ],
   accountant: [
     "dashboard.view",
@@ -828,10 +837,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "vouchers.view", "vouchers.create", "vouchers.edit",
     "expenses.view", "expenses.create",
     "reports.view",
+    "payroll_employees.view_own",
   ],
-  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view"],
-  viewer: ["dashboard.view"],
-  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view"],
+  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view", "payroll_employees.view_own"],
+  viewer: ["dashboard.view", "payroll_employees.view_own"],
+  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view", "payroll_employees.view_own"],
   sales_manager: [
     "dashboard.view",
     "quotations.view", "quotations.create", "quotations.edit", "quotations.approve",
@@ -840,6 +850,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "invoices.view", "invoices.create",
     "expenses.view",
     "reports.view",
+    "payroll_employees.view_own",
   ],
   // Tutor self-service: view-only access to their own payslips. Scoped
   // server-side to the tutor record linked via tutors.loginEmployeeId —

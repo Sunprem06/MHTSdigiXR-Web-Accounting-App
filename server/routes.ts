@@ -515,11 +515,23 @@ export async function registerRoutes(
     res.json(safeEmployees);
   });
 
+  app.get("/api/accounting/employees/next-code", requireAuth, requirePermission("employees.manage"), async (req, res) => {
+    const employeeCode = await storage.getNextEmployeeCode();
+    res.json({ employeeCode });
+  });
+
   app.post("/api/accounting/employees", requireAuth, requirePermission("employees.manage"), async (req, res) => {
     try {
-      const { username, email, password, fullName, role, permissions: userPermissions, phone } = req.body;
+      const { username, email, password, fullName, role, permissions: userPermissions, phone, employeeCode } = req.body;
       if (req.user!.role !== "super_admin" && (role === "super_admin" || role === "admin")) {
         return res.status(403).json({ message: "Only Super Admin can create Super Admin or Admin accounts" });
+      }
+      const finalEmployeeCode = employeeCode || await storage.getNextEmployeeCode();
+      // No DB unique constraint on employee_code yet (deferred until backfill —
+      // see shared/schema.ts), so this app-level check is the only thing
+      // preventing two employees from silently ending up with the same code.
+      if (await storage.getEmployeeByCode(finalEmployeeCode)) {
+        return res.status(400).json({ message: `Employee code "${finalEmployeeCode}" is already in use` });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
       const { ALL_PERMISSIONS: AP } = await import("@shared/schema");
@@ -528,6 +540,7 @@ export async function registerRoutes(
         username, email, password: hashedPassword, fullName, role,
         permissions: validPerms || null,
         phone: phone || null,
+        employeeCode: finalEmployeeCode,
         isActive: true, createdBy: req.user!.id,
       });
       await storage.createAuditLog({
@@ -568,6 +581,16 @@ export async function registerRoutes(
     if (req.body.fullName) data.fullName = req.body.fullName;
     if (req.body.email) data.email = req.body.email;
     if (req.body.phone !== undefined) data.phone = req.body.phone || null;
+    if (req.body.employeeCode !== undefined) {
+      const newCode = req.body.employeeCode || null;
+      if (newCode) {
+        const existing = await storage.getEmployeeByCode(newCode);
+        if (existing && existing.id !== id) {
+          return res.status(400).json({ message: `Employee code "${newCode}" is already in use` });
+        }
+      }
+      data.employeeCode = newCode;
+    }
     if (req.body.role) {
       if (req.user!.role !== "super_admin" && (req.body.role === "super_admin" || req.body.role === "admin")) {
         return res.status(403).json({ message: "Cannot assign this role" });
@@ -1214,6 +1237,17 @@ export async function registerRoutes(
     res.json(payslip);
   });
 
+  // Payroll Employee self-service — mirrors the tutor pattern (payroll_tutors.view_own)
+  // but granted broadly across staff roles by default (see SYSTEM_ROLE_PERMISSIONS),
+  // not restricted to one dedicated role — salaried staff already log in with their
+  // real functional role (Senior Accountant, Admin, etc.) to use the Accounts app,
+  // and this permission just lets that role also see its own linked payroll profile.
+  app.get("/api/accounting/my-payroll-profile", requireAuth, requirePermission("payroll_employees.view_own"), async (req, res) => {
+    const profile = await storage.getPayrollEmployeeByLoginEmployeeId(req.user!.id);
+    if (!profile) return res.status(404).json({ message: "No payroll profile linked to this account" });
+    res.json(profile);
+  });
+
   // Tutor Payslips (admin side)
   app.get("/api/accounting/tutor-payslips", requireAuth, requirePermission("payroll_tutors.view"), async (req, res) => {
     const filters: any = {};
@@ -1455,6 +1489,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/accounting/payroll-employees", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    if (req.body.loginEmployeeId) {
+      const linked = await storage.getEmployeeById(parseInt(req.body.loginEmployeeId));
+      if (!linked) return res.status(400).json({ message: "Linked login account not found" });
+    }
     const employee = await storage.createPayrollEmployee({ ...req.body, createdBy: req.user!.id });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "create", entity: "payroll_employee",
@@ -1465,6 +1503,10 @@ export async function registerRoutes(
   });
 
   app.patch("/api/accounting/payroll-employees/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    if (req.body.loginEmployeeId) {
+      const linked = await storage.getEmployeeById(parseInt(req.body.loginEmployeeId));
+      if (!linked) return res.status(400).json({ message: "Linked login account not found" });
+    }
     const updated = await storage.updatePayrollEmployee(parseInt(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Payroll employee not found" });
     await storage.createAuditLog({
