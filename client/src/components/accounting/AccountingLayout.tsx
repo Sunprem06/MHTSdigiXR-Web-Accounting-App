@@ -9,7 +9,7 @@ import {
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
   Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen,
   Layers, DollarSign, Lock, Eye, EyeOff, Loader2, AlertTriangle, Fingerprint,
-  Banknote, GraduationCap
+  Banknote, GraduationCap, Landmark
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -35,6 +35,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Dashboard", path: "/accounting", icon: LayoutDashboard, requiredPermission: "dashboard.view" },
   { label: "Ledger Accounts", path: "/accounting/ledgers", icon: BookOpen, requiredPermission: "ledgers.view" },
+  { label: "Fixed Assets", path: "/accounting/fixed-assets", icon: Landmark, requiredPermission: "fixed_assets.view" },
   { label: "Parties", path: "/accounting/parties", icon: UserCheck, requiredPermission: "parties.view" },
   { label: "Products", path: "/accounting/products", icon: Boxes, requiredPermission: "products.view" },
   { label: "Quotations", path: "/accounting/quotations", icon: FileSpreadsheet, requiredPermission: "quotations.view" },

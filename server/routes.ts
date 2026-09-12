@@ -9,6 +9,7 @@ import nodemailer from "nodemailer";
 import { requireAuth, requirePermission, requireRole } from "./auth";
 import { rateLimiter } from "./middleware/security.js";
 import type { JobApplication } from "@shared/schema";
+import { FIXED_ASSET_CATEGORY_DEFAULTS } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
 
@@ -681,6 +682,111 @@ export async function registerRoutes(
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "delete", entity: "ledger",
       entityId: id, details: `Deleted ledger account`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
+  // Fixed Assets Register — per-item tracking, distinct from the aggregate GL ledger
+  // balances under the same "Fixed Assets" account group. Depreciation calculation
+  // (Companies Act 2013 Schedule II, NOT yet CA-reviewed) is a separate follow-up piece.
+  app.get("/api/accounting/fixed-assets", requireAuth, requirePermission("fixed_assets.view"), async (req, res) => {
+    const assets = await storage.getFixedAssets({
+      category: req.query.category as string | undefined,
+      status: req.query.status as string | undefined,
+    });
+    res.json(assets);
+  });
+
+  app.get("/api/accounting/fixed-assets/next-code", requireAuth, requirePermission("fixed_assets.create"), async (req, res) => {
+    const code = await storage.getNextAssetCode();
+    res.json({ assetCode: code });
+  });
+
+  app.get("/api/accounting/fixed-assets/:id", requireAuth, requirePermission("fixed_assets.view"), async (req, res) => {
+    const asset = await storage.getFixedAsset(parseInt(req.params.id));
+    if (!asset) return res.status(404).json({ message: "Fixed asset not found" });
+    res.json(asset);
+  });
+
+  function validateFixedAssetInput(body: any): string | null {
+    const originalCost = parseFloat(body.originalCost);
+    const residualValue = parseFloat(body.residualValue ?? "0");
+    if (residualValue > originalCost * 0.05 && !body.residualValueJustification?.trim()) {
+      return "Residual value exceeds 5% of original cost (Companies Act 2013 Schedule II Part C, note 4) — a justification is required.";
+    }
+    if (body.acquisitionDate && new Date(body.acquisitionDate) > new Date()) {
+      return "Acquisition date cannot be in the future.";
+    }
+    return null;
+  }
+
+  app.post("/api/accounting/fixed-assets", requireAuth, requirePermission("fixed_assets.create"), async (req, res) => {
+    const validationError = validateFixedAssetInput(req.body);
+    if (validationError) return res.status(400).json({ message: validationError });
+
+    let ledgerAccountId = req.body.ledgerAccountId ? parseInt(req.body.ledgerAccountId) : undefined;
+    if (!ledgerAccountId) {
+      const categoryDefault = FIXED_ASSET_CATEGORY_DEFAULTS[req.body.category as keyof typeof FIXED_ASSET_CATEGORY_DEFAULTS];
+      const existingAccounts = await storage.getLedgerAccounts();
+      let ledger = existingAccounts.find(a => a.name === categoryDefault?.defaultLedgerAccountName);
+      if (!ledger && categoryDefault) {
+        const groups = await storage.getAccountGroups();
+        const fixedAssetsGroup = groups.find(g => g.name === "Fixed Assets");
+        if (fixedAssetsGroup) {
+          ledger = await storage.createLedgerAccount({
+            name: categoryDefault.defaultLedgerAccountName,
+            groupId: fixedAssetsGroup.id,
+            openingBalance: "0",
+            balanceType: "debit",
+          });
+        }
+      }
+      ledgerAccountId = ledger?.id;
+    }
+    if (!ledgerAccountId) {
+      return res.status(400).json({ message: "Could not resolve a ledger account for this asset" });
+    }
+
+    const asset = await storage.createFixedAsset({ ...req.body, ledgerAccountId, createdBy: req.user!.id });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "fixed_asset",
+      entityId: asset.id, details: `Registered fixed asset: ${asset.name} (${asset.assetCode})`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(asset);
+  });
+
+  app.patch("/api/accounting/fixed-assets/:id", requireAuth, requirePermission("fixed_assets.edit"), async (req, res) => {
+    const validationError = validateFixedAssetInput(req.body);
+    if (validationError) return res.status(400).json({ message: validationError });
+
+    const updated = await storage.updateFixedAsset(parseInt(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ message: "Fixed asset not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "fixed_asset",
+      entityId: updated.id, details: `Updated fixed asset: ${updated.name} (${updated.assetCode})`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/fixed-assets/:id", requireAuth, requirePermission("fixed_assets.edit"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const asset = await storage.getFixedAsset(id);
+    if (!asset) return res.status(404).json({ message: "Fixed asset not found" });
+    if (asset.status !== "active") {
+      return res.status(400).json({ message: "Cannot delete a disposed or scrapped asset — its disposal record must stay intact" });
+    }
+    const depreciationEntries = await storage.getFixedAssetDepreciationEntries(id);
+    if (depreciationEntries.length > 0) {
+      return res.status(400).json({ message: "Cannot delete an asset with existing depreciation entries" });
+    }
+    const deleted = await storage.deleteFixedAsset(id);
+    if (!deleted) return res.status(404).json({ message: "Fixed asset not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "fixed_asset",
+      entityId: id, details: `Deleted fixed asset: ${asset.name} (${asset.assetCode})`,
       ipAddress: req.ip || null,
     });
     res.json({ message: "Deleted successfully" });
@@ -2845,6 +2951,28 @@ async function seedDatabase() {
           balanceType: "credit",
           description: "Platform commission retained from tutor fees per Clause 4.2 of the Individual Tutor Agreement (usually 0%)",
         });
+      }
+    }
+  }
+
+  // Backfill any Fixed Assets category ledger accounts not already in the chart of
+  // accounts (Furniture & Fixtures / Computer & Equipment already exist from the
+  // fresh-install seed above; this adds the rest so the Fixed Assets Register can
+  // assign every category to a real ledger without a manual migration step).
+  {
+    const existingGroups = await storage.getAccountGroups();
+    const fixedAssetsGroup = existingGroups.find(g => g.name === "Fixed Assets");
+    if (fixedAssetsGroup) {
+      const existingAccounts = await storage.getLedgerAccounts();
+      for (const { defaultLedgerAccountName } of Object.values(FIXED_ASSET_CATEGORY_DEFAULTS)) {
+        if (!existingAccounts.some(a => a.name === defaultLedgerAccountName)) {
+          await storage.createLedgerAccount({
+            name: defaultLedgerAccountName,
+            groupId: fixedAssetsGroup.id,
+            openingBalance: "0",
+            balanceType: "debit",
+          });
+        }
       }
     }
   }

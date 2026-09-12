@@ -3,6 +3,7 @@ import {
   contactMessages, posts, services, caseStudies, pricingPlans, legalPages,
   employees, auditLogs, accountGroups, ledgerAccounts,
   financialYears, companySettings, vouchers, voucherEntries, auditNotes, attachments,
+  fixedAssets, fixedAssetDepreciationEntries,
   parties, products, quotations, expenseClaims, roles,
   jobPostings, jobApplications, faqItems, testimonials, siteStats,
   smtpSettings, passwordResetTokens,
@@ -11,12 +12,14 @@ import {
   type InsertEmployee, type InsertAuditLog, type InsertAccountGroup, type InsertLedgerAccount,
   type InsertFinancialYear, type InsertCompanySettings, type InsertVoucher, type InsertVoucherEntry,
   type InsertAuditNote, type InsertAttachment, type InsertParty, type InsertProduct, type InsertQuotation, type InsertExpenseClaim,
+  type InsertFixedAsset, type InsertFixedAssetDepreciationEntry,
   type InsertDbRole, type InsertJobPosting, type InsertJobApplication,
   type InsertFaqItem, type InsertTestimonial, type InsertSiteStat,
   type InsertSmtpSettings, type InsertPasswordResetToken,
   type ContactMessage, type Post, type Service, type CaseStudy, type PricingPlan, type LegalPage,
   type Employee, type AuditLog, type AccountGroup, type LedgerAccount,
   type FinancialYear, type CompanySettings, type Voucher, type VoucherEntry, type AuditNote, type Attachment,
+  type FixedAsset, type FixedAssetDepreciationEntry,
   type Party, type Product, type Quotation, type ExpenseClaim, type DbRole,
   type JobPosting, type JobApplication, type FaqItem, type Testimonial, type SiteStat,
   type SmtpSettings, type PasswordResetToken,
@@ -79,6 +82,17 @@ export interface IStorage {
   deleteLedgerAccount(id: number): Promise<boolean>;
   getVoucherEntriesByLedger(ledgerAccountId: number): Promise<VoucherEntry[]>;
   getLedgerStatement(ledgerAccountId: number, startDate?: string, endDate?: string): Promise<Array<{ date: string; voucherNumber: string; type: string; narration: string | null; debit: number; credit: number; balance: number }>>;
+
+  getFixedAssets(filters?: { category?: string; status?: string }): Promise<FixedAsset[]>;
+  getFixedAsset(id: number): Promise<FixedAsset | undefined>;
+  getFixedAssetByCode(assetCode: string): Promise<FixedAsset | undefined>;
+  createFixedAsset(asset: InsertFixedAsset): Promise<FixedAsset>;
+  updateFixedAsset(id: number, data: Partial<InsertFixedAsset>): Promise<FixedAsset | undefined>;
+  deleteFixedAsset(id: number): Promise<boolean>;
+  getNextAssetCode(): Promise<string>;
+  getFixedAssetDepreciationEntries(fixedAssetId: number): Promise<FixedAssetDepreciationEntry[]>;
+  createFixedAssetDepreciationEntry(entry: InsertFixedAssetDepreciationEntry): Promise<FixedAssetDepreciationEntry>;
+  deleteFixedAssetDepreciationEntriesForAsset(fixedAssetId: number): Promise<void>;
 
   getFinancialYears(): Promise<FinancialYear[]>;
   getActiveFinancialYear(): Promise<FinancialYear | undefined>;
@@ -462,6 +476,68 @@ export class DatabaseStorage implements IStorage {
   async deleteLedgerAccount(id: number): Promise<boolean> {
     const result = await db.delete(ledgerAccounts).where(eq(ledgerAccounts.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getFixedAssets(filters?: { category?: string; status?: string }): Promise<FixedAsset[]> {
+    let conditions = [];
+    if (filters?.category) conditions.push(eq(fixedAssets.category, filters.category));
+    if (filters?.status) conditions.push(eq(fixedAssets.status, filters.status));
+
+    if (conditions.length > 0) {
+      return await db.select().from(fixedAssets).where(and(...conditions)).orderBy(fixedAssets.name);
+    }
+    return await db.select().from(fixedAssets).orderBy(fixedAssets.name);
+  }
+
+  async getFixedAsset(id: number): Promise<FixedAsset | undefined> {
+    const [asset] = await db.select().from(fixedAssets).where(eq(fixedAssets.id, id));
+    return asset;
+  }
+
+  async getFixedAssetByCode(assetCode: string): Promise<FixedAsset | undefined> {
+    const [asset] = await db.select().from(fixedAssets).where(eq(fixedAssets.assetCode, assetCode));
+    return asset;
+  }
+
+  async createFixedAsset(asset: InsertFixedAsset): Promise<FixedAsset> {
+    const [newAsset] = await db.insert(fixedAssets).values(asset).returning();
+    return newAsset;
+  }
+
+  async updateFixedAsset(id: number, data: Partial<InsertFixedAsset>): Promise<FixedAsset | undefined> {
+    const [updated] = await db.update(fixedAssets).set(data).where(eq(fixedAssets.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFixedAsset(id: number): Promise<boolean> {
+    const result = await db.delete(fixedAssets).where(eq(fixedAssets.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getNextAssetCode(): Promise<string> {
+    // Same shape as getNextEmployeeCode()/getNextTutorCode(): a suggested default
+    // only, editable client-side, so backdated real-world asset tags can still be
+    // entered verbatim.
+    const year = new Date().getFullYear();
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(fixedAssets)
+      .where(sql`asset_code LIKE ${`FA-${year}-%`}`);
+    const num = (result?.count || 0) + 1;
+    return `FA-${year}-${String(num).padStart(3, "0")}`;
+  }
+
+  async getFixedAssetDepreciationEntries(fixedAssetId: number): Promise<FixedAssetDepreciationEntry[]> {
+    return await db.select().from(fixedAssetDepreciationEntries)
+      .where(eq(fixedAssetDepreciationEntries.fixedAssetId, fixedAssetId))
+      .orderBy(fixedAssetDepreciationEntries.periodStartDate);
+  }
+
+  async createFixedAssetDepreciationEntry(entry: InsertFixedAssetDepreciationEntry): Promise<FixedAssetDepreciationEntry> {
+    const [newEntry] = await db.insert(fixedAssetDepreciationEntries).values(entry).returning();
+    return newEntry;
+  }
+
+  async deleteFixedAssetDepreciationEntriesForAsset(fixedAssetId: number): Promise<void> {
+    await db.delete(fixedAssetDepreciationEntries).where(eq(fixedAssetDepreciationEntries.fixedAssetId, fixedAssetId));
   }
 
   async getVoucherEntriesByLedger(ledgerAccountId: number): Promise<VoucherEntry[]> {
