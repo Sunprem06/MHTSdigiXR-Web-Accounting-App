@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, Quote, Users, Target, Lightbulb, Award, ArrowRight } from "lucide-react";
+import { Check, Quote, Users, Target, Lightbulb, Award, ArrowRight, ShieldCheck, FileCheck2 } from "lucide-react";
 import { Link } from "wouter";
 import teamMemberImage from "@/assets/images/team-member.png";
 import { useSiteSettings } from "@/hooks/use-site-settings";
@@ -135,6 +135,56 @@ export default function About() {
             </p>
           </motion.div>
         </div>
+
+        {/* ISO Certification */}
+        <section className="mb-24">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-3xl p-8 md:p-12"
+          >
+            <div className="grid lg:grid-cols-3 gap-10 items-center">
+              <div className="lg:col-span-2">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 text-sm font-semibold mb-6">
+                  <ShieldCheck className="w-4 h-4" />
+                  Certified Quality Management
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold mb-4 dark:text-white">ISO 9001:2015 Certified</h2>
+                <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
+                  {s.companyName} has been independently assessed and certified compliant with ISO 9001:2015 Quality
+                  Management System standards, covering digital technology solutions, digital marketing, web and mobile
+                  application development, UI/UX design, business automation &amp; AI solutions, and technology consulting
+                  under the {s.brandName} brand, as well as online IT education, corporate training, career development
+                  and placement under the KoodalDigiXS Learning brand.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3 text-sm text-slate-500 dark:text-slate-400 mb-8">
+                  <p><span className="font-semibold text-slate-700 dark:text-slate-300">Certificate Number:</span> 305026083187Q</p>
+                  <p><span className="font-semibold text-slate-700 dark:text-slate-300">Certifying Body:</span> QRO Certification LLP</p>
+                  <p><span className="font-semibold text-slate-700 dark:text-slate-300">Date of Certification:</span> 31 August 2026</p>
+                  <p><span className="font-semibold text-slate-700 dark:text-slate-300">Certificate Valid Until:</span> 30 August 2029</p>
+                </div>
+                <a
+                  href="/certifications/iso-9001-2015-certificate.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-all shadow-lg"
+                  data-testid="link-view-iso-certificate"
+                >
+                  <FileCheck2 className="w-4 h-4" />
+                  View Certificate
+                </a>
+              </div>
+              <div className="flex justify-center">
+                <div className="w-40 h-40 rounded-full bg-gradient-to-br from-sky-500 to-sky-600 flex flex-col items-center justify-center text-white shadow-xl text-center p-4">
+                  <ShieldCheck className="w-12 h-12 mb-2" />
+                  <span className="font-bold text-sm leading-tight">ISO 9001:2015</span>
+                  <span className="text-xs text-white/80 mt-1">Quality Management</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </section>
 
         {/* Core Values */}
         <section className="mb-24">

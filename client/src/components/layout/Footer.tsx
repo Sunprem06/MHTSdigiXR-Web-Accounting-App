@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from "lucide-react";
+import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, ShieldCheck } from "lucide-react";
 import logoImage from "@assets/MHTSdigiXR_logo_1080x1080_1773540695277.jpg";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 
@@ -26,6 +26,16 @@ export function Footer() {
             <p className="text-slate-400 mb-6 leading-relaxed">
               {s.tagline || "Empowering businesses with cutting-edge digital solutions. From web development to AI integration, we are your partner in growth."}
             </p>
+            <a
+              href="/certifications/iso-9001-2015-certificate.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mb-6 px-3 py-2 rounded-full bg-slate-800 dark:bg-slate-900 hover:bg-slate-700 transition-colors text-xs font-semibold text-slate-200"
+              data-testid="link-iso-certificate"
+            >
+              <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0" />
+              ISO 9001:2015 Certified
+            </a>
             <div className="flex gap-4">
               {s.linkedinUrl && (
                 <a href={s.linkedinUrl} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-slate-800 dark:bg-slate-900 flex items-center justify-center hover:bg-sky-600 transition-colors" data-testid="link-linkedin">
