@@ -6,6 +6,7 @@ import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { seedSystemRoles } from "./seed-roles";
 import { seedContent } from "./seed-content";
+import { seedLeaveTypes } from "./seed-leave-types";
 
 const app = express();
 app.set('trust proxy', 1);
@@ -71,6 +72,7 @@ app.use((req, res, next) => {
 (async () => {
   await seedSystemRoles().catch(err => console.error("Role seed error:", err));
   await seedContent().catch(err => console.error("Content seed error:", err));
+  await seedLeaveTypes().catch(err => console.error("Leave type seed error:", err));
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

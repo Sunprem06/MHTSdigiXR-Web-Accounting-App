@@ -522,7 +522,7 @@ export async function registerRoutes(
 
   app.post("/api/accounting/employees", requireAuth, requirePermission("employees.manage"), async (req, res) => {
     try {
-      const { username, email, password, fullName, role, permissions: userPermissions, phone, employeeCode } = req.body;
+      const { username, email, password, fullName, role, permissions: userPermissions, phone, employeeCode, reportsTo } = req.body;
       if (req.user!.role !== "super_admin" && (role === "super_admin" || role === "admin")) {
         return res.status(403).json({ message: "Only Super Admin can create Super Admin or Admin accounts" });
       }
@@ -533,6 +533,13 @@ export async function registerRoutes(
       if (await storage.getEmployeeByCode(finalEmployeeCode)) {
         return res.status(400).json({ message: `Employee code "${finalEmployeeCode}" is already in use` });
       }
+      let finalReportsTo: number | null = null;
+      if (reportsTo !== undefined && reportsTo !== null && reportsTo !== "") {
+        finalReportsTo = parseInt(reportsTo);
+        if (!(await storage.getEmployeeById(finalReportsTo))) {
+          return res.status(400).json({ message: "Selected manager does not exist" });
+        }
+      }
       const hashedPassword = await bcrypt.hash(password, 10);
       const { ALL_PERMISSIONS: AP } = await import("@shared/schema");
       const validPerms = Array.isArray(userPermissions) ? userPermissions.filter((p: string) => (AP as readonly string[]).includes(p)) : undefined;
@@ -541,6 +548,7 @@ export async function registerRoutes(
         permissions: validPerms || null,
         phone: phone || null,
         employeeCode: finalEmployeeCode,
+        reportsTo: finalReportsTo,
         isActive: true, createdBy: req.user!.id,
       });
       await storage.createAuditLog({
@@ -590,6 +598,20 @@ export async function registerRoutes(
         }
       }
       data.employeeCode = newCode;
+    }
+    if (req.body.reportsTo !== undefined) {
+      if (req.body.reportsTo === null || req.body.reportsTo === "") {
+        data.reportsTo = null;
+      } else {
+        const newManagerId = parseInt(req.body.reportsTo);
+        if (newManagerId === id) {
+          return res.status(400).json({ message: "An employee cannot report to themselves" });
+        }
+        if (!(await storage.getEmployeeById(newManagerId))) {
+          return res.status(400).json({ message: "Selected manager does not exist" });
+        }
+        data.reportsTo = newManagerId;
+      }
     }
     if (req.body.role) {
       if (req.user!.role !== "super_admin" && (req.body.role === "super_admin" || req.body.role === "admin")) {
