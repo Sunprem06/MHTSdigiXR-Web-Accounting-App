@@ -26,6 +26,7 @@ interface Employee {
   fullName: string;
   role: string;
   phone: string | null;
+  employeeCode: string | null;
   permissions: string[] | null;
   isActive: boolean;
   createdAt: string;
@@ -44,6 +45,7 @@ export default function EmployeeManagement() {
   const [newFullName, setNewFullName] = useState("");
   const [newRole, setNewRole] = useState("viewer");
   const [newPhone, setNewPhone] = useState("");
+  const [newEmployeeCode, setNewEmployeeCode] = useState("");
   const [newUseOverrides, setNewUseOverrides] = useState(false);
   const [newOverridePerms, setNewOverridePerms] = useState<string[]>([]);
 
@@ -51,6 +53,7 @@ export default function EmployeeManagement() {
   const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState("viewer");
   const [editPhone, setEditPhone] = useState("");
+  const [editEmployeeCode, setEditEmployeeCode] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
   const [editPassword, setEditPassword] = useState("");
   const [editUseOverrides, setEditUseOverrides] = useState(false);
@@ -66,7 +69,7 @@ export default function EmployeeManagement() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; email: string; password: string; fullName: string; role: string; phone?: string; permissions?: string[] }) => {
+    mutationFn: async (data: { username: string; email: string; password: string; fullName: string; role: string; phone?: string; employeeCode?: string; permissions?: string[] }) => {
       const res = await apiRequest("POST", "/api/accounting/employees", data);
       return res.json();
     },
@@ -102,7 +105,7 @@ export default function EmployeeManagement() {
     },
   });
 
-  const resetAddForm = () => {
+  const resetAddForm = async () => {
     setNewUsername("");
     setNewEmail("");
     setNewPassword("");
@@ -111,6 +114,13 @@ export default function EmployeeManagement() {
     setNewPhone("");
     setNewUseOverrides(false);
     setNewOverridePerms([]);
+    setNewEmployeeCode("");
+    try {
+      const res = await apiRequest("GET", "/api/accounting/employees/next-code");
+      setNewEmployeeCode((await res.json()).employeeCode);
+    } catch {
+      // Non-fatal — the field stays editable, they can type a code manually.
+    }
   };
 
   const handleAdd = () => {
@@ -121,6 +131,7 @@ export default function EmployeeManagement() {
       fullName: newFullName,
       role: newRole,
       ...(newPhone ? { phone: newPhone } : {}),
+      ...(newEmployeeCode ? { employeeCode: newEmployeeCode } : {}),
       ...(newUseOverrides ? { permissions: newOverridePerms } : {}),
     });
   };
@@ -133,6 +144,7 @@ export default function EmployeeManagement() {
       role: editRole,
       isActive: editIsActive,
       phone: editPhone || "",
+      employeeCode: editEmployeeCode || null,
     };
     if (editPassword) {
       data.password = editPassword;
@@ -147,6 +159,7 @@ export default function EmployeeManagement() {
     setEditEmail(emp.email);
     setEditRole(emp.role);
     setEditPhone(emp.phone || "");
+    setEditEmployeeCode(emp.employeeCode || "");
     setEditIsActive(emp.isActive);
     setEditPassword("");
     const hasOverrides = Array.isArray(emp.permissions) && emp.permissions.length > 0;
@@ -196,7 +209,7 @@ export default function EmployeeManagement() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">
             Employee Management
           </h1>
-          <Button onClick={() => { resetAddForm(); setAddOpen(true); }} data-testid="button-add-employee">
+          <Button onClick={async () => { await resetAddForm(); setAddOpen(true); }} data-testid="button-add-employee" type="button">
             <Plus className="w-4 h-4 mr-2" />
             Add Employee
           </Button>
@@ -216,6 +229,7 @@ export default function EmployeeManagement() {
               <Table data-testid="table-employees">
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Code</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Username</TableHead>
                     <TableHead>Email</TableHead>
@@ -227,6 +241,7 @@ export default function EmployeeManagement() {
                 <TableBody>
                   {filteredEmployees.map((emp) => (
                     <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
+                      <TableCell className="font-mono text-xs">{emp.employeeCode || "-"}</TableCell>
                       <TableCell className="font-medium">{emp.fullName}</TableCell>
                       <TableCell>{emp.username}</TableCell>
                       <TableCell>{emp.email}</TableCell>
@@ -267,6 +282,11 @@ export default function EmployeeManagement() {
               <DialogTitle>Add New Employee</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div>
+                <Label>Employee Code</Label>
+                <Input value={newEmployeeCode} onChange={(e) => setNewEmployeeCode(e.target.value)} placeholder="2026001" data-testid="input-new-employee-code" />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Auto-suggested — overwrite with an existing code when backfilling.</p>
+              </div>
               <div>
                 <Label>Full Name</Label>
                 <Input value={newFullName} onChange={(e) => setNewFullName(e.target.value)} data-testid="input-new-fullname" />
@@ -367,6 +387,10 @@ export default function EmployeeManagement() {
               <DialogTitle>Edit Employee</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div>
+                <Label>Employee Code</Label>
+                <Input value={editEmployeeCode} onChange={(e) => setEditEmployeeCode(e.target.value)} placeholder="2026001" data-testid="input-edit-employee-code" />
+              </div>
               <div>
                 <Label>Full Name</Label>
                 <Input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} data-testid="input-edit-fullname" />

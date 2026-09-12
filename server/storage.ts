@@ -56,8 +56,10 @@ export interface IStorage {
   deleteRole(id: number): Promise<boolean>;
 
   getEmployeeById(id: number): Promise<Employee | undefined>;
+  getEmployeeByCode(employeeCode: string): Promise<Employee | undefined>;
   getEmployeeByUsername(username: string): Promise<Employee | undefined>;
   getEmployees(): Promise<Employee[]>;
+  getNextEmployeeCode(): Promise<string>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: number, data: Partial<InsertEmployee>): Promise<Employee | undefined>;
   updateEmployeeLastLogin(id: number): Promise<void>;
@@ -158,6 +160,7 @@ export interface IStorage {
 
   getPayrollEmployees(filters?: { status?: string }): Promise<PayrollEmployee[]>;
   getPayrollEmployee(id: number): Promise<PayrollEmployee | undefined>;
+  getPayrollEmployeeByLoginEmployeeId(employeeId: number): Promise<PayrollEmployee | undefined>;
   createPayrollEmployee(employee: InsertPayrollEmployee): Promise<PayrollEmployee>;
   updatePayrollEmployee(id: number, data: Partial<InsertPayrollEmployee>): Promise<PayrollEmployee | undefined>;
   deletePayrollEmployee(id: number): Promise<boolean>;
@@ -363,6 +366,11 @@ export class DatabaseStorage implements IStorage {
     return employee;
   }
 
+  async getEmployeeByCode(employeeCode: string): Promise<Employee | undefined> {
+    const [employee] = await db.select().from(employees).where(eq(employees.employeeCode, employeeCode));
+    return employee;
+  }
+
   async getEmployeeByUsername(username: string): Promise<Employee | undefined> {
     const [employee] = await db.select().from(employees).where(sql`lower(${employees.username}) = lower(${username})`);
     return employee;
@@ -370,6 +378,17 @@ export class DatabaseStorage implements IStorage {
 
   async getEmployees(): Promise<Employee[]> {
     return await db.select().from(employees).orderBy(employees.createdAt);
+  }
+
+  async getNextEmployeeCode(): Promise<string> {
+    // Same shape as getNextTutorCode(): year + 3-digit sequence, e.g. 2026001.
+    // Suggested default only, editable client-side, so real historical codes
+    // can be entered verbatim during backfill.
+    const year = new Date().getFullYear();
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(employees)
+      .where(sql`employee_code LIKE ${`${year}%`}`);
+    const num = (result?.count || 0) + 1;
+    return `${year}${String(num).padStart(3, "0")}`;
   }
 
   async createEmployee(employee: InsertEmployee): Promise<Employee> {
@@ -923,6 +942,14 @@ export class DatabaseStorage implements IStorage {
 
   async getPayrollEmployee(id: number): Promise<PayrollEmployee | undefined> {
     const [employee] = await db.select().from(payrollEmployees).where(eq(payrollEmployees.id, id));
+    return employee;
+  }
+
+  async getPayrollEmployeeByLoginEmployeeId(employeeId: number): Promise<PayrollEmployee | undefined> {
+    // .limit(1) is defensive: nothing enforces loginEmployeeId uniqueness across
+    // payrollEmployees rows, so this guards against an ambiguous multi-row result
+    // if a login is ever (mistakenly) linked from more than one profile.
+    const [employee] = await db.select().from(payrollEmployees).where(eq(payrollEmployees.loginEmployeeId, employeeId)).limit(1);
     return employee;
   }
 

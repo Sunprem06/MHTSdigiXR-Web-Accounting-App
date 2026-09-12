@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/SEO";
 import { Spinner } from "@/components/ui/loading";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
+import { useAuth } from "@/hooks/use-auth";
+import type { PayrollEmployee } from "@shared/schema";
 const SYM: Record<string,string> = { INR:"₹", USD:"$", AED:"د.إ", EUR:"€", GBP:"£" };
 function Card({ label, value, color }: { label:string; value:string|number; color:string }) {
   return <div className={`rounded-2xl p-6 ${color}`}><p className="text-sm opacity-70 mb-1">{label}</p><p className="text-2xl font-bold">{value}</p></div>;
@@ -11,11 +14,27 @@ function Card({ label, value, color }: { label:string; value:string|number; colo
 const NEUTRAL_CARD = "bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-700 text-slate-900 dark:text-white";
 export default function AccountingDashboard() {
   const [, nav] = useLocation();
+  const { user } = useAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string|null>(null);
   const [currency, setCurrency] = useState("INR");
   useEffect(() => { fetch("/api/accounting/dashboard").then(r=>r.json()).then(setData).catch(()=>setError("Failed to load. Please refresh.")).finally(()=>setLoading(false)); }, []);
+
+  // Salaried staff whose payroll master profile has been linked to their login
+  // (Settings/HR → Employees (Payroll) → Self-Service Login) see their own
+  // profile here, alongside their normal accounting work — 404 just means
+  // "not linked," not an error, so it resolves to null rather than surfacing.
+  const { data: payrollProfile } = useQuery<PayrollEmployee | null>({
+    queryKey: ["/api/accounting/my-payroll-profile"],
+    queryFn: async () => {
+      const res = await fetch("/api/accounting/my-payroll-profile", { credentials: "include" });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("Failed to load payroll profile");
+      return res.json();
+    },
+    enabled: !!user && user.role !== "tutor",
+  });
   const fmt = (n: number) => `${SYM[currency]}${Number(n||0).toLocaleString("en-IN",{maximumFractionDigits:2})}`;
   return (
     <AccountingLayout>
@@ -64,6 +83,18 @@ export default function AccountingDashboard() {
               ))}
             </div>
           </div>
+          {payrollProfile && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 p-6 mt-6" data-testid="section-my-payslips">
+              <h2 className="font-semibold text-gray-800 dark:text-white mb-4">My Payslips</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div><p className="text-xs text-gray-400 dark:text-slate-500">Employee Code</p><p className="text-sm font-medium text-gray-800 dark:text-white">{payrollProfile.employeeCode}</p></div>
+                <div><p className="text-xs text-gray-400 dark:text-slate-500">Designation</p><p className="text-sm font-medium text-gray-800 dark:text-white">{payrollProfile.designation || "-"}</p></div>
+                <div><p className="text-xs text-gray-400 dark:text-slate-500">Date of Joining</p><p className="text-sm font-medium text-gray-800 dark:text-white">{payrollProfile.dateOfJoining || "-"}</p></div>
+                <div><p className="text-xs text-gray-400 dark:text-slate-500">Status</p><p className="text-sm font-medium text-gray-800 dark:text-white capitalize">{payrollProfile.status}</p></div>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-slate-400">Payslips will appear here once compensation is set up.</p>
+            </div>
+          )}
         </>}
       </div>
     </AccountingLayout>

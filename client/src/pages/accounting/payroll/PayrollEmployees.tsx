@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { useAuth } from "@/hooks/use-auth";
-import type { PayrollEmployee } from "@shared/schema";
+import type { PayrollEmployee, Employee } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,12 +19,18 @@ import { AlertTriangle, Plus, Pencil, Loader2, Trash2 } from "lucide-react";
 const emptyForm = {
   employeeCode: "", fullName: "", designation: "", dateOfJoining: "",
   panNumber: "", pfApplicable: false, esiApplicable: false, ctcAnnual: "", status: "active",
+  loginEmployeeId: "",
 };
 
 export default function PayrollEmployees() {
   const { hasPermission } = useAuth();
   const { toast } = useToast();
   const canManage = hasPermission("payroll_employees.manage");
+  // GET /api/accounting/employees requires employees.manage server-side (not
+  // employees.view) — gate on the same permission the fetch actually needs, so
+  // this dropdown never renders empty-looking for a user who can see it but
+  // whose underlying employees-list request would 403.
+  const canLinkLogin = hasPermission("employees.manage");
 
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -34,6 +40,16 @@ export default function PayrollEmployees() {
   const { data: employees, isLoading } = useQuery<PayrollEmployee[]>({
     queryKey: ["/api/accounting/payroll-employees"],
   });
+
+  const { data: loginAccounts } = useQuery<Employee[]>({
+    queryKey: ["/api/accounting/employees"],
+    enabled: canLinkLogin,
+  });
+  // Salaried staff already log in with their real functional role (Senior
+  // Accountant, Admin, etc.) — unlike tutors, there's no single dedicated role
+  // to filter on, so any active login account can be linked. Tutors are on a
+  // separate track and excluded here to avoid cross-linking the two.
+  const linkableAccounts = loginAccounts?.filter(e => e.isActive && e.role !== "tutor") || [];
 
   const createMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
@@ -72,7 +88,12 @@ export default function PayrollEmployees() {
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
-  const buildPayload = () => ({ ...form, dateOfJoining: form.dateOfJoining || null, ctcAnnual: form.ctcAnnual || null });
+  const buildPayload = () => ({
+    ...form,
+    dateOfJoining: form.dateOfJoining || null,
+    ctcAnnual: form.ctcAnnual || null,
+    loginEmployeeId: form.loginEmployeeId ? parseInt(form.loginEmployeeId) : null,
+  });
 
   const openEdit = (e: PayrollEmployee) => {
     setEditingEmployee(e);
@@ -81,6 +102,7 @@ export default function PayrollEmployees() {
       dateOfJoining: e.dateOfJoining || "", panNumber: e.panNumber || "",
       pfApplicable: e.pfApplicable, esiApplicable: e.esiApplicable,
       ctcAnnual: e.ctcAnnual || "", status: e.status,
+      loginEmployeeId: e.loginEmployeeId ? String(e.loginEmployeeId) : "",
     });
     setEditOpen(true);
   };
@@ -105,6 +127,23 @@ export default function PayrollEmployees() {
           </SelectContent>
         </Select>
       </div>
+      {canLinkLogin && (
+        <div className="sm:col-span-2">
+          <Label>Self-Service Login (optional)</Label>
+          <Select value={form.loginEmployeeId || "none"} onValueChange={v => setForm({ ...form, loginEmployeeId: v === "none" ? "" : v })}>
+            <SelectTrigger data-testid="select-pe-login"><SelectValue placeholder="Not linked" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Not linked</SelectItem>
+              {linkableAccounts.map(acc => (
+                <SelectItem key={acc.id} value={String(acc.id)}>{acc.fullName} ({acc.username})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Link this profile to the employee's existing ERP login so they see "My Payslips" on their own Dashboard once payslips exist.
+          </p>
+        </div>
+      )}
     </div>
   );
 

@@ -10,7 +10,8 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "test:local-portal": "tsx testing/start-local-test-portal.mjs",
-    "reset-admin-password": "tsx scripts/reset-admin-password.ts"
+    "reset-admin-password": "tsx scripts/reset-admin-password.ts",
+    "backfill-employee-codes": "tsx scripts/backfill-employee-codes.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
