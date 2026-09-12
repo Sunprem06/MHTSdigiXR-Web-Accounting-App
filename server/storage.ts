@@ -181,6 +181,7 @@ export interface IStorage {
   updateLeaveType(id: number, data: Partial<InsertLeaveType>): Promise<LeaveType | undefined>;
 
   getLeaveBalances(filters?: { employeeId?: number; financialYearId?: number }): Promise<LeaveBalance[]>;
+  getLeaveBalanceById(id: number): Promise<LeaveBalance | undefined>;
   getLeaveBalance(employeeId: number, leaveTypeId: number, financialYearId: number): Promise<LeaveBalance | undefined>;
   createLeaveBalance(data: InsertLeaveBalance): Promise<LeaveBalance>;
   updateLeaveBalance(id: number, data: Partial<InsertLeaveBalance>): Promise<LeaveBalance | undefined>;
@@ -1038,6 +1039,11 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(leaveBalances).where(and(...conditions));
     }
     return await db.select().from(leaveBalances);
+  }
+
+  async getLeaveBalanceById(id: number): Promise<LeaveBalance | undefined> {
+    const [balance] = await db.select().from(leaveBalances).where(eq(leaveBalances.id, id));
+    return balance;
   }
 
   async getLeaveBalance(employeeId: number, leaveTypeId: number, financialYearId: number): Promise<LeaveBalance | undefined> {

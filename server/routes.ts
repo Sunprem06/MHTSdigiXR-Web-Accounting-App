@@ -11,6 +11,7 @@ import { rateLimiter } from "./middleware/security.js";
 import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
+import { getFinancialYearPeriods, computeMonthlyAccrualCredit, computeCarryForwardOpeningBalance, computeAvailableBalance, round1 } from "./lib/leave-accrual-engine";
 
 // ── Tutor payslip calculation — Sec 194J (KoodaldigiXS Learning independent contractors) ──
 // Matches Clause 4.1-4.4 of the signed Individual Tutor Agreement (verified against real
@@ -1705,6 +1706,183 @@ export async function registerRoutes(
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "activate", entity: "financial_year",
       entityId: updated.id, details: `Activated financial year: ${updated.name}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  // Leave Management
+  app.get("/api/accounting/leave-types", requireAuth, requirePermission("leave.view_own"), async (req, res) => {
+    // Admins configuring leave (leave.manage) can see inactive types too; everyone
+    // else (applying for their own leave) only needs the active ones.
+    const includeInactive = req.query.all === "true" && (req.user!.permissions || []).includes("leave.manage");
+    const types = await storage.getLeaveTypes(!includeInactive);
+    res.json(types);
+  });
+
+  app.post("/api/accounting/leave-types", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    if (await storage.getLeaveTypeByCode(req.body.code)) {
+      return res.status(400).json({ message: `Leave type code "${req.body.code}" is already in use` });
+    }
+    const type = await storage.createLeaveType(req.body);
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "leave_type",
+      entityId: type.id, details: `Created leave type: ${type.name} (${type.code})`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(type);
+  });
+
+  app.patch("/api/accounting/leave-types/:id", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const updated = await storage.updateLeaveType(id, req.body);
+    if (!updated) return res.status(404).json({ message: "Leave type not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "leave_type",
+      entityId: id, details: `Updated leave type: ${updated.name}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.get("/api/accounting/leave-balances/mine", requireAuth, requirePermission("leave.view_own"), async (req, res) => {
+    const activeFy = await storage.getActiveFinancialYear();
+    if (!activeFy) return res.json([]);
+    const [balances, types] = await Promise.all([
+      storage.getLeaveBalances({ employeeId: req.user!.id, financialYearId: activeFy.id }),
+      storage.getLeaveTypes(true),
+    ]);
+    const typeById = new Map(types.map(t => [t.id, t]));
+    res.json(balances.map(b => {
+      const type = typeById.get(b.leaveTypeId);
+      const opening = parseFloat(b.openingBalance);
+      const accrued = parseFloat(b.accruedYtd);
+      const adjustment = parseFloat(b.adjustmentYtd);
+      const used = parseFloat(b.usedYtd);
+      return {
+        ...b,
+        leaveTypeCode: type?.code, leaveTypeName: type?.name, isPaid: type?.isPaid,
+        availableBalance: type?.annualEntitlementDays === null ? null : computeAvailableBalance({ openingBalance: opening, accruedYtd: accrued, adjustmentYtd: adjustment, usedYtd: used }),
+      };
+    }));
+  });
+
+  app.get("/api/accounting/leave-balances", requireAuth, requirePermission("leave.view"), async (req, res) => {
+    const employeeId = req.query.employeeId ? parseInt(req.query.employeeId as string) : undefined;
+    const financialYearId = req.query.financialYearId ? parseInt(req.query.financialYearId as string) : undefined;
+    const balances = await storage.getLeaveBalances({ employeeId, financialYearId });
+    res.json(balances);
+  });
+
+  // Ensures every active, non-tutor employee has a leave_balances row for every
+  // active leave type in the active financial year — safe to re-run (skips rows
+  // that already exist). Annual-frequency types are granted in full immediately;
+  // monthly-frequency types start at 0 and build up via run-monthly-accrual.
+  app.post("/api/accounting/leave-balances/initialize", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    const activeFy = await storage.getActiveFinancialYear();
+    if (!activeFy) return res.status(400).json({ message: "No active financial year is set" });
+    const [allEmployees, types, previousFys] = await Promise.all([
+      storage.getEmployees(),
+      storage.getLeaveTypes(true),
+      storage.getFinancialYears(),
+    ]);
+    const eligibleEmployees = allEmployees.filter(e => e.isActive && e.role !== "tutor");
+    // Leave applies to salaried staff only — the immediately preceding FY (by end
+    // date) is used to carry forward a closing balance, if one was tracked.
+    const priorFy = previousFys
+      .filter(f => f.id !== activeFy.id && f.endDate < activeFy.startDate)
+      .sort((a, b) => (a.endDate < b.endDate ? 1 : -1))[0];
+
+    let created = 0;
+    for (const employee of eligibleEmployees) {
+      for (const type of types) {
+        const existing = await storage.getLeaveBalance(employee.id, type.id, activeFy.id);
+        if (existing) continue;
+
+        let openingBalance = 0;
+        if (priorFy) {
+          const priorBalance = await storage.getLeaveBalance(employee.id, type.id, priorFy.id);
+          if (priorBalance) {
+            const priorClosing = computeAvailableBalance({
+              openingBalance: parseFloat(priorBalance.openingBalance),
+              accruedYtd: parseFloat(priorBalance.accruedYtd),
+              adjustmentYtd: parseFloat(priorBalance.adjustmentYtd),
+              usedYtd: parseFloat(priorBalance.usedYtd),
+            });
+            openingBalance = computeCarryForwardOpeningBalance({
+              priorClosingBalance: priorClosing,
+              carryForwardCap: type.carryForwardCap === null ? null : parseFloat(type.carryForwardCap),
+            });
+          }
+        }
+
+        const annualEntitlement = type.annualEntitlementDays === null ? 0 : parseFloat(type.annualEntitlementDays);
+        const accruedYtd = type.accrualFrequency === "annual" ? annualEntitlement : 0;
+
+        await storage.createLeaveBalance({
+          employeeId: employee.id, leaveTypeId: type.id, financialYearId: activeFy.id,
+          openingBalance: String(openingBalance), accruedYtd: String(accruedYtd), usedYtd: "0", adjustmentYtd: "0",
+          lastAccrualPeriod: null,
+        });
+        created += 1;
+      }
+    }
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "initialize", entity: "leave_balance",
+      entityId: activeFy.id, details: `Initialized ${created} leave balance row(s) for ${activeFy.name}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ financialYear: activeFy.name, created });
+  });
+
+  // Credits monthly-accrual leave types (e.g. Earned Leave) up through the
+  // current calendar month. Idempotent — re-running mid-month credits nothing
+  // more until the next month starts.
+  app.post("/api/accounting/leave-balances/run-monthly-accrual", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    const activeFy = await storage.getActiveFinancialYear();
+    if (!activeFy) return res.status(400).json({ message: "No active financial year is set" });
+    const types = await storage.getLeaveTypes(true);
+    const monthlyTypeIds = new Set(types.filter(t => t.accrualFrequency === "monthly").map(t => t.id));
+    if (monthlyTypeIds.size === 0) return res.json({ updated: 0 });
+
+    const fyPeriods = getFinancialYearPeriods(activeFy.startDate, activeFy.endDate);
+    const throughPeriod = new Date().toISOString().slice(0, 7);
+    const typeById = new Map(types.map(t => [t.id, t]));
+    const balances = await storage.getLeaveBalances({ financialYearId: activeFy.id });
+
+    let updated = 0;
+    for (const balance of balances) {
+      if (!monthlyTypeIds.has(balance.leaveTypeId)) continue;
+      const type = typeById.get(balance.leaveTypeId)!;
+      const result = computeMonthlyAccrualCredit({
+        annualEntitlementDays: parseFloat(type.annualEntitlementDays || "0"),
+        fyPeriods, lastAccrualPeriod: balance.lastAccrualPeriod, throughPeriod,
+      });
+      if (result.periodsCredited === 0) continue;
+      await storage.updateLeaveBalance(balance.id, {
+        accruedYtd: String(round1(parseFloat(balance.accruedYtd) + result.creditAmount)),
+        lastAccrualPeriod: result.newLastAccrualPeriod,
+      });
+      updated += 1;
+    }
+    res.json({ updated });
+  });
+
+  app.patch("/api/accounting/leave-balances/:id/adjust", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const amount = parseFloat(req.body.amount);
+    const reason = (req.body.reason || "").trim();
+    if (!Number.isFinite(amount) || amount === 0) return res.status(400).json({ message: "A non-zero adjustment amount is required" });
+    if (!reason) return res.status(400).json({ message: "A reason is required for a manual balance adjustment" });
+    const existing = await storage.getLeaveBalanceById(id);
+    if (!existing) return res.status(404).json({ message: "Leave balance not found" });
+    const updated = await storage.updateLeaveBalance(id, {
+      adjustmentYtd: String(round1(parseFloat(existing.adjustmentYtd) + amount)),
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "adjust", entity: "leave_balance",
+      entityId: id, details: `Adjusted leave balance by ${amount} day(s): ${reason}`,
       ipAddress: req.ip || null,
     });
     res.json(updated);
