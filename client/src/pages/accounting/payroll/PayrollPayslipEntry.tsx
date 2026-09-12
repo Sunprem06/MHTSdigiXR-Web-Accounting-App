@@ -30,6 +30,72 @@ function monthLabelToInput(label: string): string {
   return `${match[2]}-${String(idx + 1).padStart(2, "0")}`;
 }
 
+function parsePayMonthToDate(payMonth: string): string | null {
+  const match = payMonth.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (!match) return null;
+  const idx = MONTH_NAMES.findIndex(m => m.toLowerCase() === match[1].toLowerCase());
+  if (idx === -1) return null;
+  return `${match[2]}-${String(idx + 1).padStart(2, "0")}-01`;
+}
+
+type FinancialYearLite = { startDate: string; endDate: string };
+
+// Mirrors computeIncomeTaxOnAnnualIncome + computeIncomeTaxForPayslip in
+// server/routes.ts — preview only, the server always recomputes authoritatively.
+function computeIncomeTaxPreview(input: {
+  payMonthInput: string; currentMonthGrossEarnings: number; fullMonthlyGrossRate: number;
+  config: PayrollStatutoryConfig; financialYears: FinancialYearLite[] | undefined;
+  otherPayslipsForEmployee: PayrollPayslip[] | undefined; excludePayslipId: number | null;
+}): { error?: string; annualProjectedGross: number; annualTaxableIncome: number; annualTaxPayable: number; tdsThisMonth: number; tdsDeductedTillDate: number } {
+  const zero = { annualProjectedGross: 0, annualTaxableIncome: 0, annualTaxPayable: 0, tdsThisMonth: 0, tdsDeductedTillDate: 0 };
+  if (!input.payMonthInput) return zero;
+  const asOfDate = `${input.payMonthInput}-01`;
+  const fy = input.financialYears?.find(f => asOfDate >= f.startDate && asOfDate <= f.endDate);
+  if (!fy) return { ...zero, error: "No financial year is configured covering this month" };
+
+  const priorInFy = (input.otherPayslipsForEmployee || []).filter(p => {
+    if (p.id === input.excludePayslipId || p.status === "rejected") return false;
+    const d = parsePayMonthToDate(p.payMonth);
+    return !!d && d >= fy.startDate && d <= fy.endDate && d < asOfDate;
+  });
+  const grossSoFar = priorInFy.reduce((sum, p) => sum + parseFloat(p.grossEarnings), 0);
+  const tdsSoFar = priorInFy.reduce((sum, p) => sum + parseFloat(p.tdsThisMonth || "0"), 0);
+
+  const [asOfYear, asOfMonth] = asOfDate.split("-").map(Number);
+  const [endYear, endMonth] = fy.endDate.split("-").map(Number);
+  const remainingMonths = (endYear * 12 + endMonth) - (asOfYear * 12 + asOfMonth) + 1;
+  if (remainingMonths <= 0) return zero;
+  const futureMonthsCount = remainingMonths - 1;
+
+  const annualProjectedGross = Math.round(grossSoFar + input.currentMonthGrossEarnings + futureMonthsCount * input.fullMonthlyGrossRate);
+  const annualTaxableIncome = Math.max(0, annualProjectedGross - input.config.incomeTaxStandardDeduction);
+
+  let tax = 0, lowerBound = 0;
+  for (const slab of input.config.incomeTaxSlabs) {
+    const upperBound = slab.upTo ?? Infinity;
+    if (annualTaxableIncome > lowerBound) {
+      tax += (Math.min(annualTaxableIncome, upperBound) - lowerBound) * (slab.ratePercent / 100);
+    }
+    lowerBound = upperBound;
+    if (annualTaxableIncome <= upperBound) break;
+  }
+  tax = Math.round(tax);
+  let taxAfterRebate = tax;
+  if (annualTaxableIncome <= input.config.incomeTaxRebateThreshold) {
+    taxAfterRebate = Math.max(0, tax - Math.min(tax, input.config.incomeTaxRebateCap));
+  } else {
+    const excess = annualTaxableIncome - input.config.incomeTaxRebateThreshold;
+    if (tax > excess) taxAfterRebate = excess;
+  }
+  const cess = Math.round(taxAfterRebate * (input.config.incomeTaxCessPercent / 100));
+  const annualTaxPayable = taxAfterRebate + cess;
+
+  const remainingTaxLiability = Math.max(0, annualTaxPayable - tdsSoFar);
+  const tdsThisMonth = Math.round(remainingTaxLiability / remainingMonths);
+
+  return { annualProjectedGross, annualTaxableIncome, annualTaxPayable, tdsThisMonth, tdsDeductedTillDate: tdsSoFar + tdsThisMonth };
+}
+
 // Finds the compensation structure effective as of the first day of the selected
 // pay month — the same "latest effectiveFrom <= asOfDate" rule the server uses.
 function resolveStructure(structures: PayrollCompensationStructure[] | undefined, payMonthInput: string): PayrollCompensationStructure | undefined {
@@ -77,10 +143,7 @@ function computePreview(input: {
     esiEmployeeAmount = esiApplied ? Math.round(grossEarnings * (input.config.esiEmployeeRatePercent / 100)) : 0;
   }
 
-  const totalDeductions = professionalTax + pfEmployeeAmount + esiEmployeeAmount;
-  const netPay = Math.max(0, grossEarnings - totalDeductions);
-
-  return { basicEarned, hraEarned, conveyanceEarned, medicalEarned, otherAllowancesEarned, grossEarnings, professionalTax, pfApplied, pfEmployeeAmount, esiApplied, esiEmployeeAmount, netPay };
+  return { basicEarned, hraEarned, conveyanceEarned, medicalEarned, otherAllowancesEarned, grossEarnings, professionalTax, pfApplied, pfEmployeeAmount, esiApplied, esiEmployeeAmount };
 }
 
 export default function PayrollPayslipEntry() {
@@ -101,6 +164,7 @@ export default function PayrollPayslipEntry() {
     queryKey: ["/api/accounting/payroll-statutory-config/active"],
     retry: false,
   });
+  const { data: financialYears } = useQuery<FinancialYearLite[]>({ queryKey: ["/api/accounting/financial-years"] });
 
   const [employeeId, setEmployeeId] = useState(preselectedEmployeeId || "");
   const [payMonthInput, setPayMonthInput] = useState(() => {
@@ -118,6 +182,16 @@ export default function PayrollPayslipEntry() {
     queryKey: ["/api/accounting/payroll-compensation-structures", { payrollEmployeeId: employeeId }],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/accounting/payroll-compensation-structures?payrollEmployeeId=${employeeId}`);
+      return res.json();
+    },
+    enabled: !!employeeId,
+  });
+  // For the Sec 192 TDS worksheet — this employee's other payslips already in the
+  // financial year, to sum "gross/TDS so far" the same way the server does.
+  const { data: employeePayslips } = useQuery<PayrollPayslip[]>({
+    queryKey: ["/api/accounting/payroll-payslips", { payrollEmployeeId: employeeId }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/accounting/payroll-payslips?payrollEmployeeId=${employeeId}`);
       return res.json();
     },
     enabled: !!employeeId,
@@ -148,7 +222,7 @@ export default function PayrollPayslipEntry() {
     }
   }, [existing, isEditMode, loaded]);
 
-  const preview = useMemo(() => computePreview({
+  const earningsPreview = useMemo(() => computePreview({
     structure: applicableStructure,
     standardWorkingDays: parseFloat(standardWorkingDays) || 0,
     lopDays: parseFloat(lopDays) || 0,
@@ -159,7 +233,38 @@ export default function PayrollPayslipEntry() {
     config,
   }), [applicableStructure, standardWorkingDays, lopDays, professionalTax, payslipFormat, selectedEmployee, config]);
 
-  const needsConfig = payslipFormat === "with_pf_esi" && !activeConfig;
+  // Full (non-LOP-prorated) monthly rate, for projecting the FY's remaining months —
+  // mirrors fullMonthlyGrossRate in server/routes.ts.
+  const fullMonthlyGrossRate = useMemo(() => computePreview({
+    structure: applicableStructure,
+    standardWorkingDays: parseFloat(standardWorkingDays) || 0,
+    lopDays: 0,
+    professionalTax: 0,
+    payslipFormat: "no_pf_esi",
+    pfApplicable: false, esiApplicable: false, config,
+  }).grossEarnings, [applicableStructure, standardWorkingDays, config]);
+
+  const taxPreview = useMemo(() => computeIncomeTaxPreview({
+    payMonthInput,
+    currentMonthGrossEarnings: earningsPreview.grossEarnings,
+    fullMonthlyGrossRate,
+    config,
+    financialYears,
+    otherPayslipsForEmployee: employeePayslips,
+    excludePayslipId: editId,
+  }), [payMonthInput, earningsPreview.grossEarnings, fullMonthlyGrossRate, config, financialYears, employeePayslips, editId]);
+
+  const preview = {
+    ...earningsPreview,
+    ...taxPreview,
+    totalDeductions: earningsPreview.professionalTax + earningsPreview.pfEmployeeAmount + earningsPreview.esiEmployeeAmount + taxPreview.tdsThisMonth,
+    netPay: Math.max(0, earningsPreview.grossEarnings - (earningsPreview.professionalTax + earningsPreview.pfEmployeeAmount + earningsPreview.esiEmployeeAmount + taxPreview.tdsThisMonth)),
+  };
+
+  // Every payslip now needs an active statutory config — it also carries the Sec 192
+  // tax slab settings used regardless of payslipFormat, not just PF/ESI.
+  const needsConfig = !activeConfig;
+  const needsFinancialYear = !!taxPreview.error;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -240,6 +345,9 @@ export default function PayrollPayslipEntry() {
                 No statutory configuration is active — set one up in Payroll → Statutory Config first.
               </p>
             )}
+            {!needsConfig && needsFinancialYear && (
+              <p className="sm:col-span-2 text-xs text-red-600">{taxPreview.error} — set one up in Settings → Financial Years first.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -260,6 +368,20 @@ export default function PayrollPayslipEntry() {
                 <Input type="number" min="0" value={professionalTax} onChange={e => setProfessionalTax(e.target.value)} data-testid="input-professional-tax" />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Entered manually per payslip, per the Tamil Nadu PT half-yearly slab — not auto-calculated.</p>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {applicableStructure && !needsConfig && !needsFinancialYear && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Income Tax Worksheet — Sec 192 TDS (New Regime)</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">Annual Projected Gross</span><span data-testid="text-annual-gross">₹{preview.annualProjectedGross.toLocaleString("en-IN")}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Standard Deduction</span><span>-₹{config.incomeTaxStandardDeduction.toLocaleString("en-IN")}</span></div>
+              <div className="flex justify-between sm:col-span-2 font-medium border-t border-slate-200 dark:border-slate-700 pt-1"><span>Annual Taxable Income</span><span data-testid="text-annual-taxable">₹{preview.annualTaxableIncome.toLocaleString("en-IN")}</span></div>
+              <div className="flex justify-between sm:col-span-2"><span className="text-slate-500">Annual Tax Payable (after rebate + cess)</span><span data-testid="text-annual-tax">₹{preview.annualTaxPayable.toLocaleString("en-IN")}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">TDS Deducted Till Date (this FY)</span><span>₹{preview.tdsDeductedTillDate.toLocaleString("en-IN")}</span></div>
+              <div className="flex justify-between font-medium"><span>TDS This Month</span><span data-testid="text-tds-this-month">₹{preview.tdsThisMonth.toLocaleString("en-IN")}</span></div>
             </CardContent>
           </Card>
         )}
@@ -286,6 +408,9 @@ export default function PayrollPayslipEntry() {
                   </div>
                 </>
               )}
+              {!needsConfig && !needsFinancialYear && (
+                <div className="flex justify-between text-sm text-red-600"><span>TDS (Sec 192)</span><span data-testid="text-preview-tds">-₹{preview.tdsThisMonth.toLocaleString("en-IN")}</span></div>
+              )}
               <div className="flex justify-between text-base font-bold pt-2 border-t border-sky-200 dark:border-sky-800"><span>Net Pay</span><span data-testid="text-preview-net-pay">₹{preview.netPay.toLocaleString("en-IN")}</span></div>
             </CardContent>
           </Card>
@@ -295,7 +420,7 @@ export default function PayrollPayslipEntry() {
           <Button variant="outline" onClick={() => setLocation("/accounting/payroll/payslips")}>Cancel</Button>
           <Button
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending || !employeeId || !payMonthInput || !applicableStructure || needsConfig}
+            disabled={saveMutation.isPending || !employeeId || !payMonthInput || !applicableStructure || needsConfig || needsFinancialYear}
             data-testid="button-save-payslip"
           >
             {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}

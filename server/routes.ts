@@ -187,6 +187,93 @@ function computePayrollPayslipWithPfEsi(input: {
   };
 }
 
+// ── Sec 192 TDS (New Tax Regime only) ──
+// Applies to every payslip regardless of payslipFormat — PF/ESI applicability
+// is a separate axis. Verified against a real payslip's worked example: Gross
+// ₹7,42,295 − ₹75,000 standard deduction = Taxable ₹6,67,300; tax = 5% ×
+// (6,67,300 − 4,00,000) = ₹13,365 exactly, fully cancelled by the Sec 87A
+// rebate (taxable ≤ ₹12,00,000) → Net Tax ₹0. Confirmed via web search
+// (Sep 2026) that Budget 2026 made no change to these New Regime numbers for
+// FY 2026-27. Old Regime (investment declarations, HRA/80C exemptions) is
+// deliberately not built — no reference material for it, and it needs its
+// own declaration workflow. Surcharge (only above ₹50L income) is out of
+// scope — not applicable at this business's pay scale.
+function computeIncomeTaxOnAnnualIncome(taxableIncome: number, config: PayrollStatutoryConfig): { taxBeforeRebate: number; rebate: number; taxAfterRebate: number; cess: number; totalTax: number } {
+  let tax = 0;
+  let lowerBound = 0;
+  for (const slab of config.incomeTaxSlabs) {
+    const upperBound = slab.upTo ?? Infinity;
+    if (taxableIncome > lowerBound) {
+      tax += (Math.min(taxableIncome, upperBound) - lowerBound) * (slab.ratePercent / 100);
+    }
+    lowerBound = upperBound;
+    if (taxableIncome <= upperBound) break;
+  }
+  tax = Math.round(tax);
+
+  // Sec 87A: full rebate (net tax zero) at/below the threshold; a marginal-relief
+  // band just above it caps tax at the amount of income exceeding the threshold,
+  // so crossing the threshold by a small amount never costs more tax than the excess.
+  let rebate = 0;
+  let taxAfterRebate = tax;
+  if (taxableIncome <= config.incomeTaxRebateThreshold) {
+    rebate = Math.min(tax, config.incomeTaxRebateCap);
+    taxAfterRebate = Math.max(0, tax - rebate);
+  } else {
+    const excessOverThreshold = taxableIncome - config.incomeTaxRebateThreshold;
+    if (tax > excessOverThreshold) {
+      rebate = tax - excessOverThreshold;
+      taxAfterRebate = excessOverThreshold;
+    }
+  }
+  const cess = Math.round(taxAfterRebate * (config.incomeTaxCessPercent / 100));
+  return { taxBeforeRebate: tax, rebate, taxAfterRebate, cess, totalTax: taxAfterRebate + cess };
+}
+
+// Projects this employee's annual salary for the financial year containing payMonth
+// (actual gross from their OTHER payslips already in that FY + this month's actual
+// gross + remaining months projected at the current full monthly rate, i.e. without
+// this month's own LOP proration — future months are assumed full attendance), then
+// spreads the remaining annual tax liability evenly across the remaining months.
+// Past payslips' frozen numbers are read-only inputs here — never rewritten.
+async function computeIncomeTaxForPayslip(input: {
+  payrollEmployeeId: number; payMonth: string;
+  currentMonthGrossEarnings: number; fullMonthlyGrossRate: number;
+  config: PayrollStatutoryConfig; excludePayslipId?: number;
+}): Promise<{ error: string; data?: undefined } | { error?: undefined; data: { annualProjectedGross: number; annualTaxableIncome: number; annualTaxPayable: number; tdsDeductedTillDate: number; tdsThisMonth: number } }> {
+  const asOfDate = parsePayMonthToDate(input.payMonth);
+  if (!asOfDate) return { error: "Invalid Pay Month" };
+
+  const financialYears = await storage.getFinancialYears();
+  const fy = financialYears.find(f => asOfDate >= f.startDate && asOfDate <= f.endDate);
+  if (!fy) return { error: `No financial year is configured covering ${input.payMonth} — set one up in Settings → Financial Years first` };
+
+  const allPayslips = await storage.getPayrollPayslips({ payrollEmployeeId: input.payrollEmployeeId });
+  const priorInFy = allPayslips.filter(p => {
+    if (p.id === input.excludePayslipId || p.status === "rejected") return false;
+    const d = parsePayMonthToDate(p.payMonth);
+    return !!d && d >= fy.startDate && d <= fy.endDate && d < asOfDate;
+  });
+  const grossSoFar = priorInFy.reduce((sum, p) => sum + parseFloat(p.grossEarnings), 0);
+  const tdsSoFar = priorInFy.reduce((sum, p) => sum + parseFloat(p.tdsThisMonth || "0"), 0);
+
+  const [asOfYear, asOfMonth] = asOfDate.split("-").map(Number);
+  const [endYear, endMonth] = fy.endDate.split("-").map(Number);
+  const remainingMonths = (endYear * 12 + endMonth) - (asOfYear * 12 + asOfMonth) + 1;
+  if (remainingMonths <= 0) return { error: "Pay Month falls outside its financial year" };
+  const futureMonthsCount = remainingMonths - 1;
+
+  const annualProjectedGross = Math.round(grossSoFar + input.currentMonthGrossEarnings + futureMonthsCount * input.fullMonthlyGrossRate);
+  const annualTaxableIncome = Math.max(0, annualProjectedGross - input.config.incomeTaxStandardDeduction);
+  const { totalTax: annualTaxPayable } = computeIncomeTaxOnAnnualIncome(annualTaxableIncome, input.config);
+
+  const remainingTaxLiability = Math.max(0, annualTaxPayable - tdsSoFar);
+  const tdsThisMonth = Math.round(remainingTaxLiability / remainingMonths);
+  const tdsDeductedTillDate = tdsSoFar + tdsThisMonth;
+
+  return { data: { annualProjectedGross, annualTaxableIncome, annualTaxPayable, tdsDeductedTillDate, tdsThisMonth } };
+}
+
 // A voucher's date must fall within SOME configured Financial Year — not
 // specifically the currently active one. Backdating/catching up entries into a
 // prior year (e.g. FY 2025-26 while FY 2026-27 is active) is normal accounting
@@ -1838,7 +1925,9 @@ export async function registerRoutes(
     res.json({ message: "Deleted successfully" });
   });
 
-  // Payroll: Payslips — both formats
+  // Payroll: Payslips — both formats. Sec 192 TDS applies to both alike (see
+  // computeIncomeTaxForPayslip above) — an active statutory config is now required
+  // for ANY payslip, not just With-PF/ESI, since it also carries the tax slab settings.
   type PayrollPayslipComputedFields = {
     compensationStructureId: number;
     statutoryConfigVersionId: number | null;
@@ -1851,15 +1940,21 @@ export async function registerRoutes(
     professionalTax: string;
     pfApplied: boolean; pfEmployeeAmount: string; pfEmployerAmount: string;
     esiApplied: boolean; esiEmployeeAmount: string; esiEmployerAmount: string;
+    annualProjectedGross: string; annualTaxableIncome: string; annualTaxPayable: string;
+    tdsDeductedTillDate: string; tdsThisMonth: string;
     totalDeductions: string;
     netPay: string;
   };
-  async function buildPayrollPayslipData(employee: PayrollEmployee, body: any): Promise<{ error: string; data?: undefined } | { error?: undefined; data: PayrollPayslipComputedFields }> {
+  async function buildPayrollPayslipData(employee: PayrollEmployee, body: any, excludePayslipId?: number): Promise<{ error: string; data?: undefined } | { error?: undefined; data: PayrollPayslipComputedFields }> {
     if (!body.payMonth) return { error: "Pay Month is required" };
     const asOfDate = parsePayMonthToDate(body.payMonth);
     if (!asOfDate) return { error: "Invalid Pay Month" };
     const structure = await storage.getCurrentPayrollCompensationStructure(employee.id, asOfDate);
     if (!structure) return { error: `No compensation structure is effective for ${body.payMonth} — set one up first` };
+
+    const configVersion = await storage.getActivePayrollStatutoryConfigVersion();
+    if (!configVersion) return { error: "No statutory configuration is active — set one up in Payroll → Statutory Config first" };
+    const config = { ...DEFAULT_PAYROLL_STATUTORY_CONFIG, ...(configVersion.config as Partial<PayrollStatutoryConfig>) };
 
     const standardWorkingDays = parseInt(body.standardWorkingDays) || 26;
     const lopDays = parseFloat(body.lopDays) || 0;
@@ -1871,40 +1966,29 @@ export async function registerRoutes(
         ? body.payslipFormat
         : (employee.pfApplicable || employee.esiApplicable ? "with_pf_esi" : "no_pf_esi");
 
-    const earningsInput = {
+    const structureAnnuals = {
       basicAnnual: parseFloat(structure.basicAnnual), hraAnnual: parseFloat(structure.hraAnnual),
       conveyanceAnnual: parseFloat(structure.conveyanceAnnual), medicalAnnual: parseFloat(structure.medicalAnnual),
       otherAllowancesAnnual: parseFloat(structure.otherAllowancesAnnual),
-      standardWorkingDays, lopDays,
     };
+    const earningsInput = { ...structureAnnuals, standardWorkingDays, lopDays };
 
-    if (payslipFormat === "no_pf_esi") {
-      const computed = computePayrollPayslipNoPfEsi({ ...earningsInput, professionalTax });
-      return {
-        data: {
-          compensationStructureId: structure.id, statutoryConfigVersionId: null,
-          payMonth: body.payMonth, payslipFormat,
-          standardWorkingDays, lopDays: String(lopDays),
-          basicEarned: String(computed.basicEarned), hraEarned: String(computed.hraEarned),
-          conveyanceEarned: String(computed.conveyanceEarned), medicalEarned: String(computed.medicalEarned),
-          otherAllowancesEarned: String(computed.otherAllowancesEarned),
-          grossEarnings: String(computed.grossEarnings),
-          professionalTax: String(computed.professionalTax),
-          pfApplied: false, pfEmployeeAmount: "0", pfEmployerAmount: "0",
-          esiApplied: false, esiEmployeeAmount: "0", esiEmployerAmount: "0",
-          totalDeductions: String(computed.totalDeductions),
-          netPay: String(computed.netPay),
-        },
-      };
-    }
+    const computed = payslipFormat === "no_pf_esi"
+      ? { ...computePayrollPayslipNoPfEsi({ ...earningsInput, professionalTax }), pfApplied: false, pfEmployeeAmount: 0, pfEmployerAmount: 0, esiApplied: false, esiEmployeeAmount: 0, esiEmployerAmount: 0 }
+      : computePayrollPayslipWithPfEsi({ ...earningsInput, professionalTax, pfApplicable: employee.pfApplicable, esiApplicable: employee.esiApplicable, config });
 
-    const configVersion = await storage.getActivePayrollStatutoryConfigVersion();
-    if (!configVersion) return { error: "No statutory configuration is active — set one up in Payroll → Statutory Config first" };
-    const config = { ...DEFAULT_PAYROLL_STATUTORY_CONFIG, ...(configVersion.config as Partial<PayrollStatutoryConfig>) };
-    const computed = computePayrollPayslipWithPfEsi({
-      ...earningsInput, professionalTax,
-      pfApplicable: employee.pfApplicable, esiApplicable: employee.esiApplicable, config,
+    // Full (non-LOP-prorated) monthly rate, for projecting the FY's remaining months.
+    const fullMonthlyGrossRate = computeProRatedEarnings({ ...structureAnnuals, standardWorkingDays, lopDays: 0 }).grossEarnings;
+    const taxResult = await computeIncomeTaxForPayslip({
+      payrollEmployeeId: employee.id, payMonth: body.payMonth,
+      currentMonthGrossEarnings: computed.grossEarnings, fullMonthlyGrossRate, config, excludePayslipId,
     });
+    if (taxResult.error) return { error: taxResult.error };
+    const tax = taxResult.data!;
+
+    const totalDeductions = computed.totalDeductions + tax.tdsThisMonth;
+    const netPay = Math.max(0, computed.grossEarnings - totalDeductions);
+
     return {
       data: {
         compensationStructureId: structure.id, statutoryConfigVersionId: configVersion.id,
@@ -1917,8 +2001,10 @@ export async function registerRoutes(
         professionalTax: String(computed.professionalTax),
         pfApplied: computed.pfApplied, pfEmployeeAmount: String(computed.pfEmployeeAmount), pfEmployerAmount: String(computed.pfEmployerAmount),
         esiApplied: computed.esiApplied, esiEmployeeAmount: String(computed.esiEmployeeAmount), esiEmployerAmount: String(computed.esiEmployerAmount),
-        totalDeductions: String(computed.totalDeductions),
-        netPay: String(computed.netPay),
+        annualProjectedGross: String(tax.annualProjectedGross), annualTaxableIncome: String(tax.annualTaxableIncome), annualTaxPayable: String(tax.annualTaxPayable),
+        tdsDeductedTillDate: String(tax.tdsDeductedTillDate), tdsThisMonth: String(tax.tdsThisMonth),
+        totalDeductions: String(totalDeductions),
+        netPay: String(netPay),
       },
     };
   }
@@ -1983,7 +2069,7 @@ export async function registerRoutes(
       }
     }
 
-    const built = await buildPayrollPayslipData(employee, mergedBody);
+    const built = await buildPayrollPayslipData(employee, mergedBody, id);
     if (built.error) return res.status(400).json({ message: built.error });
 
     const updated = await storage.updatePayrollPayslip(id, {
@@ -2081,6 +2167,7 @@ export async function registerRoutes(
     const bankLedger = ledgerAccounts.find(a => a.name === "Bank Account");
     const pfLedger = ledgerAccounts.find(a => a.name === "PF Payable");
     const esiLedger = ledgerAccounts.find(a => a.name === "ESI Payable");
+    const tdsLedger = ledgerAccounts.find(a => a.name === "TDS Payable");
     if (!salaryLedger || !ptLedger || !bankLedger) {
       return res.status(500).json({ message: "Required ledger accounts are missing — contact an administrator" });
     }
@@ -2089,6 +2176,7 @@ export async function registerRoutes(
     const pt = parseFloat(payslip.professionalTax);
     const pfEmployee = parseFloat(payslip.pfEmployeeAmount || "0");
     const esiEmployee = parseFloat(payslip.esiEmployeeAmount || "0");
+    const tds = parseFloat(payslip.tdsThisMonth || "0");
     const net = parseFloat(payslip.netPay);
 
     // voucherId is a placeholder — storage.createVoucher() overwrites it with the
@@ -2110,6 +2198,10 @@ export async function registerRoutes(
     if (esiEmployee > 0) {
       if (!esiLedger) return res.status(500).json({ message: "ESI Payable ledger account is missing — contact an administrator" });
       entries.push({ ledgerAccountId: esiLedger.id, voucherId: 0, debit: "0", credit: String(esiEmployee) });
+    }
+    if (tds > 0) {
+      if (!tdsLedger) return res.status(500).json({ message: "TDS Payable ledger account is missing — contact an administrator" });
+      entries.push({ ledgerAccountId: tdsLedger.id, voucherId: 0, debit: "0", credit: String(tds) });
     }
 
     const voucherNumber = await storage.getNextVoucherNumber("payment");

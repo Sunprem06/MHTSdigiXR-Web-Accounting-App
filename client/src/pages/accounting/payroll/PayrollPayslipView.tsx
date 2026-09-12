@@ -119,10 +119,12 @@ export default function PayrollPayslipView() {
                       { label: "Medical Allowance", amount: parseFloat(payslip.medicalEarned) },
                       { label: "Other Allowances", amount: parseFloat(payslip.otherAllowancesEarned) },
                     ];
+                    const tdsThisMonth = parseFloat(payslip.tdsThisMonth || "0");
                     const deductionRows = [
                       { label: "Professional Tax", amount: pt, testId: "text-professional-tax" },
                       ...(payslip.pfApplied ? [{ label: "Provident Fund (Employee)", amount: parseFloat(payslip.pfEmployeeAmount), testId: "text-pf-employee" }] : []),
                       ...(payslip.esiApplied ? [{ label: "ESI (Employee)", amount: parseFloat(payslip.esiEmployeeAmount), testId: "text-esi-employee" }] : []),
+                      ...(tdsThisMonth > 0 ? [{ label: "TDS (Sec 192)", amount: tdsThisMonth, testId: "text-tds-this-month" }] : []),
                     ];
                     const rowCount = Math.max(earningsRows.length, deductionRows.length);
                     return Array.from({ length: rowCount }).map((_, i) => (
@@ -144,6 +146,16 @@ export default function PayrollPayslipView() {
               </table>
             </div>
 
+            <div className="border border-slate-200 dark:border-slate-700 rounded overflow-hidden">
+              <div className="bg-slate-100 dark:bg-slate-800 px-3 py-2 text-sm font-semibold">Income Tax Worksheet — Sec 192 TDS (New Regime)</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm p-3">
+                <div className="flex justify-between"><span className="text-slate-500">Annual Projected Gross</span><span>₹{parseFloat(payslip.annualProjectedGross || "0").toLocaleString("en-IN")}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Annual Taxable Income</span><span data-testid="text-annual-taxable">₹{parseFloat(payslip.annualTaxableIncome || "0").toLocaleString("en-IN")}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Annual Tax Payable</span><span data-testid="text-annual-tax">₹{parseFloat(payslip.annualTaxPayable || "0").toLocaleString("en-IN")}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">TDS Deducted Till Date (this FY)</span><span>₹{parseFloat(payslip.tdsDeductedTillDate || "0").toLocaleString("en-IN")}</span></div>
+              </div>
+            </div>
+
             <div className="bg-sky-600 text-white rounded px-4 py-3 text-center font-semibold" data-testid="text-net-pay">
               Net Pay: ₹{net.toLocaleString("en-IN")} ( {toWords(net)} )
             </div>
@@ -153,6 +165,7 @@ export default function PayrollPayslipView() {
               {payslip.payslipFormat === "with_pf_esi"
                 ? ` PF ${payslip.pfApplied ? "deducted" : "not applicable"}, ESI ${payslip.esiApplied ? "deducted" : "not applicable"} on this payslip (Format: With PF/ESI).`
                 : " No PF/ESI deducted on this payslip (Format: No PF/ESI)."}
+              {" "}TDS computed under the New Tax Regime (Sec 192) — Old Regime is not supported.
             </p>
           </CardContent>
         </Card>

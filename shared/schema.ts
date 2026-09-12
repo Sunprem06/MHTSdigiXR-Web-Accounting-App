@@ -507,6 +507,8 @@ export const payrollStatutoryConfigVersions = pgTable("payroll_statutory_config_
 // or the business's own choice to go beyond the legal minimum). The headcount
 // thresholds are informational/gating only — see PayrollEmployees.tsx — they do
 // not auto-flip any employee's pfApplicable/esiApplicable flag.
+export type IncomeTaxSlab = { upTo: number | null; ratePercent: number }; // upTo: null = no upper bound (top slab)
+
 export type PayrollStatutoryConfig = {
   esiHeadcountThreshold: number;   // ESI Act, 1948 — mandatory coverage from this many employees (statutory default: 10)
   epfHeadcountThreshold: number;   // EPF & MP Act, 1952 — mandatory coverage from this many employees (statutory default: 20)
@@ -517,7 +519,28 @@ export type PayrollStatutoryConfig = {
   esiEmployeeRatePercent: number;  // Employee ESI contribution % of gross (statutory default: 0.75)
   esiEmployerRatePercent: number;  // Employer ESI contribution % of gross (statutory default: 3.25)
   esiWageCeiling: number;          // ESI eligibility ceiling — gross above this is ESI-exempt (default: 21000)
+  // Sec 192 TDS — New Tax Regime only (the only regime this app supports; Old Regime
+  // needs its own investment-declaration flow and is deliberately not built). Verified
+  // against Budget 2025/2026 published rates (unchanged for FY 2026-27) — see the
+  // computeIncomeTax comment in server/routes.ts for the worked-example validation.
+  // Deliberately excludes surcharge (only applies above ₹50L income — not applicable
+  // at this business's pay scale; flagged rather than guessed).
+  incomeTaxStandardDeduction: number; // New Regime standard deduction (default: 75000)
+  incomeTaxRebateThreshold: number;   // Sec 87A — taxable income at/below this owes zero net tax (default: 1200000)
+  incomeTaxRebateCap: number;         // Sec 87A — maximum rebate amount (default: 60000)
+  incomeTaxCessPercent: number;       // Health & Education Cess, on tax after rebate (default: 4)
+  incomeTaxSlabs: IncomeTaxSlab[];    // progressive slabs, evaluated in order
 };
+
+export const DEFAULT_INCOME_TAX_SLABS: IncomeTaxSlab[] = [
+  { upTo: 400000, ratePercent: 0 },
+  { upTo: 800000, ratePercent: 5 },
+  { upTo: 1200000, ratePercent: 10 },
+  { upTo: 1600000, ratePercent: 15 },
+  { upTo: 2000000, ratePercent: 20 },
+  { upTo: 2400000, ratePercent: 25 },
+  { upTo: null, ratePercent: 30 },
+];
 
 export const DEFAULT_PAYROLL_STATUTORY_CONFIG: PayrollStatutoryConfig = {
   esiHeadcountThreshold: 10,
@@ -529,6 +552,11 @@ export const DEFAULT_PAYROLL_STATUTORY_CONFIG: PayrollStatutoryConfig = {
   esiEmployeeRatePercent: 0.75,
   esiEmployerRatePercent: 3.25,
   esiWageCeiling: 21000,
+  incomeTaxStandardDeduction: 75000,
+  incomeTaxRebateThreshold: 1200000,
+  incomeTaxRebateCap: 60000,
+  incomeTaxCessPercent: 4,
+  incomeTaxSlabs: DEFAULT_INCOME_TAX_SLABS,
 };
 
 // One row per compensation event (joining, annual revision) for a payroll
@@ -577,6 +605,13 @@ export type PayrollPayslipStatus = typeof PAYROLL_PAYSLIP_STATUSES[number];
 // PF/ESI employEE amounts reduce netPay like Professional Tax; PF/ESI
 // employER amounts are stored for future CTC/reporting use only — they are
 // NOT yet posted to the ledger on mark-paid (see the mark-paid route).
+// Sec 192 TDS (New Regime only) is computed independently of payslipFormat —
+// it applies to every payslip regardless of PF/ESI applicability — by
+// projecting this employee's annual salary for the financial year containing
+// payMonth (actual gross from their other payslips already in that FY, plus
+// this month, plus the remaining months projected at the current monthly
+// rate), then spreading the remaining annual tax liability evenly across the
+// remaining months. See computeIncomeTaxForPayslip in server/routes.ts.
 export const payrollPayslips = pgTable("payroll_payslips", {
   id: serial("id").primaryKey(),
   payrollEmployeeId: integer("payroll_employee_id").references(() => payrollEmployees.id).notNull(),
@@ -603,6 +638,12 @@ export const payrollPayslips = pgTable("payroll_payslips", {
   esiApplied: boolean("esi_applied").notNull().default(false),
   esiEmployeeAmount: decimal("esi_employee_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   esiEmployerAmount: decimal("esi_employer_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  // Sec 192 TDS worksheet (New Regime) — see the payrollPayslips comment above.
+  annualProjectedGross: decimal("annual_projected_gross", { precision: 12, scale: 2 }).notNull().default("0"),
+  annualTaxableIncome: decimal("annual_taxable_income", { precision: 12, scale: 2 }).notNull().default("0"),
+  annualTaxPayable: decimal("annual_tax_payable", { precision: 12, scale: 2 }).notNull().default("0"), // after rebate + cess
+  tdsDeductedTillDate: decimal("tds_deducted_till_date", { precision: 12, scale: 2 }).notNull().default("0"), // cumulative for the FY, including this month
+  tdsThisMonth: decimal("tds_this_month", { precision: 10, scale: 2 }).notNull().default("0"),
   totalDeductions: decimal("total_deductions", { precision: 12, scale: 2 }).notNull().default("0"),
   netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull().default("0"),
   status: text("status").notNull().default("draft"),

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { useAuth } from "@/hooks/use-auth";
-import type { PayrollStatutoryConfigVersion, PayrollStatutoryConfig } from "@shared/schema";
+import type { PayrollStatutoryConfigVersion, PayrollStatutoryConfig, IncomeTaxSlab } from "@shared/schema";
 import { DEFAULT_PAYROLL_STATUTORY_CONFIG } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -14,14 +14,20 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertTriangle, Plus, Pencil, Trash2, CheckCircle, Loader2, Users } from "lucide-react";
+import { AlertTriangle, Plus, Pencil, Trash2, CheckCircle, Loader2, Users, X } from "lucide-react";
+
+type SlabForm = { upTo: string; ratePercent: string }; // upTo: "" means no upper bound (top slab)
 
 type ConfigForm = {
   effectiveFrom: string; label: string; notes: string;
   esiHeadcountThreshold: string; epfHeadcountThreshold: string;
   pfRatePercent: string; pfEmployerRatePercent: string; pfWageCeilingApplied: boolean; pfWageCeiling: string;
   esiEmployeeRatePercent: string; esiEmployerRatePercent: string; esiWageCeiling: string;
+  incomeTaxStandardDeduction: string; incomeTaxRebateThreshold: string; incomeTaxRebateCap: string; incomeTaxCessPercent: string;
+  incomeTaxSlabs: SlabForm[];
 };
+
+const defaultSlabForm: SlabForm[] = DEFAULT_PAYROLL_STATUTORY_CONFIG.incomeTaxSlabs.map(s => ({ upTo: s.upTo === null ? "" : String(s.upTo), ratePercent: String(s.ratePercent) }));
 
 const emptyForm: ConfigForm = {
   effectiveFrom: "", label: "", notes: "",
@@ -34,6 +40,11 @@ const emptyForm: ConfigForm = {
   esiEmployeeRatePercent: String(DEFAULT_PAYROLL_STATUTORY_CONFIG.esiEmployeeRatePercent),
   esiEmployerRatePercent: String(DEFAULT_PAYROLL_STATUTORY_CONFIG.esiEmployerRatePercent),
   esiWageCeiling: String(DEFAULT_PAYROLL_STATUTORY_CONFIG.esiWageCeiling),
+  incomeTaxStandardDeduction: String(DEFAULT_PAYROLL_STATUTORY_CONFIG.incomeTaxStandardDeduction),
+  incomeTaxRebateThreshold: String(DEFAULT_PAYROLL_STATUTORY_CONFIG.incomeTaxRebateThreshold),
+  incomeTaxRebateCap: String(DEFAULT_PAYROLL_STATUTORY_CONFIG.incomeTaxRebateCap),
+  incomeTaxCessPercent: String(DEFAULT_PAYROLL_STATUTORY_CONFIG.incomeTaxCessPercent),
+  incomeTaxSlabs: defaultSlabForm,
 };
 
 export default function PayrollStatutoryConfigPage() {
@@ -119,6 +130,11 @@ export default function PayrollStatutoryConfigPage() {
       esiEmployeeRatePercent: parseFloat(form.esiEmployeeRatePercent) || 0,
       esiEmployerRatePercent: parseFloat(form.esiEmployerRatePercent) || 0,
       esiWageCeiling: parseFloat(form.esiWageCeiling) || 0,
+      incomeTaxStandardDeduction: parseFloat(form.incomeTaxStandardDeduction) || 0,
+      incomeTaxRebateThreshold: parseFloat(form.incomeTaxRebateThreshold) || 0,
+      incomeTaxRebateCap: parseFloat(form.incomeTaxRebateCap) || 0,
+      incomeTaxCessPercent: parseFloat(form.incomeTaxCessPercent) || 0,
+      incomeTaxSlabs: form.incomeTaxSlabs.map(s => ({ upTo: s.upTo === "" ? null : parseFloat(s.upTo) || 0, ratePercent: parseFloat(s.ratePercent) || 0 })) as IncomeTaxSlab[],
     },
   });
 
@@ -132,9 +148,18 @@ export default function PayrollStatutoryConfigPage() {
       pfWageCeilingApplied: c.pfWageCeilingApplied, pfWageCeiling: String(c.pfWageCeiling),
       esiEmployeeRatePercent: String(c.esiEmployeeRatePercent), esiEmployerRatePercent: String(c.esiEmployerRatePercent),
       esiWageCeiling: String(c.esiWageCeiling),
+      incomeTaxStandardDeduction: String(c.incomeTaxStandardDeduction), incomeTaxRebateThreshold: String(c.incomeTaxRebateThreshold),
+      incomeTaxRebateCap: String(c.incomeTaxRebateCap), incomeTaxCessPercent: String(c.incomeTaxCessPercent),
+      incomeTaxSlabs: c.incomeTaxSlabs.map(s => ({ upTo: s.upTo === null ? "" : String(s.upTo), ratePercent: String(s.ratePercent) })),
     });
     setEditOpen(true);
   };
+
+  const updateSlab = (index: number, field: keyof SlabForm, value: string) => {
+    setForm(f => ({ ...f, incomeTaxSlabs: f.incomeTaxSlabs.map((s, i) => i === index ? { ...s, [field]: value } : s) }));
+  };
+  const addSlab = () => setForm(f => ({ ...f, incomeTaxSlabs: [...f.incomeTaxSlabs, { upTo: "", ratePercent: "" }] }));
+  const removeSlab = (index: number) => setForm(f => ({ ...f, incomeTaxSlabs: f.incomeTaxSlabs.filter((_, i) => i !== index) }));
 
   const renderFormFields = () => (
     <div className="space-y-4">
@@ -180,6 +205,34 @@ export default function PayrollStatutoryConfigPage() {
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">ESI only applies when that month's gross earnings are at or below the ceiling.</p>
       </div>
+
+      <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Income Tax — Sec 192 TDS (New Regime only)</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div><Label>Standard Deduction (₹)</Label><Input type="number" min="0" value={form.incomeTaxStandardDeduction} onChange={e => setForm({ ...form, incomeTaxStandardDeduction: e.target.value })} data-testid="input-config-std-deduction" /></div>
+          <div><Label>Cess (%)</Label><Input type="number" min="0" step="0.01" value={form.incomeTaxCessPercent} onChange={e => setForm({ ...form, incomeTaxCessPercent: e.target.value })} data-testid="input-config-cess" /></div>
+          <div><Label>Sec 87A Rebate Threshold (₹)</Label><Input type="number" min="0" value={form.incomeTaxRebateThreshold} onChange={e => setForm({ ...form, incomeTaxRebateThreshold: e.target.value })} data-testid="input-config-rebate-threshold" /></div>
+          <div><Label>Sec 87A Rebate Cap (₹)</Label><Input type="number" min="0" value={form.incomeTaxRebateCap} onChange={e => setForm({ ...form, incomeTaxRebateCap: e.target.value })} data-testid="input-config-rebate-cap" /></div>
+        </div>
+        <Label>Tax Slabs (progressive — each row applies to income above the previous row's ceiling)</Label>
+        <div className="space-y-2 mt-1">
+          {form.incomeTaxSlabs.map((slab, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="flex-1">
+                <Input type="number" min="0" placeholder="No upper bound" value={slab.upTo} onChange={e => updateSlab(i, "upTo", e.target.value)} data-testid={`input-slab-upto-${i}`} />
+              </div>
+              <span className="text-sm text-slate-500">up to, at</span>
+              <div className="w-24">
+                <Input type="number" min="0" step="0.01" value={slab.ratePercent} onChange={e => updateSlab(i, "ratePercent", e.target.value)} data-testid={`input-slab-rate-${i}`} />
+              </div>
+              <span className="text-sm text-slate-500">%</span>
+              <Button size="icon" variant="ghost" className="text-red-600" onClick={() => removeSlab(i)} data-testid={`button-remove-slab-${i}`}><X className="w-4 h-4" /></Button>
+            </div>
+          ))}
+        </div>
+        <Button variant="outline" size="sm" className="mt-2" onClick={addSlab} data-testid="button-add-slab"><Plus className="w-3.5 h-3.5 mr-1" />Add Slab</Button>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Leave the last row's "up to" blank for the top, uncapped slab. Old Regime (investment declarations, HRA/80C exemptions) is not supported — this is New Regime only.</p>
+      </div>
     </div>
   );
 
@@ -189,7 +242,7 @@ export default function PayrollStatutoryConfigPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">Statutory Config</h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-1">PF/ESI rates, ceilings, and headcount thresholds for the With-PF/ESI payslip format</p>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">PF/ESI rates and ceilings for the With-PF/ESI payslip format, plus Sec 192 TDS (New Regime) slabs used on every payslip</p>
           </div>
           {canManage && (
             <Button onClick={() => { setForm(emptyForm); setAddOpen(true); }} data-testid="button-add-config">
@@ -220,7 +273,7 @@ export default function PayrollStatutoryConfigPage() {
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-amber-800 dark:text-amber-300">
             <p className="font-semibold">These rates are configurable, not legal advice.</p>
-            <p className="mt-1">The defaults shown match the published EPF/ESI Act rates as of this build, but labour law can change independently of this app. Review with a Chartered Accountant before relying on these for a real payroll run.</p>
+            <p className="mt-1">The defaults shown match the published EPF/ESI Act rates and the New Tax Regime slabs/standard deduction/rebate for FY 2026-27 as of this build, but law can change independently of this app (a future Budget could revise these). Review with a Chartered Accountant before relying on these for a real payroll run.</p>
           </div>
         </div>
 
@@ -239,6 +292,7 @@ export default function PayrollStatutoryConfigPage() {
                       <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Label</th>
                       <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">PF</th>
                       <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">ESI</th>
+                      <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Tax (New Regime)</th>
                       <th className="text-center text-xs font-medium text-slate-500 px-4 py-3">Status</th>
                       <th className="text-right text-xs font-medium text-slate-500 px-4 py-3">Actions</th>
                     </tr>
@@ -252,6 +306,7 @@ export default function PayrollStatutoryConfigPage() {
                           <td className="px-4 py-3 text-sm">{v.label}</td>
                           <td className="px-4 py-3 text-sm">{c.pfRatePercent}% (cap ₹{c.pfWageCeilingApplied ? c.pfWageCeiling.toLocaleString("en-IN") : "none"})</td>
                           <td className="px-4 py-3 text-sm">{c.esiEmployeeRatePercent}% (≤₹{c.esiWageCeiling.toLocaleString("en-IN")})</td>
+                          <td className="px-4 py-3 text-sm">SD ₹{c.incomeTaxStandardDeduction.toLocaleString("en-IN")}, rebate ≤₹{c.incomeTaxRebateThreshold.toLocaleString("en-IN")}</td>
                           <td className="px-4 py-3 text-center">
                             {v.isActive ? <Badge data-testid={`badge-active-${v.id}`}>Active</Badge> : <Badge variant="outline">Inactive</Badge>}
                           </td>
