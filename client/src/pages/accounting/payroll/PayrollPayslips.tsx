@@ -4,6 +4,7 @@ import { Link, useSearch } from "wouter";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,7 +105,7 @@ export default function PayrollPayslips() {
             <p className="text-slate-500 dark:text-slate-400 mt-1">
               {employeeIdFilter && employeeMap.get(parseInt(employeeIdFilter))
                 ? `History for ${employeeMap.get(parseInt(employeeIdFilter))?.fullName}`
-                : "No-PF/ESI payslips for salaried MHTSdigiXR staff"}
+                : "Payslips for salaried MHTSdigiXR staff — No PF/ESI or With PF/ESI"}
             </p>
           </div>
           {canProcess && (
@@ -139,6 +140,7 @@ export default function PayrollPayslips() {
                   <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                     <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Employee</th>
                     <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Month</th>
+                    <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Format</th>
                     <th className="text-right text-xs font-medium text-slate-500 px-4 py-3">Gross</th>
                     <th className="text-right text-xs font-medium text-slate-500 px-4 py-3">Prof. Tax</th>
                     <th className="text-right text-xs font-medium text-slate-500 px-4 py-3">Net Pay</th>
@@ -151,6 +153,9 @@ export default function PayrollPayslips() {
                     <tr key={p.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0" data-testid={`row-payslip-${p.id}`}>
                       <td className="px-4 py-3 text-sm">{employeeMap.get(p.payrollEmployeeId)?.fullName || "-"}</td>
                       <td className="px-4 py-3 text-sm">{p.payMonth}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <Badge variant="outline" className="text-xs">{p.payslipFormat === "with_pf_esi" ? "With PF/ESI" : "No PF/ESI"}</Badge>
+                      </td>
                       <td className="px-4 py-3 text-right text-sm">₹{parseFloat(p.grossEarnings).toLocaleString("en-IN")}</td>
                       <td className="px-4 py-3 text-right text-sm text-red-600">₹{parseFloat(p.professionalTax).toLocaleString("en-IN")}</td>
                       <td className="px-4 py-3 text-right text-sm font-medium">₹{parseFloat(p.netPay).toLocaleString("en-IN")}</td>

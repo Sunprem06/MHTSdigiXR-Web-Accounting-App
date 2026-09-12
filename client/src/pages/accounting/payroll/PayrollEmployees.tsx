@@ -170,13 +170,13 @@ export default function PayrollEmployees() {
         <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4" data-testid="banner-ca-review-required">
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-amber-800 dark:text-amber-300">
-            <p className="font-semibold">PF, ESI, and Sec 192 TDS calculations are not implemented.</p>
+            <p className="font-semibold">Sec 192 salary TDS calculations are not implemented.</p>
             <p className="mt-1">
-              Compensation structures and the No-PF/ESI payslip format are live (its only deduction,
-              Professional Tax, is entered manually — never auto-calculated). PF, ESI, and Sec 192 salary TDS
-              formulas still require review and sign-off by a Chartered Accountant before any payslip that
-              needs them relies on this app — the Labour Codes (effective 21 Nov 2025) were still being
-              finalized per state as of early 2026.
+              Compensation structures and both payslip formats are live: No-PF/ESI (Professional Tax entered
+              manually, never auto-calculated) and With-PF/ESI (PF/ESI rates and ceilings are configurable in
+              Payroll → Statutory Config, gated per employee by the PF/ESI Applicable flags below). Sec 192
+              salary TDS still requires review and sign-off by a Chartered Accountant before it gets built —
+              the Labour Codes (effective 21 Nov 2025) were still being finalized per state as of early 2026.
             </p>
           </div>
         </div>

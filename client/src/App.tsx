@@ -83,6 +83,7 @@ import TutorPayslipEntry from "@/pages/accounting/payroll/TutorPayslipEntry";
 import TutorPayslipView from "@/pages/accounting/payroll/TutorPayslipView";
 import PayrollEmployees from "@/pages/accounting/payroll/PayrollEmployees";
 import PayrollCompensation from "@/pages/accounting/payroll/PayrollCompensation";
+import PayrollStatutoryConfig from "@/pages/accounting/payroll/PayrollStatutoryConfig";
 import PayrollPayslips from "@/pages/accounting/payroll/PayrollPayslips";
 import PayrollPayslipEntry from "@/pages/accounting/payroll/PayrollPayslipEntry";
 import PayrollPayslipView from "@/pages/accounting/payroll/PayrollPayslipView";
@@ -242,6 +243,9 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/payroll/compensation">
         {() => <ProtectedRoute requiredPermission="payroll_employees.view"><PayrollCompensation /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/payroll/statutory-config">
+        {() => <ProtectedRoute requiredPermission="payroll_employees.manage"><PayrollStatutoryConfig /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/payroll/payslips/new">
         {() => <ProtectedRoute requiredPermission="payroll_employees.process"><PayrollPayslipEntry /></ProtectedRoute>}

@@ -9,10 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { PayrollEmployee, PayrollCompensationStructure, PayrollPayslip } from "@shared/schema";
+import type { PayrollEmployee, PayrollCompensationStructure, PayrollPayslip, PayrollStatutoryConfigVersion, PayrollStatutoryConfig } from "@shared/schema";
+import { PAYSLIP_FORMATS, DEFAULT_PAYROLL_STATUTORY_CONFIG } from "@shared/schema";
 import { Loader2, Save } from "lucide-react";
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const FORMAT_LABELS: Record<string, string> = { no_pf_esi: "No PF/ESI", with_pf_esi: "With PF/ESI" };
 
 function monthInputToLabel(value: string): string {
   const [y, m] = value.split("-");
@@ -28,8 +30,6 @@ function monthLabelToInput(label: string): string {
   return `${match[2]}-${String(idx + 1).padStart(2, "0")}`;
 }
 
-function round2(n: number) { return Math.round(n * 100) / 100; }
-
 // Finds the compensation structure effective as of the first day of the selected
 // pay month — the same "latest effectiveFrom <= asOfDate" rule the server uses.
 function resolveStructure(structures: PayrollCompensationStructure[] | undefined, payMonthInput: string): PayrollCompensationStructure | undefined {
@@ -42,10 +42,13 @@ function resolveStructure(structures: PayrollCompensationStructure[] | undefined
 
 // Client-side preview ONLY — the server always recomputes these authoritatively on save.
 // Each component is pro-rated for LOP and rounded individually, matching the
-// business's own payslip and Full & Final Settlement documents.
+// business's own payslip and Full & Final Settlement documents. PF/ESI mirror
+// computePayrollPayslipWithPfEsi in server/routes.ts — see that function for the
+// full reasoning (independent employee/PF/ESI gating, ceilings not pro-rated).
 function computePreview(input: {
   structure: PayrollCompensationStructure | undefined;
   standardWorkingDays: number; lopDays: number; professionalTax: number;
+  payslipFormat: string; pfApplicable: boolean; esiApplicable: boolean; config: PayrollStatutoryConfig;
 }) {
   const s = input.structure;
   const factor = input.standardWorkingDays > 0
@@ -62,9 +65,22 @@ function computePreview(input: {
   const otherAllowancesEarned = earned(s?.otherAllowancesAnnual);
   const grossEarnings = basicEarned + hraEarned + conveyanceEarned + medicalEarned + otherAllowancesEarned;
   const professionalTax = Math.round(Math.max(0, input.professionalTax || 0));
-  const netPay = Math.max(0, round2(grossEarnings - professionalTax));
 
-  return { basicEarned, hraEarned, conveyanceEarned, medicalEarned, otherAllowancesEarned, grossEarnings, professionalTax, netPay };
+  let pfApplied = false, pfEmployeeAmount = 0, esiApplied = false, esiEmployeeAmount = 0;
+  if (input.payslipFormat === "with_pf_esi") {
+    pfApplied = input.pfApplicable;
+    const pfWageBase = input.config.pfWageCeilingApplied ? Math.min(basicEarned, input.config.pfWageCeiling) : basicEarned;
+    pfEmployeeAmount = pfApplied ? Math.round(pfWageBase * (input.config.pfRatePercent / 100)) : 0;
+
+    const esiEligible = grossEarnings <= input.config.esiWageCeiling;
+    esiApplied = input.esiApplicable && esiEligible;
+    esiEmployeeAmount = esiApplied ? Math.round(grossEarnings * (input.config.esiEmployeeRatePercent / 100)) : 0;
+  }
+
+  const totalDeductions = professionalTax + pfEmployeeAmount + esiEmployeeAmount;
+  const netPay = Math.max(0, grossEarnings - totalDeductions);
+
+  return { basicEarned, hraEarned, conveyanceEarned, medicalEarned, otherAllowancesEarned, grossEarnings, professionalTax, pfApplied, pfEmployeeAmount, esiApplied, esiEmployeeAmount, netPay };
 }
 
 export default function PayrollPayslipEntry() {
@@ -81,6 +97,10 @@ export default function PayrollPayslipEntry() {
     queryKey: ["/api/accounting/payroll-payslips", editId],
     enabled: isEditMode,
   });
+  const { data: activeConfig } = useQuery<PayrollStatutoryConfigVersion>({
+    queryKey: ["/api/accounting/payroll-statutory-config/active"],
+    retry: false,
+  });
 
   const [employeeId, setEmployeeId] = useState(preselectedEmployeeId || "");
   const [payMonthInput, setPayMonthInput] = useState(() => {
@@ -90,6 +110,8 @@ export default function PayrollPayslipEntry() {
   const [standardWorkingDays, setStandardWorkingDays] = useState("26");
   const [lopDays, setLopDays] = useState("0");
   const [professionalTax, setProfessionalTax] = useState("0");
+  const [payslipFormat, setPayslipFormat] = useState<string>("no_pf_esi");
+  const [formatTouched, setFormatTouched] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const { data: structures } = useQuery<PayrollCompensationStructure[]>({
@@ -103,6 +125,15 @@ export default function PayrollPayslipEntry() {
 
   const selectedEmployee = employees?.find(e => String(e.id) === employeeId);
   const applicableStructure = useMemo(() => resolveStructure(structures, payMonthInput), [structures, payMonthInput]);
+  const config: PayrollStatutoryConfig = { ...DEFAULT_PAYROLL_STATUTORY_CONFIG, ...(activeConfig?.config as Partial<PayrollStatutoryConfig> | undefined) };
+
+  // Format defaults from the employee's own pfApplicable/esiApplicable flags, but
+  // stays a per-payslip override once the preparer has touched the dropdown.
+  useEffect(() => {
+    if (!isEditMode && selectedEmployee && !formatTouched) {
+      setPayslipFormat(selectedEmployee.pfApplicable || selectedEmployee.esiApplicable ? "with_pf_esi" : "no_pf_esi");
+    }
+  }, [selectedEmployee, isEditMode, formatTouched]);
 
   useEffect(() => {
     if (isEditMode && existing && !loaded) {
@@ -111,6 +142,8 @@ export default function PayrollPayslipEntry() {
       setStandardWorkingDays(String(existing.standardWorkingDays));
       setLopDays(existing.lopDays);
       setProfessionalTax(existing.professionalTax);
+      setPayslipFormat(existing.payslipFormat);
+      setFormatTouched(true);
       setLoaded(true);
     }
   }, [existing, isEditMode, loaded]);
@@ -120,7 +153,13 @@ export default function PayrollPayslipEntry() {
     standardWorkingDays: parseFloat(standardWorkingDays) || 0,
     lopDays: parseFloat(lopDays) || 0,
     professionalTax: parseFloat(professionalTax) || 0,
-  }), [applicableStructure, standardWorkingDays, lopDays, professionalTax]);
+    payslipFormat,
+    pfApplicable: selectedEmployee?.pfApplicable || false,
+    esiApplicable: selectedEmployee?.esiApplicable || false,
+    config,
+  }), [applicableStructure, standardWorkingDays, lopDays, professionalTax, payslipFormat, selectedEmployee, config]);
+
+  const needsConfig = payslipFormat === "with_pf_esi" && !activeConfig;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -130,6 +169,7 @@ export default function PayrollPayslipEntry() {
         standardWorkingDays,
         lopDays,
         professionalTax,
+        payslipFormat,
       };
       const res = isEditMode
         ? await apiRequest("PATCH", `/api/accounting/payroll-payslips/${editId}`, payload)
@@ -160,7 +200,7 @@ export default function PayrollPayslipEntry() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Payroll Employee *</Label>
-              <Select value={employeeId} onValueChange={v => { setEmployeeId(v); setLoaded(false); }} disabled={isEditMode}>
+              <Select value={employeeId} onValueChange={v => { setEmployeeId(v); setLoaded(false); setFormatTouched(false); }} disabled={isEditMode}>
                 <SelectTrigger data-testid="select-payslip-employee"><SelectValue placeholder="Select an employee" /></SelectTrigger>
                 <SelectContent>
                   {employees?.filter(e => e.status === "active").map(e => (
@@ -173,6 +213,18 @@ export default function PayrollPayslipEntry() {
               <Label>Pay Month *</Label>
               <Input type="month" value={payMonthInput} onChange={e => setPayMonthInput(e.target.value)} data-testid="input-pay-month" />
             </div>
+            <div>
+              <Label>Payslip Format</Label>
+              <Select value={payslipFormat} onValueChange={v => { setPayslipFormat(v); setFormatTouched(true); }}>
+                <SelectTrigger data-testid="select-payslip-format"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAYSLIP_FORMATS.map(f => <SelectItem key={f} value={f}>{FORMAT_LABELS[f]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Defaults from this employee's PF/ESI Applicable flags — override here only for a one-off exception.
+              </p>
+            </div>
             {employeeId && !applicableStructure && (
               <p className="sm:col-span-2 text-xs text-red-600">
                 No compensation structure is effective for this month — set one up on the employee's Compensation page first.
@@ -181,6 +233,11 @@ export default function PayrollPayslipEntry() {
             {applicableStructure && (
               <p className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">
                 Using compensation structure effective {applicableStructure.effectiveFrom} — CTC ₹{parseFloat(applicableStructure.ctcAnnual).toLocaleString("en-IN")}/yr
+              </p>
+            )}
+            {needsConfig && (
+              <p className="sm:col-span-2 text-xs text-red-600">
+                No statutory configuration is active — set one up in Payroll → Statutory Config first.
               </p>
             )}
           </CardContent>
@@ -217,6 +274,18 @@ export default function PayrollPayslipEntry() {
               <div className="flex justify-between text-sm"><span>Other Allowances</span><span>₹{preview.otherAllowancesEarned.toLocaleString("en-IN")}</span></div>
               <div className="flex justify-between text-sm font-medium pt-2 border-t border-sky-200 dark:border-sky-800"><span>Gross Earnings</span><span data-testid="text-preview-gross">₹{preview.grossEarnings.toLocaleString("en-IN")}</span></div>
               <div className="flex justify-between text-sm text-red-600"><span>Professional Tax</span><span>-₹{preview.professionalTax.toLocaleString("en-IN")}</span></div>
+              {payslipFormat === "with_pf_esi" && (
+                <>
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>Provident Fund (Employee){!preview.pfApplied && " — not applicable"}</span>
+                    <span>-₹{preview.pfEmployeeAmount.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>ESI (Employee){!preview.esiApplied && (selectedEmployee?.esiApplicable ? " — gross exceeds ESI ceiling" : " — not applicable")}</span>
+                    <span>-₹{preview.esiEmployeeAmount.toLocaleString("en-IN")}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between text-base font-bold pt-2 border-t border-sky-200 dark:border-sky-800"><span>Net Pay</span><span data-testid="text-preview-net-pay">₹{preview.netPay.toLocaleString("en-IN")}</span></div>
             </CardContent>
           </Card>
@@ -226,7 +295,7 @@ export default function PayrollPayslipEntry() {
           <Button variant="outline" onClick={() => setLocation("/accounting/payroll/payslips")}>Cancel</Button>
           <Button
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending || !employeeId || !payMonthInput || !applicableStructure}
+            disabled={saveMutation.isPending || !employeeId || !payMonthInput || !applicableStructure || needsConfig}
             data-testid="button-save-payslip"
           >
             {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}

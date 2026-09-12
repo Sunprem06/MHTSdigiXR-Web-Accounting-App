@@ -501,6 +501,36 @@ export const payrollStatutoryConfigVersions = pgTable("payroll_statutory_config_
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Shape of payrollStatutoryConfigVersions.config — every rate/ceiling/threshold
+// is a plain configurable number, never hardcoded into calculation code, since
+// these can change independently of this app (labour codes, budget notifications,
+// or the business's own choice to go beyond the legal minimum). The headcount
+// thresholds are informational/gating only — see PayrollEmployees.tsx — they do
+// not auto-flip any employee's pfApplicable/esiApplicable flag.
+export type PayrollStatutoryConfig = {
+  esiHeadcountThreshold: number;   // ESI Act, 1948 — mandatory coverage from this many employees (statutory default: 10)
+  epfHeadcountThreshold: number;   // EPF & MP Act, 1952 — mandatory coverage from this many employees (statutory default: 20)
+  pfRatePercent: number;           // Employee PF contribution % (statutory default: 12)
+  pfEmployerRatePercent: number;   // Employer PF contribution % (statutory default: 12)
+  pfWageCeilingApplied: boolean;   // Whether PF is capped at pfWageCeiling, or computed on full actual Basic
+  pfWageCeiling: number;           // Statutory PF wage ceiling (default: 15000)
+  esiEmployeeRatePercent: number;  // Employee ESI contribution % of gross (statutory default: 0.75)
+  esiEmployerRatePercent: number;  // Employer ESI contribution % of gross (statutory default: 3.25)
+  esiWageCeiling: number;          // ESI eligibility ceiling — gross above this is ESI-exempt (default: 21000)
+};
+
+export const DEFAULT_PAYROLL_STATUTORY_CONFIG: PayrollStatutoryConfig = {
+  esiHeadcountThreshold: 10,
+  epfHeadcountThreshold: 20,
+  pfRatePercent: 12,
+  pfEmployerRatePercent: 12,
+  pfWageCeilingApplied: true,
+  pfWageCeiling: 15000,
+  esiEmployeeRatePercent: 0.75,
+  esiEmployerRatePercent: 3.25,
+  esiWageCeiling: 21000,
+};
+
 // One row per compensation event (joining, annual revision) for a payroll
 // employee — mirrors the tutorAgreements pattern of effective-dated records
 // rather than a single mutable "current salary" field, so a past payslip stays
@@ -527,9 +557,11 @@ export const payrollCompensationStructures = pgTable("payroll_compensation_struc
 
 // Two payslip formats (per the business's actual documents): "no_pf_esi" (this
 // employee isn't PF/ESI-covered — the current default for MHTSdigiXR's
-// headcount) and "with_pf_esi" (PF/ESI deduction lines, gated on the
-// business's own headcount thresholds, added in a later step once real
-// PF/ESI reference figures are confirmed — not built yet).
+// headcount) and "with_pf_esi" (adds PF/ESI deduction lines, computed from
+// whichever payrollStatutoryConfigVersions row is active — rates/ceilings are
+// configurable there, never hardcoded, since law can change independently of
+// this app). A payslip's format defaults from the employee's own
+// pfApplicable/esiApplicable flags but is overridable per payslip.
 export const PAYSLIP_FORMATS = ["no_pf_esi", "with_pf_esi"] as const;
 export type PayslipFormat = typeof PAYSLIP_FORMATS[number];
 
@@ -540,13 +572,18 @@ export type PayrollPayslipStatus = typeof PAYROLL_PAYSLIP_STATUSES[number];
 // whichever compensationStructure was effective as of that pay month (never
 // live-recomputed later) — same convention as tutorPayslips storing its own
 // frozen grossEarnings/netPay rather than re-deriving from the agreement's
-// current rate. Format 1 (no_pf_esi) is the only format implemented — its
-// only deduction is Professional Tax, entered manually per payslip (never
-// auto-calculated from a slab table — see the standing rule at payrollEmployees).
+// current rate. Professional Tax is always a manual per-payslip entry, never
+// auto-calculated from a slab table (see the standing rule at payrollEmployees).
+// PF/ESI employEE amounts reduce netPay like Professional Tax; PF/ESI
+// employER amounts are stored for future CTC/reporting use only — they are
+// NOT yet posted to the ledger on mark-paid (see the mark-paid route).
 export const payrollPayslips = pgTable("payroll_payslips", {
   id: serial("id").primaryKey(),
   payrollEmployeeId: integer("payroll_employee_id").references(() => payrollEmployees.id).notNull(),
   compensationStructureId: integer("compensation_structure_id").references(() => payrollCompensationStructures.id).notNull(),
+  // Set only when payslipFormat is "with_pf_esi" — the statutory config version whose
+  // rates/ceilings were used, frozen here the same way compensationStructureId is.
+  statutoryConfigVersionId: integer("statutory_config_version_id").references(() => payrollStatutoryConfigVersions.id),
   payMonth: text("pay_month").notNull(), // e.g. "April 2026" — matches tutorPayslips.payMonth convention
   payslipFormat: text("payslip_format").notNull().default("no_pf_esi"),
   standardWorkingDays: integer("standard_working_days").notNull().default(26),
@@ -560,6 +597,12 @@ export const payrollPayslips = pgTable("payroll_payslips", {
   otherAllowancesEarned: decimal("other_allowances_earned", { precision: 10, scale: 2 }).notNull().default("0"),
   grossEarnings: decimal("gross_earnings", { precision: 12, scale: 2 }).notNull().default("0"),
   professionalTax: decimal("professional_tax", { precision: 10, scale: 2 }).notNull().default("0"), // manual entry, not auto-calculated
+  pfApplied: boolean("pf_applied").notNull().default(false),
+  pfEmployeeAmount: decimal("pf_employee_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  pfEmployerAmount: decimal("pf_employer_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  esiApplied: boolean("esi_applied").notNull().default(false),
+  esiEmployeeAmount: decimal("esi_employee_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  esiEmployerAmount: decimal("esi_employer_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   totalDeductions: decimal("total_deductions", { precision: 12, scale: 2 }).notNull().default("0"),
   netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull().default("0"),
   status: text("status").notNull().default("draft"),

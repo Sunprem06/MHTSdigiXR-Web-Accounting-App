@@ -81,6 +81,7 @@ const navItems: NavItem[] = [
       { label: "Tutor Payslips", path: "/accounting/payroll/tutor-payslips", icon: Receipt, requiredPermission: "payroll_tutors.view" },
       { label: "Employees (Payroll)", path: "/accounting/payroll/employees", icon: Banknote, requiredPermission: "payroll_employees.view" },
       { label: "Compensation", path: "/accounting/payroll/compensation", icon: IndianRupee, requiredPermission: "payroll_employees.view" },
+      { label: "Statutory Config", path: "/accounting/payroll/statutory-config", icon: Scale, requiredPermission: "payroll_employees.manage" },
       { label: "Payroll Payslips", path: "/accounting/payroll/payslips", icon: Receipt, requiredPermission: "payroll_employees.view" },
     ],
   },

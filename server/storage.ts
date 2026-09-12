@@ -183,7 +183,12 @@ export interface IStorage {
   deletePayrollPayslip(id: number): Promise<boolean>;
 
   getPayrollStatutoryConfigVersions(): Promise<PayrollStatutoryConfigVersion[]>;
+  getPayrollStatutoryConfigVersion(id: number): Promise<PayrollStatutoryConfigVersion | undefined>;
+  getActivePayrollStatutoryConfigVersion(): Promise<PayrollStatutoryConfigVersion | undefined>;
   createPayrollStatutoryConfigVersion(version: InsertPayrollStatutoryConfigVersion): Promise<PayrollStatutoryConfigVersion>;
+  updatePayrollStatutoryConfigVersion(id: number, data: Partial<InsertPayrollStatutoryConfigVersion>): Promise<PayrollStatutoryConfigVersion | undefined>;
+  deletePayrollStatutoryConfigVersion(id: number): Promise<boolean>;
+  activatePayrollStatutoryConfigVersion(id: number): Promise<PayrollStatutoryConfigVersion | undefined>;
   getNextClaimNumber(): Promise<string>;
 
   deleteProduct(id: number): Promise<boolean>;
@@ -1073,9 +1078,38 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(payrollStatutoryConfigVersions).orderBy(desc(payrollStatutoryConfigVersions.effectiveFrom));
   }
 
+  async getPayrollStatutoryConfigVersion(id: number): Promise<PayrollStatutoryConfigVersion | undefined> {
+    const [version] = await db.select().from(payrollStatutoryConfigVersions).where(eq(payrollStatutoryConfigVersions.id, id));
+    return version;
+  }
+
+  async getActivePayrollStatutoryConfigVersion(): Promise<PayrollStatutoryConfigVersion | undefined> {
+    const [version] = await db.select().from(payrollStatutoryConfigVersions).where(eq(payrollStatutoryConfigVersions.isActive, true)).limit(1);
+    return version;
+  }
+
   async createPayrollStatutoryConfigVersion(version: InsertPayrollStatutoryConfigVersion): Promise<PayrollStatutoryConfigVersion> {
     const [newVersion] = await db.insert(payrollStatutoryConfigVersions).values(version).returning();
     return newVersion;
+  }
+
+  async updatePayrollStatutoryConfigVersion(id: number, data: Partial<InsertPayrollStatutoryConfigVersion>): Promise<PayrollStatutoryConfigVersion | undefined> {
+    const [updated] = await db.update(payrollStatutoryConfigVersions).set(data).where(eq(payrollStatutoryConfigVersions.id, id)).returning();
+    return updated;
+  }
+
+  async deletePayrollStatutoryConfigVersion(id: number): Promise<boolean> {
+    const result = await db.delete(payrollStatutoryConfigVersions).where(eq(payrollStatutoryConfigVersions.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async activatePayrollStatutoryConfigVersion(id: number): Promise<PayrollStatutoryConfigVersion | undefined> {
+    // Only one statutory config version may be active at a time — same pattern as activateFinancialYear.
+    return await db.transaction(async (tx) => {
+      await tx.update(payrollStatutoryConfigVersions).set({ isActive: false }).where(sql`id != ${id}`);
+      const [updated] = await tx.update(payrollStatutoryConfigVersions).set({ isActive: true }).where(eq(payrollStatutoryConfigVersions.id, id)).returning();
+      return updated;
+    });
   }
 
   async deleteProduct(id: number): Promise<boolean> {

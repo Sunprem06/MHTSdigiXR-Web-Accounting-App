@@ -111,36 +111,29 @@ export default function PayrollPayslipView() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="px-3 py-2">Basic Salary</td>
-                    <td className="text-right px-3 py-2">₹{parseFloat(payslip.basicEarned).toLocaleString("en-IN")}</td>
-                    <td className="px-3 py-2">Professional Tax</td>
-                    <td className="text-right px-3 py-2" data-testid="text-professional-tax">₹{pt.toLocaleString("en-IN")}</td>
-                  </tr>
-                  <tr className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="px-3 py-2">House Rent Allowance</td>
-                    <td className="text-right px-3 py-2">₹{parseFloat(payslip.hraEarned).toLocaleString("en-IN")}</td>
-                    <td className="px-3 py-2"></td>
-                    <td className="text-right px-3 py-2"></td>
-                  </tr>
-                  <tr className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="px-3 py-2">Conveyance Allowance</td>
-                    <td className="text-right px-3 py-2">₹{parseFloat(payslip.conveyanceEarned).toLocaleString("en-IN")}</td>
-                    <td className="px-3 py-2"></td>
-                    <td className="text-right px-3 py-2"></td>
-                  </tr>
-                  <tr className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="px-3 py-2">Medical Allowance</td>
-                    <td className="text-right px-3 py-2">₹{parseFloat(payslip.medicalEarned).toLocaleString("en-IN")}</td>
-                    <td className="px-3 py-2"></td>
-                    <td className="text-right px-3 py-2"></td>
-                  </tr>
-                  <tr className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="px-3 py-2">Other Allowances</td>
-                    <td className="text-right px-3 py-2">₹{parseFloat(payslip.otherAllowancesEarned).toLocaleString("en-IN")}</td>
-                    <td className="px-3 py-2"></td>
-                    <td className="text-right px-3 py-2"></td>
-                  </tr>
+                  {(() => {
+                    const earningsRows = [
+                      { label: "Basic Salary", amount: parseFloat(payslip.basicEarned) },
+                      { label: "House Rent Allowance", amount: parseFloat(payslip.hraEarned) },
+                      { label: "Conveyance Allowance", amount: parseFloat(payslip.conveyanceEarned) },
+                      { label: "Medical Allowance", amount: parseFloat(payslip.medicalEarned) },
+                      { label: "Other Allowances", amount: parseFloat(payslip.otherAllowancesEarned) },
+                    ];
+                    const deductionRows = [
+                      { label: "Professional Tax", amount: pt, testId: "text-professional-tax" },
+                      ...(payslip.pfApplied ? [{ label: "Provident Fund (Employee)", amount: parseFloat(payslip.pfEmployeeAmount), testId: "text-pf-employee" }] : []),
+                      ...(payslip.esiApplied ? [{ label: "ESI (Employee)", amount: parseFloat(payslip.esiEmployeeAmount), testId: "text-esi-employee" }] : []),
+                    ];
+                    const rowCount = Math.max(earningsRows.length, deductionRows.length);
+                    return Array.from({ length: rowCount }).map((_, i) => (
+                      <tr key={i} className="border-t border-slate-100 dark:border-slate-800">
+                        <td className="px-3 py-2">{earningsRows[i]?.label || ""}</td>
+                        <td className="text-right px-3 py-2">{earningsRows[i] ? `₹${earningsRows[i].amount.toLocaleString("en-IN")}` : ""}</td>
+                        <td className="px-3 py-2">{deductionRows[i]?.label || ""}</td>
+                        <td className="text-right px-3 py-2" data-testid={deductionRows[i]?.testId}>{deductionRows[i] ? `₹${deductionRows[i].amount.toLocaleString("en-IN")}` : ""}</td>
+                      </tr>
+                    ));
+                  })()}
                   <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 font-bold">
                     <td className="px-3 py-2">Gross Earnings</td>
                     <td className="text-right px-3 py-2" data-testid="text-gross-earnings">₹{gross.toLocaleString("en-IN")}</td>
@@ -157,7 +150,9 @@ export default function PayrollPayslipView() {
 
             <p className="text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-3">
               This is a computer-generated payslip. No signature required for regular months.
-              No PF/ESI deducted on this payslip (Format: No PF/ESI).
+              {payslip.payslipFormat === "with_pf_esi"
+                ? ` PF ${payslip.pfApplied ? "deducted" : "not applicable"}, ESI ${payslip.esiApplied ? "deducted" : "not applicable"} on this payslip (Format: With PF/ESI).`
+                : " No PF/ESI deducted on this payslip (Format: No PF/ESI)."}
             </p>
           </CardContent>
         </Card>
