@@ -1762,7 +1762,10 @@ export async function registerRoutes(
       return {
         ...b,
         leaveTypeCode: type?.code, leaveTypeName: type?.name, isPaid: type?.isPaid,
-        availableBalance: type?.annualEntitlementDays === null ? null : computeAvailableBalance({ openingBalance: opening, accruedYtd: accrued, adjustmentYtd: adjustment, usedYtd: used }),
+        // Unpaid (LOP) has no ceiling concept — everything else, including Comp-off
+        // (annualEntitlementDays is null there too, since it's earned per instance
+        // rather than granted annually, but its balance IS tracked via adjustments).
+        availableBalance: type?.isPaid === false ? null : computeAvailableBalance({ openingBalance: opening, accruedYtd: accrued, adjustmentYtd: adjustment, usedYtd: used }),
       };
     }));
   });
@@ -1883,6 +1886,181 @@ export async function registerRoutes(
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "adjust", entity: "leave_balance",
       entityId: id, details: `Adjusted leave balance by ${amount} day(s): ${reason}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  // Computes the calendar-day count for a leave request. Deliberately simple —
+  // no working-day/holiday-calendar exclusion, since no holiday calendar module
+  // exists in this app yet. Half-day portions only apply meaningfully on a
+  // single-day request; on a multi-day request each end trims 0.5 day.
+  function computeLeaveDays(startDate: string, endDate: string, startDayPortion: string, endDayPortion: string): number {
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const end = new Date(`${endDate}T00:00:00.000Z`);
+    const calendarDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    if (calendarDays <= 0) return 0;
+    if (calendarDays === 1) {
+      return startDayPortion !== "full" || endDayPortion !== "full" ? 0.5 : 1;
+    }
+    let days = calendarDays;
+    if (startDayPortion !== "full") days -= 0.5;
+    if (endDayPortion !== "full") days -= 0.5;
+    return days;
+  }
+
+  function canActOnLeaveRequest(req: any, request: { approverId: number | null }): boolean {
+    const perms: string[] = req.user!.permissions || [];
+    return perms.includes("leave.approve") || request.approverId === req.user!.id;
+  }
+
+  app.get("/api/accounting/leave-requests/mine", requireAuth, requirePermission("leave.view_own"), async (req, res) => {
+    const requests = await storage.getLeaveRequests({ employeeId: req.user!.id });
+    res.json(requests);
+  });
+
+  // "My team's" pending approvals — scoped to requests routed to this user via
+  // employees.reportsTo, no leave.approve permission needed to see your own
+  // direct reports' requests. A leave.approve holder (HR/admin override) sees
+  // every pending request instead, since they can act on any of them — this
+  // also covers requests with no manager set (approverId null).
+  // Enriches each request with the applicant's name/leave-type name so the
+  // client doesn't need employees.view (which not every manager-capable role
+  // has) just to render this page.
+  app.get("/api/accounting/leave-requests/for-approval", requireAuth, async (req, res) => {
+    const perms: string[] = req.user!.permissions || [];
+    const isOverride = perms.includes("leave.approve");
+    const requests = isOverride
+      ? await storage.getLeaveRequests({ status: "pending" })
+      : await storage.getLeaveRequests({ approverId: req.user!.id, status: "pending" });
+    const [employees, types] = await Promise.all([storage.getEmployees(), storage.getLeaveTypes()]);
+    const employeeById = new Map(employees.map(e => [e.id, e]));
+    const typeById = new Map(types.map(t => [t.id, t]));
+    res.json(requests.map(r => ({
+      ...r,
+      employeeName: employeeById.get(r.employeeId)?.fullName || `Employee #${r.employeeId}`,
+      leaveTypeName: typeById.get(r.leaveTypeId)?.name || String(r.leaveTypeId),
+    })));
+  });
+
+  app.get("/api/accounting/leave-requests", requireAuth, requirePermission("leave.view"), async (req, res) => {
+    const employeeId = req.query.employeeId ? parseInt(req.query.employeeId as string) : undefined;
+    const status = req.query.status as string | undefined;
+    const requests = await storage.getLeaveRequests({ employeeId, status });
+    res.json(requests);
+  });
+
+  app.post("/api/accounting/leave-requests", requireAuth, requirePermission("leave.apply"), async (req, res) => {
+    const { leaveTypeId, startDate, endDate, reason } = req.body;
+    const startDayPortion = req.body.startDayPortion || "full";
+    const endDayPortion = req.body.endDayPortion || "full";
+    if (!leaveTypeId || !startDate || !endDate) {
+      return res.status(400).json({ message: "leaveTypeId, startDate and endDate are required" });
+    }
+    if (endDate < startDate) {
+      return res.status(400).json({ message: "End date cannot be before start date" });
+    }
+    const leaveType = await storage.getLeaveType(parseInt(leaveTypeId));
+    if (!leaveType || !leaveType.isActive) {
+      return res.status(400).json({ message: "Selected leave type is not available" });
+    }
+    const numberOfDays = computeLeaveDays(startDate, endDate, startDayPortion, endDayPortion);
+    if (numberOfDays <= 0) {
+      return res.status(400).json({ message: "Invalid date range" });
+    }
+
+    const overlapping = await storage.getOverlappingLeaveRequests(req.user!.id, startDate, endDate);
+    if (overlapping.length > 0) {
+      return res.status(400).json({ message: "You already have a pending or approved leave request overlapping these dates" });
+    }
+
+    // Paid leave types are balance-checked against the active FY's tracked
+    // balance (opening + accrued + manual adjustments - already used). Unpaid
+    // (LOP) skips this — it's always available since it isn't a granted benefit.
+    if (leaveType.isPaid) {
+      const activeFy = await storage.getActiveFinancialYear();
+      const balance = activeFy ? await storage.getLeaveBalance(req.user!.id, leaveType.id, activeFy.id) : undefined;
+      const available = balance
+        ? computeAvailableBalance({
+            openingBalance: parseFloat(balance.openingBalance), accruedYtd: parseFloat(balance.accruedYtd),
+            adjustmentYtd: parseFloat(balance.adjustmentYtd), usedYtd: parseFloat(balance.usedYtd),
+          })
+        : 0;
+      if (numberOfDays > available) {
+        return res.status(400).json({ message: `Insufficient ${leaveType.name} balance: ${available} day(s) available, ${numberOfDays} requested` });
+      }
+    }
+
+    const applicant = await storage.getEmployeeById(req.user!.id);
+    const request = await storage.createLeaveRequest({
+      employeeId: req.user!.id, leaveTypeId: leaveType.id, startDate, endDate,
+      startDayPortion, endDayPortion, numberOfDays: String(numberOfDays), reason: reason || null,
+      approverId: applicant?.reportsTo ?? null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "leave_request",
+      entityId: request.id, details: `Applied for ${leaveType.name}: ${startDate} to ${endDate} (${numberOfDays} day(s))`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(request);
+  });
+
+  app.post("/api/accounting/leave-requests/:id/approve", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const request = await storage.getLeaveRequest(id);
+    if (!request) return res.status(404).json({ message: "Leave request not found" });
+    if (!canActOnLeaveRequest(req, request)) return res.status(403).json({ message: "You are not authorized to approve this request" });
+    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be approved" });
+
+    const updated = await storage.updateLeaveRequest(id, { status: "approved", decidedBy: req.user!.id, decidedAt: new Date() });
+
+    const leaveType = await storage.getLeaveType(request.leaveTypeId);
+    if (leaveType?.isPaid) {
+      const activeFy = await storage.getActiveFinancialYear();
+      const balance = activeFy ? await storage.getLeaveBalance(request.employeeId, request.leaveTypeId, activeFy.id) : undefined;
+      if (balance) {
+        await storage.updateLeaveBalance(balance.id, { usedYtd: String(round1(parseFloat(balance.usedYtd) + parseFloat(request.numberOfDays))) });
+      }
+    }
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "approve", entity: "leave_request",
+      entityId: id, details: `Approved leave request for employee #${request.employeeId}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/leave-requests/:id/reject", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const request = await storage.getLeaveRequest(id);
+    if (!request) return res.status(404).json({ message: "Leave request not found" });
+    if (!canActOnLeaveRequest(req, request)) return res.status(403).json({ message: "You are not authorized to reject this request" });
+    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be rejected" });
+    const rejectionReason = (req.body.rejectionReason || "").trim();
+    if (!rejectionReason) return res.status(400).json({ message: "A reason is required to reject a leave request" });
+
+    const updated = await storage.updateLeaveRequest(id, {
+      status: "rejected", decidedBy: req.user!.id, decidedAt: new Date(), rejectionReason,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "reject", entity: "leave_request",
+      entityId: id, details: `Rejected leave request for employee #${request.employeeId}: ${rejectionReason}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/leave-requests/:id/cancel", requireAuth, requirePermission("leave.apply"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const request = await storage.getLeaveRequest(id);
+    if (!request) return res.status(404).json({ message: "Leave request not found" });
+    if (request.employeeId !== req.user!.id) return res.status(403).json({ message: "You can only cancel your own leave requests" });
+    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be cancelled" });
+    const updated = await storage.updateLeaveRequest(id, { status: "cancelled" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "cancel", entity: "leave_request",
+      entityId: id, details: `Cancelled own leave request`,
       ipAddress: req.ip || null,
     });
     res.json(updated);
