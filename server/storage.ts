@@ -87,7 +87,7 @@ export interface IStorage {
   getFixedAsset(id: number): Promise<FixedAsset | undefined>;
   getFixedAssetByCode(assetCode: string): Promise<FixedAsset | undefined>;
   createFixedAsset(asset: InsertFixedAsset): Promise<FixedAsset>;
-  updateFixedAsset(id: number, data: Partial<InsertFixedAsset>): Promise<FixedAsset | undefined>;
+  updateFixedAsset(id: number, data: Partial<Omit<FixedAsset, "id" | "createdAt">>): Promise<FixedAsset | undefined>;
   deleteFixedAsset(id: number): Promise<boolean>;
   getNextAssetCode(): Promise<string>;
   getFixedAssetDepreciationEntries(fixedAssetId: number): Promise<FixedAssetDepreciationEntry[]>;
@@ -504,7 +504,7 @@ export class DatabaseStorage implements IStorage {
     return newAsset;
   }
 
-  async updateFixedAsset(id: number, data: Partial<InsertFixedAsset>): Promise<FixedAsset | undefined> {
+  async updateFixedAsset(id: number, data: Partial<Omit<FixedAsset, "id" | "createdAt">>): Promise<FixedAsset | undefined> {
     const [updated] = await db.update(fixedAssets).set(data).where(eq(fixedAssets.id, id)).returning();
     return updated;
   }

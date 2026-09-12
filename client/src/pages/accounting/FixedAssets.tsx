@@ -16,7 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AttachmentsPanel } from "@/components/accounting/AttachmentsPanel";
-import { AlertTriangle, Plus, Pencil, Loader2, Trash2, Paperclip } from "lucide-react";
+import { FixedAssetDepreciationSchedule } from "@/components/accounting/FixedAssetDepreciationSchedule";
+import { AlertTriangle, Plus, Pencil, Loader2, Trash2, Paperclip, TrendingDown } from "lucide-react";
 
 const emptyForm = {
   assetCode: "", name: "", category: "other", ledgerAccountId: "",
@@ -35,6 +36,7 @@ export default function FixedAssets() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null);
   const [attachmentsFor, setAttachmentsFor] = useState<FixedAsset | null>(null);
+  const [depreciationFor, setDepreciationFor] = useState<FixedAsset | null>(null);
   const [form, setForm] = useState(emptyForm);
 
   const { data: assets, isLoading } = useQuery<FixedAsset[]>({
@@ -217,10 +219,9 @@ export default function FixedAssets() {
           <div className="text-sm text-amber-800 dark:text-amber-300">
             <p className="font-semibold">These rates are calculated, not legal advice.</p>
             <p className="mt-1">
-              This register tracks per-item asset details. Depreciation calculation (Companies Act 2013 Schedule II,
-              SLM/WDV) is not implemented yet and, once it is, will be this app's best-effort reading of the Schedule —
-              review with a Chartered Accountant before relying on any depreciation figure for statutory filings,
-              audited financial statements, or tax computations.
+              Depreciation is computed using this app's best-effort implementation of Companies Act 2013 Schedule II
+              (SLM/WDV, day-based pro-rata for partial periods). Review with a Chartered Accountant before relying on
+              these figures for statutory filings, audited financial statements, or tax computations.
             </p>
           </div>
         </div>
@@ -240,6 +241,8 @@ export default function FixedAssets() {
                     <TableHead>Category</TableHead>
                     <TableHead>Acquisition Date</TableHead>
                     <TableHead>Original Cost</TableHead>
+                    <TableHead>Accumulated Depreciation</TableHead>
+                    <TableHead>Book Value</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -252,9 +255,14 @@ export default function FixedAssets() {
                       <TableCell>{FIXED_ASSET_CATEGORY_DEFAULTS[a.category as keyof typeof FIXED_ASSET_CATEGORY_DEFAULTS]?.label || a.category}</TableCell>
                       <TableCell>{a.acquisitionDate}</TableCell>
                       <TableCell>₹{parseFloat(a.originalCost).toLocaleString("en-IN")}</TableCell>
+                      <TableCell>₹{parseFloat(a.accumulatedDepreciation).toLocaleString("en-IN")}</TableCell>
+                      <TableCell>{a.currentBookValue !== null ? `₹${parseFloat(a.currentBookValue).toLocaleString("en-IN")}` : `₹${parseFloat(a.originalCost).toLocaleString("en-IN")}`}</TableCell>
                       <TableCell><Badge variant={a.status === "active" ? "default" : "outline"}>{a.status === "active" ? "Active" : a.status === "disposed" ? "Disposed" : "Scrapped"}</Badge></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setDepreciationFor(a)} title="Depreciation Schedule" data-testid={`button-depreciation-fixed-asset-${a.id}`}>
+                            <TrendingDown className="w-4 h-4" />
+                          </Button>
                           <Button size="icon" variant="ghost" onClick={() => setAttachmentsFor(a)} data-testid={`button-attachments-fixed-asset-${a.id}`}>
                             <Paperclip className="w-4 h-4" />
                           </Button>
@@ -316,6 +324,13 @@ export default function FixedAssets() {
             {attachmentsFor && (
               <AttachmentsPanel entityType="fixed_asset" entityId={attachmentsFor.id} uploadPermission="fixed_assets.create" managePermission="fixed_assets.edit" />
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!depreciationFor} onOpenChange={(open) => !open && setDepreciationFor(null)}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="dialog-depreciation-schedule">
+            <DialogHeader><DialogTitle>Depreciation Schedule — {depreciationFor?.name}</DialogTitle></DialogHeader>
+            {depreciationFor && <FixedAssetDepreciationSchedule fixedAssetId={depreciationFor.id} />}
           </DialogContent>
         </Dialog>
       </div>

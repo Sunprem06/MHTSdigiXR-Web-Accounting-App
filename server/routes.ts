@@ -10,6 +10,7 @@ import { requireAuth, requirePermission, requireRole } from "./auth";
 import { rateLimiter } from "./middleware/security.js";
 import type { JobApplication } from "@shared/schema";
 import { FIXED_ASSET_CATEGORY_DEFAULTS } from "@shared/schema";
+import { buildDepreciationSchedule, summarize, type PeriodBoundary } from "./lib/depreciation-engine";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
 
@@ -790,6 +791,131 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json({ message: "Deleted successfully" });
+  });
+
+  // Fixed asset depreciation — Companies Act 2013 Schedule II (SLM/WDV), NOT
+  // CA-reviewed. See server/lib/depreciation-engine.ts for the disclaimer.
+  async function getFinancialYearBoundaries(): Promise<PeriodBoundary[]> {
+    const fys = await storage.getFinancialYears();
+    return fys.map(fy => ({ periodStartDate: fy.startDate, periodEndDate: fy.endDate, label: fy.name }));
+  }
+
+  app.get("/api/accounting/fixed-assets/:id/depreciation-schedule", requireAuth, requirePermission("fixed_assets.view"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const asset = await storage.getFixedAsset(id);
+    if (!asset) return res.status(404).json({ message: "Fixed asset not found" });
+
+    const boundaries = await getFinancialYearBoundaries();
+    if (boundaries.length === 0) {
+      return res.status(400).json({ message: "No financial years are configured — add one in Settings before calculating depreciation." });
+    }
+
+    const asOfDate = asset.disposalDate || new Date().toISOString().slice(0, 10);
+    const existingEntries = await storage.getFixedAssetDepreciationEntries(id);
+    const fullSchedule = buildDepreciationSchedule({
+      acquisitionDate: asset.acquisitionDate,
+      originalCost: parseFloat(asset.originalCost),
+      residualValue: parseFloat(asset.residualValue),
+      usefulLifeYears: parseFloat(asset.usefulLifeYears),
+      method: asset.depreciationMethod as "slm" | "wdv",
+      financialYearBoundaries: boundaries,
+      asOfDate,
+    });
+
+    // Append-only: never touch a persisted (possibly closed-year) entry —
+    // only insert periods that come strictly after the last persisted one.
+    const lastPersistedEnd = existingEntries.length > 0
+      ? existingEntries[existingEntries.length - 1].periodEndDate
+      : null;
+    const newPeriods = lastPersistedEnd
+      ? fullSchedule.filter(e => e.periodStartDate > lastPersistedEnd)
+      : fullSchedule;
+
+    for (const period of newPeriods) {
+      await storage.createFixedAssetDepreciationEntry({
+        fixedAssetId: id,
+        periodStartDate: period.periodStartDate,
+        periodEndDate: period.periodEndDate,
+        financialYearLabel: period.financialYearLabel,
+        openingWdv: String(period.openingWdv),
+        depreciationAmount: String(period.depreciationAmount),
+        closingWdv: String(period.closingWdv),
+        method: period.method,
+        isProrated: period.isProrated,
+        calculatedBy: req.user!.id,
+      });
+    }
+
+    const allEntries = await storage.getFixedAssetDepreciationEntries(id);
+    const summary = summarize(fullSchedule);
+    await storage.updateFixedAsset(id, {
+      accumulatedDepreciation: String(summary.accumulatedDepreciation),
+      currentBookValue: summary.currentBookValue !== null ? String(summary.currentBookValue) : null,
+    });
+
+    res.json({ entries: allEntries, summary });
+  });
+
+  app.post("/api/accounting/fixed-assets/:id/recalculate-depreciation", requireAuth, requirePermission("fixed_assets.edit"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const asset = await storage.getFixedAsset(id);
+    if (!asset) return res.status(404).json({ message: "Fixed asset not found" });
+
+    const existingEntries = await storage.getFixedAssetDepreciationEntries(id);
+    for (const entry of existingEntries) {
+      const isPastYear = await isPastFinancialYearDate(entry.periodEndDate);
+      if (isPastYear && !ROLES_ALLOWED_PAST_FY_ENTRY.includes(req.user!.role)) {
+        return res.status(400).json({ message: "This asset has depreciation entries in a closed financial year — recalculating requires a Senior Accountant, Admin, or Super Admin." });
+      }
+    }
+
+    const boundaries = await getFinancialYearBoundaries();
+    if (boundaries.length === 0) {
+      return res.status(400).json({ message: "No financial years are configured — add one in Settings before calculating depreciation." });
+    }
+
+    await storage.deleteFixedAssetDepreciationEntriesForAsset(id);
+
+    const asOfDate = asset.disposalDate || new Date().toISOString().slice(0, 10);
+    const fullSchedule = buildDepreciationSchedule({
+      acquisitionDate: asset.acquisitionDate,
+      originalCost: parseFloat(asset.originalCost),
+      residualValue: parseFloat(asset.residualValue),
+      usefulLifeYears: parseFloat(asset.usefulLifeYears),
+      method: asset.depreciationMethod as "slm" | "wdv",
+      financialYearBoundaries: boundaries,
+      asOfDate,
+    });
+
+    for (const period of fullSchedule) {
+      await storage.createFixedAssetDepreciationEntry({
+        fixedAssetId: id,
+        periodStartDate: period.periodStartDate,
+        periodEndDate: period.periodEndDate,
+        financialYearLabel: period.financialYearLabel,
+        openingWdv: String(period.openingWdv),
+        depreciationAmount: String(period.depreciationAmount),
+        closingWdv: String(period.closingWdv),
+        method: period.method,
+        isProrated: period.isProrated,
+        calculatedBy: req.user!.id,
+      });
+    }
+
+    const summary = summarize(fullSchedule);
+    await storage.updateFixedAsset(id, {
+      accumulatedDepreciation: String(summary.accumulatedDepreciation),
+      currentBookValue: summary.currentBookValue !== null ? String(summary.currentBookValue) : null,
+    });
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "recalculate", entity: "fixed_asset",
+      entityId: id, details: `Recalculated depreciation schedule for: ${asset.name} (${asset.assetCode})`,
+      ipAddress: req.ip || null,
+    });
+
+    const allEntries = await storage.getFixedAssetDepreciationEntries(id);
+    res.json({ entries: allEntries, summary });
   });
 
   // Parties (Customers/Vendors)
