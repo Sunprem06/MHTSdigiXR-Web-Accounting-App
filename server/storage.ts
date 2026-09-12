@@ -30,6 +30,9 @@ import {
   leaveTypes, leaveBalances, leaveRequests,
   type InsertLeaveType, type InsertLeaveBalance, type InsertLeaveRequest,
   type LeaveType, type LeaveBalance, type LeaveRequest,
+  attendanceRosterAssignments, attendanceSwapRequests,
+  type InsertAttendanceRosterAssignment, type InsertAttendanceSwapRequest,
+  type AttendanceRosterAssignment, type AttendanceSwapRequest,
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -191,6 +194,16 @@ export interface IStorage {
   getOverlappingLeaveRequests(employeeId: number, startDate: string, endDate: string, excludeId?: number): Promise<LeaveRequest[]>;
   createLeaveRequest(data: InsertLeaveRequest & { approverId: number | null }): Promise<LeaveRequest>;
   updateLeaveRequest(id: number, data: Partial<LeaveRequest>): Promise<LeaveRequest | undefined>;
+
+  getAttendanceRoster(employeeId: number): Promise<AttendanceRosterAssignment[]>;
+  getAttendanceRosterForEmployees(employeeIds: number[]): Promise<AttendanceRosterAssignment[]>;
+  upsertAttendanceRosterAssignment(employeeId: number, weekday: number, dayType: string, updatedBy: number): Promise<AttendanceRosterAssignment>;
+
+  getAttendanceSwapRequests(filters?: { employeeId?: number; status?: string }): Promise<AttendanceSwapRequest[]>;
+  getAttendanceSwapRequest(id: number): Promise<AttendanceSwapRequest | undefined>;
+  getOverlappingAttendanceSwaps(employeeId: number, date: string): Promise<AttendanceSwapRequest[]>;
+  createAttendanceSwapRequest(data: InsertAttendanceSwapRequest): Promise<AttendanceSwapRequest>;
+  updateAttendanceSwapRequest(id: number, data: Partial<AttendanceSwapRequest>): Promise<AttendanceSwapRequest | undefined>;
 
   deleteProduct(id: number): Promise<boolean>;
   deleteParty(id: number): Promise<boolean>;
@@ -1099,6 +1112,62 @@ export class DatabaseStorage implements IStorage {
 
   async updateLeaveRequest(id: number, data: Partial<LeaveRequest>): Promise<LeaveRequest | undefined> {
     const [updated] = await db.update(leaveRequests).set(data).where(eq(leaveRequests.id, id)).returning();
+    return updated;
+  }
+
+  async getAttendanceRoster(employeeId: number): Promise<AttendanceRosterAssignment[]> {
+    return await db.select().from(attendanceRosterAssignments).where(eq(attendanceRosterAssignments.employeeId, employeeId)).orderBy(attendanceRosterAssignments.weekday);
+  }
+
+  async getAttendanceRosterForEmployees(employeeIds: number[]): Promise<AttendanceRosterAssignment[]> {
+    if (employeeIds.length === 0) return [];
+    return await db.select().from(attendanceRosterAssignments).where(inArray(attendanceRosterAssignments.employeeId, employeeIds));
+  }
+
+  async upsertAttendanceRosterAssignment(employeeId: number, weekday: number, dayType: string, updatedBy: number): Promise<AttendanceRosterAssignment> {
+    const [existing] = await db.select().from(attendanceRosterAssignments).where(and(
+      eq(attendanceRosterAssignments.employeeId, employeeId), eq(attendanceRosterAssignments.weekday, weekday),
+    )).limit(1);
+    if (existing) {
+      const [updated] = await db.update(attendanceRosterAssignments)
+        .set({ dayType, updatedBy, updatedAt: new Date() })
+        .where(eq(attendanceRosterAssignments.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(attendanceRosterAssignments).values({ employeeId, weekday, dayType, updatedBy }).returning();
+    return created;
+  }
+
+  async getAttendanceSwapRequests(filters?: { employeeId?: number; status?: string }): Promise<AttendanceSwapRequest[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(or(eq(attendanceSwapRequests.requesterId, filters.employeeId), eq(attendanceSwapRequests.partnerId, filters.employeeId)));
+    if (filters?.status) conditions.push(eq(attendanceSwapRequests.status, filters.status));
+    if (conditions.length) {
+      return await db.select().from(attendanceSwapRequests).where(and(...conditions)).orderBy(desc(attendanceSwapRequests.requestedAt));
+    }
+    return await db.select().from(attendanceSwapRequests).orderBy(desc(attendanceSwapRequests.requestedAt));
+  }
+
+  async getAttendanceSwapRequest(id: number): Promise<AttendanceSwapRequest | undefined> {
+    const [request] = await db.select().from(attendanceSwapRequests).where(eq(attendanceSwapRequests.id, id));
+    return request;
+  }
+
+  async getOverlappingAttendanceSwaps(employeeId: number, date: string): Promise<AttendanceSwapRequest[]> {
+    return await db.select().from(attendanceSwapRequests).where(and(
+      eq(attendanceSwapRequests.date, date),
+      or(eq(attendanceSwapRequests.requesterId, employeeId), eq(attendanceSwapRequests.partnerId, employeeId)),
+      or(eq(attendanceSwapRequests.status, "pending"), eq(attendanceSwapRequests.status, "accepted")),
+    ));
+  }
+
+  async createAttendanceSwapRequest(data: InsertAttendanceSwapRequest): Promise<AttendanceSwapRequest> {
+    const [newRequest] = await db.insert(attendanceSwapRequests).values(data).returning();
+    return newRequest;
+  }
+
+  async updateAttendanceSwapRequest(id: number, data: Partial<AttendanceSwapRequest>): Promise<AttendanceSwapRequest | undefined> {
+    const [updated] = await db.update(attendanceSwapRequests).set(data).where(eq(attendanceSwapRequests.id, id)).returning();
     return updated;
   }
 

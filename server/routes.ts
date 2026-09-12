@@ -12,6 +12,7 @@ import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
 import { getFinancialYearPeriods, computeMonthlyAccrualCredit, computeCarryForwardOpeningBalance, computeAvailableBalance, round1 } from "./lib/leave-accrual-engine";
+import { getWeekday, resolveEffectiveDayType, validateSwapRequest } from "./lib/attendance-roster-engine";
 
 // ── Tutor payslip calculation — Sec 194J (KoodaldigiXS Learning independent contractors) ──
 // Matches Clause 4.1-4.4 of the signed Individual Tutor Agreement (verified against real
@@ -2064,6 +2065,211 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json(updated);
+  });
+
+  // Attendance Roster (hybrid WFO/WFH + swaps) — DRAFT default template below
+  // is a literal reading of "4 WFO, 3 WFH" (Mon-Thu office, Fri-Sat-Sun home,
+  // no day off) since which specific weekdays and whether every role follows
+  // the same split was not confirmed. Fully per-employee editable — this only
+  // seeds a starting point for employees with no roster configured yet.
+  const DEFAULT_ROSTER_TEMPLATE: Record<number, string> = { 0: "wfh", 1: "wfo", 2: "wfo", 3: "wfo", 4: "wfo", 5: "wfh", 6: "wfh" };
+
+  async function resolveWeekEffectiveTypes(employeeId: number, startDate: string) {
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const dates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setUTCDate(start.getUTCDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+    const roster = await storage.getAttendanceRoster(employeeId);
+    const rosterByWeekday = new Map(roster.map(r => [r.weekday, r.dayType]));
+    const acceptedSwaps = await storage.getAttendanceSwapRequests({ employeeId, status: "accepted" });
+    const swapByDate = new Map(acceptedSwaps.map(s => [s.date, s]));
+
+    const results = [];
+    for (const date of dates) {
+      const weekday = getWeekday(date);
+      const ownRosterType = (rosterByWeekday.get(weekday) as any) || null;
+      const swap = swapByDate.get(date);
+      let acceptedSwap = null;
+      if (swap) {
+        const otherId = swap.requesterId === employeeId ? swap.partnerId : swap.requesterId;
+        const otherRoster = await storage.getAttendanceRoster(otherId);
+        const otherByWeekday = new Map(otherRoster.map(r => [r.weekday, r.dayType]));
+        acceptedSwap = {
+          requesterId: swap.requesterId, partnerId: swap.partnerId,
+          requesterRosterType: (swap.requesterId === employeeId ? ownRosterType : otherByWeekday.get(weekday)) as any,
+          partnerRosterType: (swap.partnerId === employeeId ? ownRosterType : otherByWeekday.get(weekday)) as any,
+        };
+      }
+      const effectiveType = resolveEffectiveDayType({ employeeId, ownRosterType, acceptedSwap });
+      results.push({ date, weekday, rosterType: ownRosterType, effectiveType, swapId: swap?.id || null });
+    }
+    return results;
+  }
+
+  app.get("/api/accounting/attendance/week/mine", requireAuth, requirePermission("attendance.view_own"), async (req, res) => {
+    const startDate = (req.query.startDate as string) || new Date().toISOString().slice(0, 10);
+    const week = await resolveWeekEffectiveTypes(req.user!.id, startDate);
+    res.json(week);
+  });
+
+  app.get("/api/accounting/attendance/roster", requireAuth, requirePermission("attendance.manage"), async (req, res) => {
+    const employees = (await storage.getEmployees()).filter(e => e.isActive && e.role !== "tutor");
+    const roster = await storage.getAttendanceRosterForEmployees(employees.map(e => e.id));
+    const byEmployee = new Map<number, Record<number, string>>();
+    for (const row of roster) {
+      if (!byEmployee.has(row.employeeId)) byEmployee.set(row.employeeId, {});
+      byEmployee.get(row.employeeId)![row.weekday] = row.dayType;
+    }
+    res.json(employees.map(e => ({ employeeId: e.id, employeeName: e.fullName, weekdayTypes: byEmployee.get(e.id) || null })));
+  });
+
+  app.put("/api/accounting/attendance/roster/:employeeId", requireAuth, requirePermission("attendance.manage"), async (req, res) => {
+    const employeeId = parseInt(req.params.employeeId);
+    const assignments = req.body.assignments as Array<{ weekday: number; dayType: string }>;
+    if (!Array.isArray(assignments)) return res.status(400).json({ message: "assignments array is required" });
+    for (const a of assignments) {
+      if (![0, 1, 2, 3, 4, 5, 6].includes(a.weekday) || !["wfo", "wfh", "off"].includes(a.dayType)) {
+        return res.status(400).json({ message: `Invalid assignment: weekday ${a.weekday}, dayType ${a.dayType}` });
+      }
+    }
+    for (const a of assignments) {
+      await storage.upsertAttendanceRosterAssignment(employeeId, a.weekday, a.dayType, req.user!.id);
+    }
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "attendance_roster",
+      entityId: employeeId, details: `Updated attendance roster for employee #${employeeId}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(await storage.getAttendanceRoster(employeeId));
+  });
+
+  app.post("/api/accounting/attendance/roster/apply-default-template", requireAuth, requirePermission("attendance.manage"), async (req, res) => {
+    const employees = (await storage.getEmployees()).filter(e => e.isActive && e.role !== "tutor");
+    let applied = 0;
+    for (const employee of employees) {
+      const existing = await storage.getAttendanceRoster(employee.id);
+      if (existing.length > 0) continue;
+      for (const [weekday, dayType] of Object.entries(DEFAULT_ROSTER_TEMPLATE)) {
+        await storage.upsertAttendanceRosterAssignment(employee.id, parseInt(weekday), dayType, req.user!.id);
+      }
+      applied += 1;
+    }
+    res.json({ applied });
+  });
+
+  app.post("/api/accounting/attendance/swaps", requireAuth, requirePermission("attendance.request_swap"), async (req, res) => {
+    const { date, partnerId, reason } = req.body;
+    if (!date || !partnerId) return res.status(400).json({ message: "date and partnerId are required" });
+    if (parseInt(partnerId) === req.user!.id) return res.status(400).json({ message: "You cannot swap with yourself" });
+    const partner = await storage.getEmployeeById(parseInt(partnerId));
+    if (!partner || !partner.isActive || partner.role === "tutor") {
+      return res.status(400).json({ message: "Selected colleague is not eligible for an attendance swap" });
+    }
+
+    const weekday = getWeekday(date);
+    const [requesterRoster, partnerRoster] = await Promise.all([
+      storage.getAttendanceRoster(req.user!.id),
+      storage.getAttendanceRoster(partner.id),
+    ]);
+    const requesterRosterType = (requesterRoster.find(r => r.weekday === weekday)?.dayType as any) || null;
+    const partnerRosterType = (partnerRoster.find(r => r.weekday === weekday)?.dayType as any) || null;
+    const validationError = validateSwapRequest({ requesterRosterType, partnerRosterType });
+    if (validationError) return res.status(400).json({ message: validationError });
+
+    const [requesterOverlap, partnerOverlap] = await Promise.all([
+      storage.getOverlappingAttendanceSwaps(req.user!.id, date),
+      storage.getOverlappingAttendanceSwaps(partner.id, date),
+    ]);
+    if (requesterOverlap.length > 0 || partnerOverlap.length > 0) {
+      return res.status(400).json({ message: "One of you already has a pending or accepted swap on this date" });
+    }
+
+    const swap = await storage.createAttendanceSwapRequest({
+      date, requesterId: req.user!.id, partnerId: partner.id, reason: reason || null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "attendance_swap",
+      entityId: swap.id, details: `Requested attendance swap with employee #${partner.id} on ${date}`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(swap);
+  });
+
+  app.get("/api/accounting/attendance/swaps/mine", requireAuth, requirePermission("attendance.view_own"), async (req, res) => {
+    const swaps = await storage.getAttendanceSwapRequests({ employeeId: req.user!.id });
+    const employees = await storage.getEmployees();
+    const employeeById = new Map(employees.map(e => [e.id, e]));
+    res.json(swaps.map(s => ({
+      ...s,
+      requesterName: employeeById.get(s.requesterId)?.fullName || `Employee #${s.requesterId}`,
+      partnerName: employeeById.get(s.partnerId)?.fullName || `Employee #${s.partnerId}`,
+    })));
+  });
+
+  function canActOnAttendanceSwap(req: any, swap: { partnerId: number }): boolean {
+    const perms: string[] = req.user!.permissions || [];
+    return perms.includes("attendance.manage") || swap.partnerId === req.user!.id;
+  }
+
+  app.post("/api/accounting/attendance/swaps/:id/accept", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const swap = await storage.getAttendanceSwapRequest(id);
+    if (!swap) return res.status(404).json({ message: "Swap request not found" });
+    if (!canActOnAttendanceSwap(req, swap)) return res.status(403).json({ message: "You are not authorized to accept this swap" });
+    if (swap.status !== "pending") return res.status(400).json({ message: "Only pending swaps can be accepted" });
+    const updated = await storage.updateAttendanceSwapRequest(id, { status: "accepted", decidedBy: req.user!.id, decidedAt: new Date() });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "accept", entity: "attendance_swap",
+      entityId: id, details: `Accepted attendance swap for ${swap.date}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/attendance/swaps/:id/reject", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const swap = await storage.getAttendanceSwapRequest(id);
+    if (!swap) return res.status(404).json({ message: "Swap request not found" });
+    if (!canActOnAttendanceSwap(req, swap)) return res.status(403).json({ message: "You are not authorized to reject this swap" });
+    if (swap.status !== "pending") return res.status(400).json({ message: "Only pending swaps can be rejected" });
+    const updated = await storage.updateAttendanceSwapRequest(id, { status: "rejected", decidedBy: req.user!.id, decidedAt: new Date() });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "reject", entity: "attendance_swap",
+      entityId: id, details: `Rejected attendance swap for ${swap.date}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/attendance/swaps/:id/cancel", requireAuth, requirePermission("attendance.request_swap"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const swap = await storage.getAttendanceSwapRequest(id);
+    if (!swap) return res.status(404).json({ message: "Swap request not found" });
+    if (swap.requesterId !== req.user!.id) return res.status(403).json({ message: "You can only cancel your own swap requests" });
+    if (swap.status !== "pending") return res.status(400).json({ message: "Only pending swaps can be cancelled" });
+    const updated = await storage.updateAttendanceSwapRequest(id, { status: "cancelled" });
+    res.json(updated);
+  });
+
+  app.get("/api/accounting/attendance/reports/swaps", requireAuth, requirePermission("attendance.view"), async (req, res) => {
+    const status = req.query.status as string | undefined;
+    const swaps = await storage.getAttendanceSwapRequests({ status });
+    const employees = await storage.getEmployees();
+    const employeeById = new Map(employees.map(e => [e.id, e]));
+    const enriched = swaps.map(s => ({
+      ...s,
+      requesterName: employeeById.get(s.requesterId)?.fullName || `Employee #${s.requesterId}`,
+      partnerName: employeeById.get(s.partnerId)?.fullName || `Employee #${s.partnerId}`,
+    }));
+    const countsByEmployee = new Map<string, number>();
+    for (const s of enriched) {
+      if (s.status !== "accepted") continue;
+      countsByEmployee.set(s.requesterName, (countsByEmployee.get(s.requesterName) || 0) + 1);
+      countsByEmployee.set(s.partnerName, (countsByEmployee.get(s.partnerName) || 0) + 1);
+    }
+    res.json({ swaps: enriched, swapCountsByEmployee: Object.fromEntries(countsByEmployee) });
   });
 
   // Company Settings

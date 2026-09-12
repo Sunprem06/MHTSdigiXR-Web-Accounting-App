@@ -582,6 +582,52 @@ export const leaveRequests = pgTable("leave_requests", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Attendance Roster: hybrid WFO/WFH (salaried MHTSdigiXR staff only — NOT
+// tutors). Deliberately separate from Leave Management: a WFH day is still a
+// working day, not leave, so nothing here ever touches leaveBalances/
+// leaveRequests. The "4 WFO / 3 WFH" split the user described is NOT
+// hardcoded — it's a per-employee weekly template, admin-configurable, since
+// which specific weekdays are WFO/WFH (and whether the ratio is uniform
+// across roles) was not confirmed before building. Swapping is a same-date,
+// two-person exchange of each other's normal day-type, requiring the named
+// colleague's acceptance — mirrors how leave approval already trusts a named
+// party (approverId) without needing a separate permission.
+export const ATTENDANCE_DAY_TYPES = ["wfo", "wfh", "off"] as const;
+export type AttendanceDayType = typeof ATTENDANCE_DAY_TYPES[number];
+
+// One row per employee per weekday (0=Sunday..6=Saturday, matching JS
+// Date#getUTCDay()) — the STANDING weekly pattern, not a per-date calendar.
+// No app-level composite-uniqueness enforcement beyond routes doing an
+// upsert-by-(employeeId, weekday); this is a brand new table so a DB unique
+// index could be added safely later if a stronger guarantee is ever needed.
+export const attendanceRosterAssignments = pgTable("attendance_roster_assignments", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  weekday: integer("weekday").notNull(),
+  dayType: text("day_type").notNull().default("wfo"),
+  updatedBy: integer("updated_by").references(() => employees.id),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const ATTENDANCE_SWAP_STATUSES = ["pending", "accepted", "rejected", "cancelled"] as const;
+export type AttendanceSwapStatus = typeof ATTENDANCE_SWAP_STATUSES[number];
+
+export const attendanceSwapRequests = pgTable("attendance_swap_requests", {
+  id: serial("id").primaryKey(),
+  date: date("date").notNull(),
+  requesterId: integer("requester_id").references(() => employees.id).notNull(),
+  partnerId: integer("partner_id").references(() => employees.id).notNull(),
+  status: text("status").notNull().default("pending"),
+  reason: text("reason"),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  // Normally the named partner accepting/rejecting their own invite, but an
+  // attendance.manage holder can also act — same HR/admin-override pattern
+  // as leave.approve.
+  decidedBy: integer("decided_by").references(() => employees.id),
+  decidedAt: timestamp("decided_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const ATTACHMENT_ENTITY_TYPES = ["voucher", "expense_claim", "quotation", "party"] as const;
 export type AttachmentEntityType = typeof ATTACHMENT_ENTITY_TYPES[number];
 
@@ -749,6 +795,10 @@ export const insertLeaveBalanceSchema = createInsertSchema(leaveBalances).omit({
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({
   id: true, createdAt: true, appliedAt: true, status: true, approverId: true, decidedBy: true, decidedAt: true,
 });
+export const insertAttendanceRosterAssignmentSchema = createInsertSchema(attendanceRosterAssignments).omit({ id: true, updatedAt: true });
+export const insertAttendanceSwapRequestSchema = createInsertSchema(attendanceSwapRequests).omit({
+  id: true, createdAt: true, requestedAt: true, status: true, decidedBy: true, decidedAt: true,
+});
 export const insertJobPostingSchema = createInsertSchema(jobPostings).omit({ id: true, createdAt: true });
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({ id: true, createdAt: true });
 export const insertFaqItemSchema = createInsertSchema(faqItems).omit({ id: true, createdAt: true });
@@ -820,6 +870,10 @@ export type LeaveBalance = typeof leaveBalances.$inferSelect;
 export type InsertLeaveBalance = z.infer<typeof insertLeaveBalanceSchema>;
 export type LeaveRequest = typeof leaveRequests.$inferSelect;
 export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
+export type AttendanceRosterAssignment = typeof attendanceRosterAssignments.$inferSelect;
+export type InsertAttendanceRosterAssignment = z.infer<typeof insertAttendanceRosterAssignmentSchema>;
+export type AttendanceSwapRequest = typeof attendanceSwapRequests.$inferSelect;
+export type InsertAttendanceSwapRequest = z.infer<typeof insertAttendanceSwapRequestSchema>;
 export type JobPosting = typeof jobPostings.$inferSelect;
 export type InsertJobPosting = z.infer<typeof insertJobPostingSchema>;
 export type JobApplication = typeof jobApplications.$inferSelect;
@@ -882,6 +936,10 @@ export const ALL_PERMISSIONS = [
   // regardless of hierarchy; a plain manager approves their own reports' leave
   // via employees.reportsTo instead, without needing this permission at all.
   "leave.view", "leave.view_own", "leave.apply", "leave.approve", "leave.manage",
+  // attendance.manage covers configuring rosters AND acting as the HR/admin
+  // override on a swap request (mirrors leave.approve) — a plain colleague
+  // accepts/rejects a swap they were named on without needing any permission.
+  "attendance.view", "attendance.view_own", "attendance.request_swap", "attendance.manage",
 ] as const;
 
 export type Permission = typeof ALL_PERMISSIONS[number];
@@ -908,6 +966,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   payroll_employees: { label: "Payroll - Employees (Stub)", permissions: ["payroll_employees.view", "payroll_employees.manage", "payroll_employees.view_own"] },
   financial_years: { label: "Financial Years", permissions: ["financial_years.manage"] },
   leave: { label: "Leave Management", permissions: ["leave.view", "leave.view_own", "leave.apply", "leave.approve", "leave.manage"] },
+  attendance: { label: "Attendance Roster", permissions: ["attendance.view", "attendance.view_own", "attendance.request_swap", "attendance.manage"] },
 };
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
@@ -916,7 +975,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   // the user that ONLY super_admin should be able to create/revoke ERP licenses or see
   // activation codes, not every admin.
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.") && !p.startsWith("erp_licenses.")),
-  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own", "leave.view_own", "leave.apply"],
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
   senior_accountant: [
     "dashboard.view",
     "ledgers.view", "ledgers.create", "ledgers.edit",
@@ -937,7 +996,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     // types and see all requests/balances, but final HR-level leave.approve
     // (i.e. approving someone else's team's request) requires admin/super_admin.
     // They can still approve their OWN direct reports via employees.reportsTo.
-    "leave.view", "leave.manage", "leave.view_own", "leave.apply",
+    "leave.view", "leave.manage", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap",
+    "attendance.view", "attendance.manage",
   ],
   accountant: [
     "dashboard.view",
@@ -950,11 +1010,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "expenses.view", "expenses.create",
     "reports.view",
     "payroll_employees.view_own",
-    "leave.view_own", "leave.apply",
+    "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap",
   ],
-  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view", "payroll_employees.view_own", "leave.view_own", "leave.apply"],
-  viewer: ["dashboard.view", "payroll_employees.view_own", "leave.view_own", "leave.apply"],
-  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view", "payroll_employees.view_own", "leave.view_own", "leave.apply"],
+  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
+  viewer: ["dashboard.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
+  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
   sales_manager: [
     "dashboard.view",
     "quotations.view", "quotations.create", "quotations.edit", "quotations.approve",
@@ -964,7 +1024,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "expenses.view",
     "reports.view",
     "payroll_employees.view_own",
-    "leave.view_own", "leave.apply",
+    "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap",
   ],
   // Tutor self-service: view-only access to their own payslips. Scoped
   // server-side to the tutor record linked via tutors.loginEmployeeId —
