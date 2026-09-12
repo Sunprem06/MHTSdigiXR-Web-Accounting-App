@@ -27,6 +27,9 @@ import {
   type InsertTutor, type InsertTutorAgreement, type InsertTutorPayslip, type InsertPayrollEmployee, type InsertPayrollStatutoryConfigVersion,
   type Tutor, type TutorAgreement, type TutorPayslip, type PayrollEmployee, type PayrollStatutoryConfigVersion,
   emailTemplates, type InsertEmailTemplate, type EmailTemplate,
+  leaveTypes, leaveBalances, leaveRequests,
+  type InsertLeaveType, type InsertLeaveBalance, type InsertLeaveRequest,
+  type LeaveType, type LeaveBalance, type LeaveRequest,
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -168,6 +171,26 @@ export interface IStorage {
   getPayrollStatutoryConfigVersions(): Promise<PayrollStatutoryConfigVersion[]>;
   createPayrollStatutoryConfigVersion(version: InsertPayrollStatutoryConfigVersion): Promise<PayrollStatutoryConfigVersion>;
   getNextClaimNumber(): Promise<string>;
+
+  getEmployeesReportingTo(managerId: number): Promise<Employee[]>;
+
+  getLeaveTypes(activeOnly?: boolean): Promise<LeaveType[]>;
+  getLeaveType(id: number): Promise<LeaveType | undefined>;
+  getLeaveTypeByCode(code: string): Promise<LeaveType | undefined>;
+  createLeaveType(data: InsertLeaveType): Promise<LeaveType>;
+  updateLeaveType(id: number, data: Partial<InsertLeaveType>): Promise<LeaveType | undefined>;
+
+  getLeaveBalances(filters?: { employeeId?: number; financialYearId?: number }): Promise<LeaveBalance[]>;
+  getLeaveBalanceById(id: number): Promise<LeaveBalance | undefined>;
+  getLeaveBalance(employeeId: number, leaveTypeId: number, financialYearId: number): Promise<LeaveBalance | undefined>;
+  createLeaveBalance(data: InsertLeaveBalance): Promise<LeaveBalance>;
+  updateLeaveBalance(id: number, data: Partial<InsertLeaveBalance>): Promise<LeaveBalance | undefined>;
+
+  getLeaveRequests(filters?: { employeeId?: number; approverId?: number; status?: string }): Promise<LeaveRequest[]>;
+  getLeaveRequest(id: number): Promise<LeaveRequest | undefined>;
+  getOverlappingLeaveRequests(employeeId: number, startDate: string, endDate: string, excludeId?: number): Promise<LeaveRequest[]>;
+  createLeaveRequest(data: InsertLeaveRequest & { approverId: number | null }): Promise<LeaveRequest>;
+  updateLeaveRequest(id: number, data: Partial<LeaveRequest>): Promise<LeaveRequest | undefined>;
 
   deleteProduct(id: number): Promise<boolean>;
   deleteParty(id: number): Promise<boolean>;
@@ -975,6 +998,108 @@ export class DatabaseStorage implements IStorage {
   async createPayrollStatutoryConfigVersion(version: InsertPayrollStatutoryConfigVersion): Promise<PayrollStatutoryConfigVersion> {
     const [newVersion] = await db.insert(payrollStatutoryConfigVersions).values(version).returning();
     return newVersion;
+  }
+
+  async getEmployeesReportingTo(managerId: number): Promise<Employee[]> {
+    return await db.select().from(employees).where(eq(employees.reportsTo, managerId)).orderBy(employees.fullName);
+  }
+
+  async getLeaveTypes(activeOnly?: boolean): Promise<LeaveType[]> {
+    if (activeOnly) {
+      return await db.select().from(leaveTypes).where(eq(leaveTypes.isActive, true)).orderBy(leaveTypes.name);
+    }
+    return await db.select().from(leaveTypes).orderBy(leaveTypes.name);
+  }
+
+  async getLeaveType(id: number): Promise<LeaveType | undefined> {
+    const [type] = await db.select().from(leaveTypes).where(eq(leaveTypes.id, id));
+    return type;
+  }
+
+  async getLeaveTypeByCode(code: string): Promise<LeaveType | undefined> {
+    const [type] = await db.select().from(leaveTypes).where(eq(leaveTypes.code, code));
+    return type;
+  }
+
+  async createLeaveType(data: InsertLeaveType): Promise<LeaveType> {
+    const [newType] = await db.insert(leaveTypes).values(data).returning();
+    return newType;
+  }
+
+  async updateLeaveType(id: number, data: Partial<InsertLeaveType>): Promise<LeaveType | undefined> {
+    const [updated] = await db.update(leaveTypes).set(data).where(eq(leaveTypes.id, id)).returning();
+    return updated;
+  }
+
+  async getLeaveBalances(filters?: { employeeId?: number; financialYearId?: number }): Promise<LeaveBalance[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(eq(leaveBalances.employeeId, filters.employeeId));
+    if (filters?.financialYearId) conditions.push(eq(leaveBalances.financialYearId, filters.financialYearId));
+    if (conditions.length) {
+      return await db.select().from(leaveBalances).where(and(...conditions));
+    }
+    return await db.select().from(leaveBalances);
+  }
+
+  async getLeaveBalanceById(id: number): Promise<LeaveBalance | undefined> {
+    const [balance] = await db.select().from(leaveBalances).where(eq(leaveBalances.id, id));
+    return balance;
+  }
+
+  async getLeaveBalance(employeeId: number, leaveTypeId: number, financialYearId: number): Promise<LeaveBalance | undefined> {
+    const [balance] = await db.select().from(leaveBalances).where(and(
+      eq(leaveBalances.employeeId, employeeId),
+      eq(leaveBalances.leaveTypeId, leaveTypeId),
+      eq(leaveBalances.financialYearId, financialYearId),
+    )).limit(1);
+    return balance;
+  }
+
+  async createLeaveBalance(data: InsertLeaveBalance): Promise<LeaveBalance> {
+    const [newBalance] = await db.insert(leaveBalances).values(data).returning();
+    return newBalance;
+  }
+
+  async updateLeaveBalance(id: number, data: Partial<InsertLeaveBalance>): Promise<LeaveBalance | undefined> {
+    const [updated] = await db.update(leaveBalances).set({ ...data, updatedAt: new Date() }).where(eq(leaveBalances.id, id)).returning();
+    return updated;
+  }
+
+  async getLeaveRequests(filters?: { employeeId?: number; approverId?: number; status?: string }): Promise<LeaveRequest[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(eq(leaveRequests.employeeId, filters.employeeId));
+    if (filters?.approverId) conditions.push(eq(leaveRequests.approverId, filters.approverId));
+    if (filters?.status) conditions.push(eq(leaveRequests.status, filters.status));
+    if (conditions.length) {
+      return await db.select().from(leaveRequests).where(and(...conditions)).orderBy(desc(leaveRequests.appliedAt));
+    }
+    return await db.select().from(leaveRequests).orderBy(desc(leaveRequests.appliedAt));
+  }
+
+  async getLeaveRequest(id: number): Promise<LeaveRequest | undefined> {
+    const [request] = await db.select().from(leaveRequests).where(eq(leaveRequests.id, id));
+    return request;
+  }
+
+  async getOverlappingLeaveRequests(employeeId: number, startDate: string, endDate: string, excludeId?: number): Promise<LeaveRequest[]> {
+    const conditions = [
+      eq(leaveRequests.employeeId, employeeId),
+      or(eq(leaveRequests.status, "pending"), eq(leaveRequests.status, "approved")),
+      lte(leaveRequests.startDate, endDate),
+      gte(leaveRequests.endDate, startDate),
+    ];
+    if (excludeId) conditions.push(sql`${leaveRequests.id} != ${excludeId}`);
+    return await db.select().from(leaveRequests).where(and(...conditions));
+  }
+
+  async createLeaveRequest(data: InsertLeaveRequest & { approverId: number | null }): Promise<LeaveRequest> {
+    const [newRequest] = await db.insert(leaveRequests).values(data).returning();
+    return newRequest;
+  }
+
+  async updateLeaveRequest(id: number, data: Partial<LeaveRequest>): Promise<LeaveRequest | undefined> {
+    const [updated] = await db.update(leaveRequests).set(data).where(eq(leaveRequests.id, id)).returning();
+    return updated;
   }
 
   async deleteProduct(id: number): Promise<boolean> {

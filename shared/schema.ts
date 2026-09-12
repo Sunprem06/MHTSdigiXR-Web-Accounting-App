@@ -120,6 +120,13 @@ export const employees = pgTable("employees", {
   // -- --apply` first, then add .unique() here in a follow-up change once every
   // row has a code (see migrations/0002 and 0003_employee_code_unique.sql).
   employeeCode: text("employee_code"),
+  // Direct manager for approval routing (leave requests, future workflows).
+  // Self-referential -> employees.id; deliberately omits .references() the same
+  // way accountGroups.parentId does, to sidestep Drizzle's circular-type issue
+  // with self-referencing FKs. Nullable/optional by design — the ERP licensing
+  // product this business also sells externally needs Employees to work without
+  // a hierarchy, so this can never become a required field.
+  reportsTo: integer("reports_to"),
   isActive: boolean("is_active").notNull().default(true),
   lastLogin: timestamp("last_login"),
   passwordChangedAt: timestamp("password_changed_at").defaultNow().notNull(),
@@ -494,6 +501,87 @@ export const payrollStatutoryConfigVersions = pgTable("payroll_statutory_config_
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Leave Management (salaried MHTSdigiXR employees only — NOT tutors,
+// whose absence is already handled by the existing payslip deduction field).
+// The entitlement/carry-forward numbers seeded below are a DRAFT baseline off
+// common Karnataka Shops & Establishments Act practice (12 CL, 12 SL, ~18 EL
+// accrued monthly with a 30-day carry-forward cap, common paternity practice).
+// Same standing rule as the payroll Sec 192/PF/ESI/gratuity math: an HR
+// policy / CA review must confirm these before a real leave cycle relies on
+// them. The data model, accrual engine, and approval workflow work correctly
+// regardless of the final numbers — those live in editable rows here, not
+// hardcoded in logic.
+export const LEAVE_ACCRUAL_FREQUENCIES = ["annual", "monthly", "manual"] as const;
+export type LeaveAccrualFrequency = typeof LEAVE_ACCRUAL_FREQUENCIES[number];
+
+export const leaveTypes = pgTable("leave_types", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // CL, SL, EL, ML, PL, COMP_OFF, LOP
+  name: text("name").notNull(),
+  // Null = no fixed entitlement / balance not enforced (used for LOP, which is
+  // always available since it's unpaid rather than a granted benefit).
+  annualEntitlementDays: decimal("annual_entitlement_days", { precision: 5, scale: 1 }),
+  // annual = full entitlement granted at FY start; monthly = accrued in equal
+  // installments through the year; manual = only ever credited by an explicit
+  // balance adjustment (e.g. Comp-off, earned per instance of extra work).
+  accrualFrequency: text("accrual_frequency").notNull().default("annual"),
+  // Null = unlimited carry-forward, 0 = lapses at financial-year end, >0 = capped.
+  carryForwardCap: decimal("carry_forward_cap", { precision: 5, scale: 1 }),
+  isPaid: boolean("is_paid").notNull().default(true),
+  requiresApproval: boolean("requires_approval").notNull().default(true),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// One row per employee + leave type + financial year. Running totals rather
+// than a single mutable "balance" so opening/accrued/used/adjusted amounts
+// stay individually auditable — mirrors why fixedAssetDepreciationEntries are
+// kept as discrete rows instead of a single live-computed number.
+export const leaveBalances = pgTable("leave_balances", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  leaveTypeId: integer("leave_type_id").references(() => leaveTypes.id).notNull(),
+  financialYearId: integer("financial_year_id").references(() => financialYears.id).notNull(),
+  openingBalance: decimal("opening_balance", { precision: 5, scale: 1 }).notNull().default("0"),
+  accruedYtd: decimal("accrued_ytd", { precision: 5, scale: 1 }).notNull().default("0"),
+  usedYtd: decimal("used_ytd", { precision: 5, scale: 1 }).notNull().default("0"),
+  adjustmentYtd: decimal("adjustment_ytd", { precision: 5, scale: 1 }).notNull().default("0"),
+  // Last "YYYY-MM" the monthly accrual job credited through, so re-running it
+  // is idempotent instead of double-crediting a period.
+  lastAccrualPeriod: text("last_accrual_period"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const LEAVE_REQUEST_STATUSES = ["pending", "approved", "rejected", "cancelled"] as const;
+export type LeaveRequestStatus = typeof LEAVE_REQUEST_STATUSES[number];
+
+export const LEAVE_DAY_PORTIONS = ["full", "first_half", "second_half"] as const;
+export type LeaveDayPortion = typeof LEAVE_DAY_PORTIONS[number];
+
+export const leaveRequests = pgTable("leave_requests", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  leaveTypeId: integer("leave_type_id").references(() => leaveTypes.id).notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  startDayPortion: text("start_day_portion").notNull().default("full"),
+  endDayPortion: text("end_day_portion").notNull().default("full"),
+  numberOfDays: decimal("number_of_days", { precision: 4, scale: 1 }).notNull(),
+  reason: text("reason"),
+  status: text("status").notNull().default("pending"),
+  // Resolved from employees.reportsTo at application time, so a later change
+  // to the employee's manager doesn't retroactively alter who approved a past
+  // request. Null if no manager was set at the time — falls back to anyone
+  // holding leave.approve.
+  approverId: integer("approver_id").references(() => employees.id),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  decidedBy: integer("decided_by").references(() => employees.id),
+  decidedAt: timestamp("decided_at"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const ATTACHMENT_ENTITY_TYPES = ["voucher", "expense_claim", "quotation", "party"] as const;
 export type AttachmentEntityType = typeof ATTACHMENT_ENTITY_TYPES[number];
 
@@ -653,6 +741,14 @@ export const insertTutorAgreementSchema = createInsertSchema(tutorAgreements).om
 export const insertTutorPayslipSchema = createInsertSchema(tutorPayslips).omit({ id: true, createdAt: true });
 export const insertPayrollEmployeeSchema = createInsertSchema(payrollEmployees).omit({ id: true, createdAt: true });
 export const insertPayrollStatutoryConfigVersionSchema = createInsertSchema(payrollStatutoryConfigVersions).omit({ id: true, createdAt: true });
+export const insertLeaveTypeSchema = createInsertSchema(leaveTypes).omit({ id: true, createdAt: true });
+export const insertLeaveBalanceSchema = createInsertSchema(leaveBalances).omit({ id: true, createdAt: true, updatedAt: true });
+// status/approverId/decidedBy/decidedAt are always server-set (resolved from
+// employees.reportsTo and the acting user), never trusted from the client —
+// same convention as tutorPayslips' server-recomputed totals.
+export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({
+  id: true, createdAt: true, appliedAt: true, status: true, approverId: true, decidedBy: true, decidedAt: true,
+});
 export const insertJobPostingSchema = createInsertSchema(jobPostings).omit({ id: true, createdAt: true });
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({ id: true, createdAt: true });
 export const insertFaqItemSchema = createInsertSchema(faqItems).omit({ id: true, createdAt: true });
@@ -718,6 +814,12 @@ export type PayrollEmployee = typeof payrollEmployees.$inferSelect;
 export type InsertPayrollEmployee = z.infer<typeof insertPayrollEmployeeSchema>;
 export type PayrollStatutoryConfigVersion = typeof payrollStatutoryConfigVersions.$inferSelect;
 export type InsertPayrollStatutoryConfigVersion = z.infer<typeof insertPayrollStatutoryConfigVersionSchema>;
+export type LeaveType = typeof leaveTypes.$inferSelect;
+export type InsertLeaveType = z.infer<typeof insertLeaveTypeSchema>;
+export type LeaveBalance = typeof leaveBalances.$inferSelect;
+export type InsertLeaveBalance = z.infer<typeof insertLeaveBalanceSchema>;
+export type LeaveRequest = typeof leaveRequests.$inferSelect;
+export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
 export type JobPosting = typeof jobPostings.$inferSelect;
 export type InsertJobPosting = z.infer<typeof insertJobPostingSchema>;
 export type JobApplication = typeof jobApplications.$inferSelect;
@@ -776,6 +878,10 @@ export const ALL_PERMISSIONS = [
   // Deliberately separate from settings.manage (which is super_admin-only) so
   // Admin can also activate/manage financial years without the broader settings access.
   "financial_years.manage",
+  // leave.approve is the HR/admin-level override that can act on ANY request
+  // regardless of hierarchy; a plain manager approves their own reports' leave
+  // via employees.reportsTo instead, without needing this permission at all.
+  "leave.view", "leave.view_own", "leave.apply", "leave.approve", "leave.manage",
 ] as const;
 
 export type Permission = typeof ALL_PERMISSIONS[number];
@@ -801,6 +907,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   payroll_tutors: { label: "Payroll - Tutors", permissions: ["payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own"] },
   payroll_employees: { label: "Payroll - Employees (Stub)", permissions: ["payroll_employees.view", "payroll_employees.manage", "payroll_employees.view_own"] },
   financial_years: { label: "Financial Years", permissions: ["financial_years.manage"] },
+  leave: { label: "Leave Management", permissions: ["leave.view", "leave.view_own", "leave.apply", "leave.approve", "leave.manage"] },
 };
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
@@ -809,7 +916,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   // the user that ONLY super_admin should be able to create/revoke ERP licenses or see
   // activation codes, not every admin.
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.") && !p.startsWith("erp_licenses.")),
-  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own"],
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own", "leave.view_own", "leave.apply"],
   senior_accountant: [
     "dashboard.view",
     "ledgers.view", "ledgers.create", "ledgers.edit",
@@ -826,6 +933,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process",
     "payroll_employees.view", "payroll_employees.manage",
     "payroll_employees.view_own",
+    // Same split as payroll_tutors above: Senior Accountant can configure leave
+    // types and see all requests/balances, but final HR-level leave.approve
+    // (i.e. approving someone else's team's request) requires admin/super_admin.
+    // They can still approve their OWN direct reports via employees.reportsTo.
+    "leave.view", "leave.manage", "leave.view_own", "leave.apply",
   ],
   accountant: [
     "dashboard.view",
@@ -838,10 +950,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "expenses.view", "expenses.create",
     "reports.view",
     "payroll_employees.view_own",
+    "leave.view_own", "leave.apply",
   ],
-  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view", "payroll_employees.view_own"],
-  viewer: ["dashboard.view", "payroll_employees.view_own"],
-  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view", "payroll_employees.view_own"],
+  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view", "payroll_employees.view_own", "leave.view_own", "leave.apply"],
+  viewer: ["dashboard.view", "payroll_employees.view_own", "leave.view_own", "leave.apply"],
+  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view", "payroll_employees.view_own", "leave.view_own", "leave.apply"],
   sales_manager: [
     "dashboard.view",
     "quotations.view", "quotations.create", "quotations.edit", "quotations.approve",
@@ -851,6 +964,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "expenses.view",
     "reports.view",
     "payroll_employees.view_own",
+    "leave.view_own", "leave.apply",
   ],
   // Tutor self-service: view-only access to their own payslips. Scoped
   // server-side to the tutor record linked via tutors.loginEmployeeId —

@@ -83,6 +83,9 @@ import TutorPayslipEntry from "@/pages/accounting/payroll/TutorPayslipEntry";
 import TutorPayslipView from "@/pages/accounting/payroll/TutorPayslipView";
 import PayrollEmployees from "@/pages/accounting/payroll/PayrollEmployees";
 import MyPayslips from "@/pages/accounting/payroll/MyPayslips";
+import MyLeave from "@/pages/accounting/leave/MyLeave";
+import LeaveApprovals from "@/pages/accounting/leave/LeaveApprovals";
+import LeaveTypes from "@/pages/accounting/leave/LeaveTypes";
 
 function WebsiteRouter() {
   return (
@@ -240,6 +243,15 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/payroll/my-payslips">
         {() => <ProtectedRoute requiredPermission="payroll_tutors.view_own"><MyPayslips /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/leave/my-leave">
+        {() => <ProtectedRoute requiredPermission="leave.view_own"><MyLeave /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/leave/approvals">
+        {() => <ProtectedRoute requiredPermission="leave.view_own"><LeaveApprovals /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/leave/leave-types">
+        {() => <ProtectedRoute requiredPermission="leave.manage"><LeaveTypes /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/contact-inbox">
         {() => <ProtectedRoute requiredPermission="contacts.view"><ContactInbox /></ProtectedRoute>}

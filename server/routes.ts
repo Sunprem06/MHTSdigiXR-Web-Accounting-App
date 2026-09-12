@@ -11,6 +11,7 @@ import { rateLimiter } from "./middleware/security.js";
 import type { JobApplication } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
+import { getFinancialYearPeriods, computeMonthlyAccrualCredit, computeCarryForwardOpeningBalance, computeAvailableBalance, round1 } from "./lib/leave-accrual-engine";
 
 // ── Tutor payslip calculation — Sec 194J (KoodaldigiXS Learning independent contractors) ──
 // Matches Clause 4.1-4.4 of the signed Individual Tutor Agreement (verified against real
@@ -522,7 +523,7 @@ export async function registerRoutes(
 
   app.post("/api/accounting/employees", requireAuth, requirePermission("employees.manage"), async (req, res) => {
     try {
-      const { username, email, password, fullName, role, permissions: userPermissions, phone, employeeCode } = req.body;
+      const { username, email, password, fullName, role, permissions: userPermissions, phone, employeeCode, reportsTo } = req.body;
       if (req.user!.role !== "super_admin" && (role === "super_admin" || role === "admin")) {
         return res.status(403).json({ message: "Only Super Admin can create Super Admin or Admin accounts" });
       }
@@ -533,6 +534,13 @@ export async function registerRoutes(
       if (await storage.getEmployeeByCode(finalEmployeeCode)) {
         return res.status(400).json({ message: `Employee code "${finalEmployeeCode}" is already in use` });
       }
+      let finalReportsTo: number | null = null;
+      if (reportsTo !== undefined && reportsTo !== null && reportsTo !== "") {
+        finalReportsTo = parseInt(reportsTo);
+        if (!(await storage.getEmployeeById(finalReportsTo))) {
+          return res.status(400).json({ message: "Selected manager does not exist" });
+        }
+      }
       const hashedPassword = await bcrypt.hash(password, 10);
       const { ALL_PERMISSIONS: AP } = await import("@shared/schema");
       const validPerms = Array.isArray(userPermissions) ? userPermissions.filter((p: string) => (AP as readonly string[]).includes(p)) : undefined;
@@ -541,6 +549,7 @@ export async function registerRoutes(
         permissions: validPerms || null,
         phone: phone || null,
         employeeCode: finalEmployeeCode,
+        reportsTo: finalReportsTo,
         isActive: true, createdBy: req.user!.id,
       });
       await storage.createAuditLog({
@@ -590,6 +599,20 @@ export async function registerRoutes(
         }
       }
       data.employeeCode = newCode;
+    }
+    if (req.body.reportsTo !== undefined) {
+      if (req.body.reportsTo === null || req.body.reportsTo === "") {
+        data.reportsTo = null;
+      } else {
+        const newManagerId = parseInt(req.body.reportsTo);
+        if (newManagerId === id) {
+          return res.status(400).json({ message: "An employee cannot report to themselves" });
+        }
+        if (!(await storage.getEmployeeById(newManagerId))) {
+          return res.status(400).json({ message: "Selected manager does not exist" });
+        }
+        data.reportsTo = newManagerId;
+      }
     }
     if (req.body.role) {
       if (req.user!.role !== "super_admin" && (req.body.role === "super_admin" || req.body.role === "admin")) {
@@ -1683,6 +1706,361 @@ export async function registerRoutes(
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "activate", entity: "financial_year",
       entityId: updated.id, details: `Activated financial year: ${updated.name}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  // Leave Management
+  app.get("/api/accounting/leave-types", requireAuth, requirePermission("leave.view_own"), async (req, res) => {
+    // Admins configuring leave (leave.manage) can see inactive types too; everyone
+    // else (applying for their own leave) only needs the active ones.
+    const includeInactive = req.query.all === "true" && (req.user!.permissions || []).includes("leave.manage");
+    const types = await storage.getLeaveTypes(!includeInactive);
+    res.json(types);
+  });
+
+  app.post("/api/accounting/leave-types", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    if (await storage.getLeaveTypeByCode(req.body.code)) {
+      return res.status(400).json({ message: `Leave type code "${req.body.code}" is already in use` });
+    }
+    const type = await storage.createLeaveType(req.body);
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "leave_type",
+      entityId: type.id, details: `Created leave type: ${type.name} (${type.code})`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(type);
+  });
+
+  app.patch("/api/accounting/leave-types/:id", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const updated = await storage.updateLeaveType(id, req.body);
+    if (!updated) return res.status(404).json({ message: "Leave type not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "leave_type",
+      entityId: id, details: `Updated leave type: ${updated.name}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.get("/api/accounting/leave-balances/mine", requireAuth, requirePermission("leave.view_own"), async (req, res) => {
+    const activeFy = await storage.getActiveFinancialYear();
+    if (!activeFy) return res.json([]);
+    const [balances, types] = await Promise.all([
+      storage.getLeaveBalances({ employeeId: req.user!.id, financialYearId: activeFy.id }),
+      storage.getLeaveTypes(true),
+    ]);
+    const typeById = new Map(types.map(t => [t.id, t]));
+    res.json(balances.map(b => {
+      const type = typeById.get(b.leaveTypeId);
+      const opening = parseFloat(b.openingBalance);
+      const accrued = parseFloat(b.accruedYtd);
+      const adjustment = parseFloat(b.adjustmentYtd);
+      const used = parseFloat(b.usedYtd);
+      return {
+        ...b,
+        leaveTypeCode: type?.code, leaveTypeName: type?.name, isPaid: type?.isPaid,
+        // Unpaid (LOP) has no ceiling concept — everything else, including Comp-off
+        // (annualEntitlementDays is null there too, since it's earned per instance
+        // rather than granted annually, but its balance IS tracked via adjustments).
+        availableBalance: type?.isPaid === false ? null : computeAvailableBalance({ openingBalance: opening, accruedYtd: accrued, adjustmentYtd: adjustment, usedYtd: used }),
+      };
+    }));
+  });
+
+  app.get("/api/accounting/leave-balances", requireAuth, requirePermission("leave.view"), async (req, res) => {
+    const employeeId = req.query.employeeId ? parseInt(req.query.employeeId as string) : undefined;
+    const financialYearId = req.query.financialYearId ? parseInt(req.query.financialYearId as string) : undefined;
+    const balances = await storage.getLeaveBalances({ employeeId, financialYearId });
+    res.json(balances);
+  });
+
+  // Ensures every active, non-tutor employee has a leave_balances row for every
+  // active leave type in the active financial year — safe to re-run (skips rows
+  // that already exist). Annual-frequency types are granted in full immediately;
+  // monthly-frequency types start at 0 and build up via run-monthly-accrual.
+  app.post("/api/accounting/leave-balances/initialize", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    const activeFy = await storage.getActiveFinancialYear();
+    if (!activeFy) return res.status(400).json({ message: "No active financial year is set" });
+    const [allEmployees, types, previousFys] = await Promise.all([
+      storage.getEmployees(),
+      storage.getLeaveTypes(true),
+      storage.getFinancialYears(),
+    ]);
+    const eligibleEmployees = allEmployees.filter(e => e.isActive && e.role !== "tutor");
+    // Leave applies to salaried staff only — the immediately preceding FY (by end
+    // date) is used to carry forward a closing balance, if one was tracked.
+    const priorFy = previousFys
+      .filter(f => f.id !== activeFy.id && f.endDate < activeFy.startDate)
+      .sort((a, b) => (a.endDate < b.endDate ? 1 : -1))[0];
+
+    let created = 0;
+    for (const employee of eligibleEmployees) {
+      for (const type of types) {
+        const existing = await storage.getLeaveBalance(employee.id, type.id, activeFy.id);
+        if (existing) continue;
+
+        let openingBalance = 0;
+        if (priorFy) {
+          const priorBalance = await storage.getLeaveBalance(employee.id, type.id, priorFy.id);
+          if (priorBalance) {
+            const priorClosing = computeAvailableBalance({
+              openingBalance: parseFloat(priorBalance.openingBalance),
+              accruedYtd: parseFloat(priorBalance.accruedYtd),
+              adjustmentYtd: parseFloat(priorBalance.adjustmentYtd),
+              usedYtd: parseFloat(priorBalance.usedYtd),
+            });
+            openingBalance = computeCarryForwardOpeningBalance({
+              priorClosingBalance: priorClosing,
+              carryForwardCap: type.carryForwardCap === null ? null : parseFloat(type.carryForwardCap),
+            });
+          }
+        }
+
+        const annualEntitlement = type.annualEntitlementDays === null ? 0 : parseFloat(type.annualEntitlementDays);
+        const accruedYtd = type.accrualFrequency === "annual" ? annualEntitlement : 0;
+
+        await storage.createLeaveBalance({
+          employeeId: employee.id, leaveTypeId: type.id, financialYearId: activeFy.id,
+          openingBalance: String(openingBalance), accruedYtd: String(accruedYtd), usedYtd: "0", adjustmentYtd: "0",
+          lastAccrualPeriod: null,
+        });
+        created += 1;
+      }
+    }
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "initialize", entity: "leave_balance",
+      entityId: activeFy.id, details: `Initialized ${created} leave balance row(s) for ${activeFy.name}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ financialYear: activeFy.name, created });
+  });
+
+  // Credits monthly-accrual leave types (e.g. Earned Leave) up through the
+  // current calendar month. Idempotent — re-running mid-month credits nothing
+  // more until the next month starts.
+  app.post("/api/accounting/leave-balances/run-monthly-accrual", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    const activeFy = await storage.getActiveFinancialYear();
+    if (!activeFy) return res.status(400).json({ message: "No active financial year is set" });
+    const types = await storage.getLeaveTypes(true);
+    const monthlyTypeIds = new Set(types.filter(t => t.accrualFrequency === "monthly").map(t => t.id));
+    if (monthlyTypeIds.size === 0) return res.json({ updated: 0 });
+
+    const fyPeriods = getFinancialYearPeriods(activeFy.startDate, activeFy.endDate);
+    const throughPeriod = new Date().toISOString().slice(0, 7);
+    const typeById = new Map(types.map(t => [t.id, t]));
+    const balances = await storage.getLeaveBalances({ financialYearId: activeFy.id });
+
+    let updated = 0;
+    for (const balance of balances) {
+      if (!monthlyTypeIds.has(balance.leaveTypeId)) continue;
+      const type = typeById.get(balance.leaveTypeId)!;
+      const result = computeMonthlyAccrualCredit({
+        annualEntitlementDays: parseFloat(type.annualEntitlementDays || "0"),
+        fyPeriods, lastAccrualPeriod: balance.lastAccrualPeriod, throughPeriod,
+      });
+      if (result.periodsCredited === 0) continue;
+      await storage.updateLeaveBalance(balance.id, {
+        accruedYtd: String(round1(parseFloat(balance.accruedYtd) + result.creditAmount)),
+        lastAccrualPeriod: result.newLastAccrualPeriod,
+      });
+      updated += 1;
+    }
+    res.json({ updated });
+  });
+
+  app.patch("/api/accounting/leave-balances/:id/adjust", requireAuth, requirePermission("leave.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const amount = parseFloat(req.body.amount);
+    const reason = (req.body.reason || "").trim();
+    if (!Number.isFinite(amount) || amount === 0) return res.status(400).json({ message: "A non-zero adjustment amount is required" });
+    if (!reason) return res.status(400).json({ message: "A reason is required for a manual balance adjustment" });
+    const existing = await storage.getLeaveBalanceById(id);
+    if (!existing) return res.status(404).json({ message: "Leave balance not found" });
+    const updated = await storage.updateLeaveBalance(id, {
+      adjustmentYtd: String(round1(parseFloat(existing.adjustmentYtd) + amount)),
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "adjust", entity: "leave_balance",
+      entityId: id, details: `Adjusted leave balance by ${amount} day(s): ${reason}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  // Computes the calendar-day count for a leave request. Deliberately simple —
+  // no working-day/holiday-calendar exclusion, since no holiday calendar module
+  // exists in this app yet. Half-day portions only apply meaningfully on a
+  // single-day request; on a multi-day request each end trims 0.5 day.
+  function computeLeaveDays(startDate: string, endDate: string, startDayPortion: string, endDayPortion: string): number {
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const end = new Date(`${endDate}T00:00:00.000Z`);
+    const calendarDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    if (calendarDays <= 0) return 0;
+    if (calendarDays === 1) {
+      return startDayPortion !== "full" || endDayPortion !== "full" ? 0.5 : 1;
+    }
+    let days = calendarDays;
+    if (startDayPortion !== "full") days -= 0.5;
+    if (endDayPortion !== "full") days -= 0.5;
+    return days;
+  }
+
+  function canActOnLeaveRequest(req: any, request: { approverId: number | null }): boolean {
+    const perms: string[] = req.user!.permissions || [];
+    return perms.includes("leave.approve") || request.approverId === req.user!.id;
+  }
+
+  app.get("/api/accounting/leave-requests/mine", requireAuth, requirePermission("leave.view_own"), async (req, res) => {
+    const requests = await storage.getLeaveRequests({ employeeId: req.user!.id });
+    res.json(requests);
+  });
+
+  // "My team's" pending approvals — scoped to requests routed to this user via
+  // employees.reportsTo, no leave.approve permission needed to see your own
+  // direct reports' requests. A leave.approve holder (HR/admin override) sees
+  // every pending request instead, since they can act on any of them — this
+  // also covers requests with no manager set (approverId null).
+  // Enriches each request with the applicant's name/leave-type name so the
+  // client doesn't need employees.view (which not every manager-capable role
+  // has) just to render this page.
+  app.get("/api/accounting/leave-requests/for-approval", requireAuth, async (req, res) => {
+    const perms: string[] = req.user!.permissions || [];
+    const isOverride = perms.includes("leave.approve");
+    const requests = isOverride
+      ? await storage.getLeaveRequests({ status: "pending" })
+      : await storage.getLeaveRequests({ approverId: req.user!.id, status: "pending" });
+    const [employees, types] = await Promise.all([storage.getEmployees(), storage.getLeaveTypes()]);
+    const employeeById = new Map(employees.map(e => [e.id, e]));
+    const typeById = new Map(types.map(t => [t.id, t]));
+    res.json(requests.map(r => ({
+      ...r,
+      employeeName: employeeById.get(r.employeeId)?.fullName || `Employee #${r.employeeId}`,
+      leaveTypeName: typeById.get(r.leaveTypeId)?.name || String(r.leaveTypeId),
+    })));
+  });
+
+  app.get("/api/accounting/leave-requests", requireAuth, requirePermission("leave.view"), async (req, res) => {
+    const employeeId = req.query.employeeId ? parseInt(req.query.employeeId as string) : undefined;
+    const status = req.query.status as string | undefined;
+    const requests = await storage.getLeaveRequests({ employeeId, status });
+    res.json(requests);
+  });
+
+  app.post("/api/accounting/leave-requests", requireAuth, requirePermission("leave.apply"), async (req, res) => {
+    const { leaveTypeId, startDate, endDate, reason } = req.body;
+    const startDayPortion = req.body.startDayPortion || "full";
+    const endDayPortion = req.body.endDayPortion || "full";
+    if (!leaveTypeId || !startDate || !endDate) {
+      return res.status(400).json({ message: "leaveTypeId, startDate and endDate are required" });
+    }
+    if (endDate < startDate) {
+      return res.status(400).json({ message: "End date cannot be before start date" });
+    }
+    const leaveType = await storage.getLeaveType(parseInt(leaveTypeId));
+    if (!leaveType || !leaveType.isActive) {
+      return res.status(400).json({ message: "Selected leave type is not available" });
+    }
+    const numberOfDays = computeLeaveDays(startDate, endDate, startDayPortion, endDayPortion);
+    if (numberOfDays <= 0) {
+      return res.status(400).json({ message: "Invalid date range" });
+    }
+
+    const overlapping = await storage.getOverlappingLeaveRequests(req.user!.id, startDate, endDate);
+    if (overlapping.length > 0) {
+      return res.status(400).json({ message: "You already have a pending or approved leave request overlapping these dates" });
+    }
+
+    // Paid leave types are balance-checked against the active FY's tracked
+    // balance (opening + accrued + manual adjustments - already used). Unpaid
+    // (LOP) skips this — it's always available since it isn't a granted benefit.
+    if (leaveType.isPaid) {
+      const activeFy = await storage.getActiveFinancialYear();
+      const balance = activeFy ? await storage.getLeaveBalance(req.user!.id, leaveType.id, activeFy.id) : undefined;
+      const available = balance
+        ? computeAvailableBalance({
+            openingBalance: parseFloat(balance.openingBalance), accruedYtd: parseFloat(balance.accruedYtd),
+            adjustmentYtd: parseFloat(balance.adjustmentYtd), usedYtd: parseFloat(balance.usedYtd),
+          })
+        : 0;
+      if (numberOfDays > available) {
+        return res.status(400).json({ message: `Insufficient ${leaveType.name} balance: ${available} day(s) available, ${numberOfDays} requested` });
+      }
+    }
+
+    const applicant = await storage.getEmployeeById(req.user!.id);
+    const request = await storage.createLeaveRequest({
+      employeeId: req.user!.id, leaveTypeId: leaveType.id, startDate, endDate,
+      startDayPortion, endDayPortion, numberOfDays: String(numberOfDays), reason: reason || null,
+      approverId: applicant?.reportsTo ?? null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "leave_request",
+      entityId: request.id, details: `Applied for ${leaveType.name}: ${startDate} to ${endDate} (${numberOfDays} day(s))`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(request);
+  });
+
+  app.post("/api/accounting/leave-requests/:id/approve", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const request = await storage.getLeaveRequest(id);
+    if (!request) return res.status(404).json({ message: "Leave request not found" });
+    if (!canActOnLeaveRequest(req, request)) return res.status(403).json({ message: "You are not authorized to approve this request" });
+    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be approved" });
+
+    const updated = await storage.updateLeaveRequest(id, { status: "approved", decidedBy: req.user!.id, decidedAt: new Date() });
+
+    const leaveType = await storage.getLeaveType(request.leaveTypeId);
+    if (leaveType?.isPaid) {
+      const activeFy = await storage.getActiveFinancialYear();
+      const balance = activeFy ? await storage.getLeaveBalance(request.employeeId, request.leaveTypeId, activeFy.id) : undefined;
+      if (balance) {
+        await storage.updateLeaveBalance(balance.id, { usedYtd: String(round1(parseFloat(balance.usedYtd) + parseFloat(request.numberOfDays))) });
+      }
+    }
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "approve", entity: "leave_request",
+      entityId: id, details: `Approved leave request for employee #${request.employeeId}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/leave-requests/:id/reject", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const request = await storage.getLeaveRequest(id);
+    if (!request) return res.status(404).json({ message: "Leave request not found" });
+    if (!canActOnLeaveRequest(req, request)) return res.status(403).json({ message: "You are not authorized to reject this request" });
+    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be rejected" });
+    const rejectionReason = (req.body.rejectionReason || "").trim();
+    if (!rejectionReason) return res.status(400).json({ message: "A reason is required to reject a leave request" });
+
+    const updated = await storage.updateLeaveRequest(id, {
+      status: "rejected", decidedBy: req.user!.id, decidedAt: new Date(), rejectionReason,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "reject", entity: "leave_request",
+      entityId: id, details: `Rejected leave request for employee #${request.employeeId}: ${rejectionReason}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/leave-requests/:id/cancel", requireAuth, requirePermission("leave.apply"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const request = await storage.getLeaveRequest(id);
+    if (!request) return res.status(404).json({ message: "Leave request not found" });
+    if (request.employeeId !== req.user!.id) return res.status(403).json({ message: "You can only cancel your own leave requests" });
+    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be cancelled" });
+    const updated = await storage.updateLeaveRequest(id, { status: "cancelled" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "cancel", entity: "leave_request",
+      entityId: id, details: `Cancelled own leave request`,
       ipAddress: req.ip || null,
     });
     res.json(updated);

@@ -9,7 +9,7 @@ import {
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
   Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen,
   Layers, DollarSign, Lock, Eye, EyeOff, Loader2, AlertTriangle, Fingerprint,
-  Banknote, GraduationCap
+  Banknote, GraduationCap, CalendarDays, CalendarCheck, CalendarCog
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -80,6 +80,9 @@ const navItems: NavItem[] = [
       { label: "Tutor Agreements", path: "/accounting/payroll/tutor-agreements", icon: FileText, requiredPermission: "payroll_tutors.view" },
       { label: "Tutor Payslips", path: "/accounting/payroll/tutor-payslips", icon: Receipt, requiredPermission: "payroll_tutors.view" },
       { label: "Employees (Payroll)", path: "/accounting/payroll/employees", icon: Banknote, requiredPermission: "payroll_employees.view" },
+      { label: "My Leave", path: "/accounting/leave/my-leave", icon: CalendarDays, requiredPermission: "leave.view_own" },
+      { label: "Leave Approvals", path: "/accounting/leave/approvals", icon: CalendarCheck, requiredPermission: "leave.view_own" },
+      { label: "Leave Types", path: "/accounting/leave/leave-types", icon: CalendarCog, requiredPermission: "leave.manage" },
     ],
   },
   { label: "My Payslips", path: "/accounting/payroll/my-payslips", icon: Receipt, requiredPermission: "payroll_tutors.view_own" },
