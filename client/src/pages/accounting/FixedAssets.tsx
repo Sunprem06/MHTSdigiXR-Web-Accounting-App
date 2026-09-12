@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { AccountingLayout } from "@/components/accounting/AccountingLayout";
 import { useAuth } from "@/hooks/use-auth";
 import type { FixedAsset, LedgerAccount } from "@shared/schema";
-import { FIXED_ASSET_CATEGORY_DEFAULTS, DEPRECIATION_METHODS } from "@shared/schema";
+import { FIXED_ASSET_CATEGORY_DEFAULTS, DEPRECIATION_METHODS, FIXED_ASSET_DISPOSAL_METHODS } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AttachmentsPanel } from "@/components/accounting/AttachmentsPanel";
 import { FixedAssetDepreciationSchedule } from "@/components/accounting/FixedAssetDepreciationSchedule";
-import { AlertTriangle, Plus, Pencil, Loader2, Trash2, Paperclip, TrendingDown } from "lucide-react";
+import { AlertTriangle, Plus, Pencil, Loader2, Trash2, Paperclip, TrendingDown, Archive } from "lucide-react";
 
 const emptyForm = {
   assetCode: "", name: "", category: "other", ledgerAccountId: "",
@@ -26,17 +26,28 @@ const emptyForm = {
   location: "", vendorName: "", invoiceRef: "", serialNumber: "", notes: "",
 };
 
+const emptyDisposalForm = {
+  disposalDate: "", disposalMethod: "sold", disposalProceeds: "0", disposalReason: "",
+};
+
+const DISPOSAL_METHOD_LABELS: Record<string, string> = {
+  sold: "Sold", scrapped: "Scrapped", written_off: "Written Off",
+};
+
 export default function FixedAssets() {
   const { hasPermission } = useAuth();
   const { toast } = useToast();
   const canCreate = hasPermission("fixed_assets.create");
   const canManage = hasPermission("fixed_assets.edit");
+  const canDispose = hasPermission("fixed_assets.dispose");
 
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null);
   const [attachmentsFor, setAttachmentsFor] = useState<FixedAsset | null>(null);
   const [depreciationFor, setDepreciationFor] = useState<FixedAsset | null>(null);
+  const [disposingAsset, setDisposingAsset] = useState<FixedAsset | null>(null);
+  const [disposalForm, setDisposalForm] = useState(emptyDisposalForm);
   const [form, setForm] = useState(emptyForm);
 
   const { data: assets, isLoading } = useQuery<FixedAsset[]>({
@@ -87,6 +98,27 @@ export default function FixedAssets() {
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
+
+  const disposeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
+      const res = await apiRequest("POST", `/api/accounting/fixed-assets/${id}/dispose`, data);
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting/fixed-assets"] });
+      setDisposingAsset(null);
+      const gainLossText = result.gainLoss >= 0
+        ? `Gain of ₹${result.gainLoss.toLocaleString("en-IN")}`
+        : `Loss of ₹${Math.abs(result.gainLoss).toLocaleString("en-IN")}`;
+      toast({ title: "Asset disposed", description: `Book value at disposal: ₹${result.bookValueAtDisposal.toLocaleString("en-IN")}. ${gainLossText}.` });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const openDispose = (a: FixedAsset) => {
+    setDisposingAsset(a);
+    setDisposalForm(emptyDisposalForm);
+  };
 
   const buildPayload = () => ({
     ...form,
@@ -271,6 +303,11 @@ export default function FixedAssets() {
                               <Pencil className="w-4 h-4" />
                             </Button>
                           )}
+                          {canDispose && a.status === "active" && (
+                            <Button size="icon" variant="ghost" className="text-amber-600" onClick={() => openDispose(a)} title="Dispose" data-testid={`button-dispose-fixed-asset-${a.id}`}>
+                              <Archive className="w-4 h-4" />
+                            </Button>
+                          )}
                           {canManage && a.status === "active" && (
                             <Button size="icon" variant="ghost" className="text-red-600"
                               onClick={() => { if (confirm(`Delete fixed asset "${a.name}"? This cannot be undone.`)) deleteMutation.mutate(a.id); }}
@@ -331,6 +368,56 @@ export default function FixedAssets() {
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="dialog-depreciation-schedule">
             <DialogHeader><DialogTitle>Depreciation Schedule — {depreciationFor?.name}</DialogTitle></DialogHeader>
             {depreciationFor && <FixedAssetDepreciationSchedule fixedAssetId={depreciationFor.id} />}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!disposingAsset} onOpenChange={(open) => !open && setDisposingAsset(null)}>
+          <DialogContent className="max-w-md" data-testid="dialog-dispose-fixed-asset">
+            <DialogHeader><DialogTitle>Dispose — {disposingAsset?.name}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Current book value: {disposingAsset?.currentBookValue !== null && disposingAsset?.currentBookValue !== undefined
+                  ? `₹${parseFloat(disposingAsset.currentBookValue).toLocaleString("en-IN")}`
+                  : `₹${disposingAsset ? parseFloat(disposingAsset.originalCost).toLocaleString("en-IN") : "0"}`}
+                {" "}(brought current as of the disposal date you enter below).
+              </p>
+              <div>
+                <Label>Disposal Date *</Label>
+                <Input type="date" value={disposalForm.disposalDate} onChange={e => setDisposalForm({ ...disposalForm, disposalDate: e.target.value })} data-testid="input-disposal-date" />
+              </div>
+              <div>
+                <Label>Disposal Method</Label>
+                <Select value={disposalForm.disposalMethod} onValueChange={v => setDisposalForm({ ...disposalForm, disposalMethod: v })}>
+                  <SelectTrigger data-testid="select-disposal-method"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {FIXED_ASSET_DISPOSAL_METHODS.map(m => (
+                      <SelectItem key={m} value={m}>{DISPOSAL_METHOD_LABELS[m]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Sale Proceeds (INR)</Label>
+                <Input type="number" min="0" value={disposalForm.disposalProceeds} onChange={e => setDisposalForm({ ...disposalForm, disposalProceeds: e.target.value })} data-testid="input-disposal-proceeds" />
+              </div>
+              <div>
+                <Label>Reason</Label>
+                <Textarea value={disposalForm.disposalReason} onChange={e => setDisposalForm({ ...disposalForm, disposalReason: e.target.value })} data-testid="input-disposal-reason" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDisposingAsset(null)}>Cancel</Button>
+              <Button
+                onClick={() => disposingAsset && disposeMutation.mutate({
+                  id: disposingAsset.id,
+                  data: { ...disposalForm, disposalReason: disposalForm.disposalReason || null },
+                })}
+                disabled={disposeMutation.isPending || !disposalForm.disposalDate}
+                data-testid="button-submit-dispose"
+              >
+                {disposeMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Confirm Disposal
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

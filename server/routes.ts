@@ -918,6 +918,84 @@ export async function registerRoutes(
     res.json({ entries: allEntries, summary });
   });
 
+  app.post("/api/accounting/fixed-assets/:id/dispose", requireAuth, requirePermission("fixed_assets.dispose"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const asset = await storage.getFixedAsset(id);
+    if (!asset) return res.status(404).json({ message: "Fixed asset not found" });
+    if (asset.status !== "active") {
+      return res.status(400).json({ message: "This asset has already been disposed or scrapped" });
+    }
+
+    const { disposalDate, disposalMethod, disposalProceeds, disposalReason } = req.body;
+    if (!disposalDate || !disposalMethod) {
+      return res.status(400).json({ message: "Disposal date and method are required" });
+    }
+    if (new Date(disposalDate) > new Date()) {
+      return res.status(400).json({ message: "Disposal date cannot be in the future" });
+    }
+    if (disposalDate < asset.acquisitionDate) {
+      return res.status(400).json({ message: "Disposal date cannot be before the acquisition date" });
+    }
+
+    // Bring depreciation current as of the disposal date (not "today") before
+    // computing gain/loss, so a backdated disposal is computed correctly.
+    const boundaries = await getFinancialYearBoundaries();
+    let currentBookValueAtDisposal = parseFloat(asset.originalCost);
+    if (boundaries.length > 0) {
+      const existingEntries = await storage.getFixedAssetDepreciationEntries(id);
+      const fullSchedule = buildDepreciationSchedule({
+        acquisitionDate: asset.acquisitionDate,
+        originalCost: parseFloat(asset.originalCost),
+        residualValue: parseFloat(asset.residualValue),
+        usefulLifeYears: parseFloat(asset.usefulLifeYears),
+        method: asset.depreciationMethod as "slm" | "wdv",
+        financialYearBoundaries: boundaries,
+        asOfDate: disposalDate,
+      });
+      const lastPersistedEnd = existingEntries.length > 0 ? existingEntries[existingEntries.length - 1].periodEndDate : null;
+      const newPeriods = lastPersistedEnd ? fullSchedule.filter(e => e.periodStartDate > lastPersistedEnd) : fullSchedule;
+      for (const period of newPeriods) {
+        await storage.createFixedAssetDepreciationEntry({
+          fixedAssetId: id,
+          periodStartDate: period.periodStartDate,
+          periodEndDate: period.periodEndDate,
+          financialYearLabel: period.financialYearLabel,
+          openingWdv: String(period.openingWdv),
+          depreciationAmount: String(period.depreciationAmount),
+          closingWdv: String(period.closingWdv),
+          method: period.method,
+          isProrated: period.isProrated,
+          calculatedBy: req.user!.id,
+        });
+      }
+      const summary = summarize(fullSchedule);
+      currentBookValueAtDisposal = summary.currentBookValue ?? parseFloat(asset.originalCost);
+    }
+
+    const proceeds = disposalProceeds ? parseFloat(disposalProceeds) : 0;
+    const gainLoss = proceeds - currentBookValueAtDisposal;
+
+    const updated = await storage.updateFixedAsset(id, {
+      status: disposalMethod === "sold" ? "disposed" : "scrapped",
+      disposalDate,
+      disposalMethod,
+      disposalProceeds: disposalProceeds ? String(disposalProceeds) : null,
+      disposalReason: disposalReason || null,
+      disposalApprovedBy: req.user!.id,
+      disposalApprovedAt: new Date(),
+      accumulatedDepreciation: String(parseFloat(asset.originalCost) - currentBookValueAtDisposal),
+      currentBookValue: String(currentBookValueAtDisposal),
+    });
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "dispose", entity: "fixed_asset",
+      entityId: id, details: `Disposed fixed asset: ${asset.name} (${asset.assetCode}) via ${disposalMethod}, book value at disposal Rs.${currentBookValueAtDisposal}, proceeds Rs.${proceeds}`,
+      ipAddress: req.ip || null,
+    });
+
+    res.json({ ...updated, bookValueAtDisposal: currentBookValueAtDisposal, gainLoss });
+  });
+
   // Parties (Customers/Vendors)
   app.get("/api/accounting/parties", requireAuth, requirePermission("parties.view"), async (req, res) => {
     const partyList = await storage.getParties(req.query.type as string);
