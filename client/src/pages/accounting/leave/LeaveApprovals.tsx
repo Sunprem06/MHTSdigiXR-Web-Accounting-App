@@ -16,6 +16,14 @@ function fmtDate(d: string) {
   return new Date(`${d}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// A request over 5 days needs the manager's approval first, then a second
+// sign-off from Super Admin/Admin — see LONG_LEAVE_THRESHOLD_DAYS.
+const STAGE_LABELS: Record<string, string> = { pending: "Needs your approval", pending_admin_approval: "Needs Admin sign-off" };
+const STAGE_COLORS: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  pending_admin_approval: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+};
+
 export default function LeaveApprovals() {
   const { toast } = useToast();
   const [rejectingId, setRejectingId] = useState<number | null>(null);
@@ -75,6 +83,7 @@ export default function LeaveApprovals() {
                       <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Dates</th>
                       <th className="text-right text-xs font-medium text-slate-500 px-4 py-3">Days</th>
                       <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Reason</th>
+                      <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Stage</th>
                       <th className="text-right text-xs font-medium text-slate-500 px-4 py-3">Actions</th>
                     </tr>
                   </thead>
@@ -86,6 +95,9 @@ export default function LeaveApprovals() {
                         <td className="px-4 py-3 text-sm">{fmtDate(r.startDate)}{r.startDate !== r.endDate ? ` – ${fmtDate(r.endDate)}` : ""}</td>
                         <td className="px-4 py-3 text-right text-sm">{r.numberOfDays}</td>
                         <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400 max-w-xs truncate">{r.reason || "-"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STAGE_COLORS[r.status]}`}>{STAGE_LABELS[r.status] || r.status}</span>
+                        </td>
                         <td className="px-4 py-3 text-right space-x-1">
                           <Button
                             size="icon" variant="ghost" className="text-green-600"
