@@ -553,8 +553,16 @@ export const leaveBalances = pgTable("leave_balances", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const LEAVE_REQUEST_STATUSES = ["pending", "approved", "rejected", "cancelled"] as const;
+// pending_admin_approval sits between pending and approved/rejected: a
+// request longer than LONG_LEAVE_THRESHOLD_DAYS needs the applicant's
+// manager to approve first, THEN a leave.approve holder (Super Admin/Admin —
+// the only roles that hold it today) to give the final sign-off, rather than
+// the manager's approval alone being sufficient. A request of
+// LONG_LEAVE_THRESHOLD_DAYS or fewer skips straight to approved on the first
+// (manager) approval, exactly like before this escalation existed.
+export const LEAVE_REQUEST_STATUSES = ["pending", "pending_admin_approval", "approved", "rejected", "cancelled"] as const;
 export type LeaveRequestStatus = typeof LEAVE_REQUEST_STATUSES[number];
+export const LONG_LEAVE_THRESHOLD_DAYS = 5;
 
 export const LEAVE_DAY_PORTIONS = ["full", "first_half", "second_half"] as const;
 export type LeaveDayPortion = typeof LEAVE_DAY_PORTIONS[number];
@@ -576,6 +584,13 @@ export const leaveRequests = pgTable("leave_requests", {
   // holding leave.approve.
   approverId: integer("approver_id").references(() => employees.id),
   appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  // The manager's own sign-off on a >5-day request (the first of two steps).
+  // Null for a <=5-day request, which never enters pending_admin_approval.
+  managerApprovedBy: integer("manager_approved_by").references(() => employees.id),
+  managerApprovedAt: timestamp("manager_approved_at"),
+  // decidedBy/decidedAt always reflect the FINAL outcome — whoever approved a
+  // <=5-day request outright, or whoever gave the second-stage sign-off on a
+  // long one. Rejection at either stage also sets these directly.
   decidedBy: integer("decided_by").references(() => employees.id),
   decidedAt: timestamp("decided_at"),
   rejectionReason: text("rejection_reason"),
@@ -794,6 +809,7 @@ export const insertLeaveBalanceSchema = createInsertSchema(leaveBalances).omit({
 // same convention as tutorPayslips' server-recomputed totals.
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({
   id: true, createdAt: true, appliedAt: true, status: true, approverId: true, decidedBy: true, decidedAt: true,
+  managerApprovedBy: true, managerApprovedAt: true,
 });
 export const insertAttendanceRosterAssignmentSchema = createInsertSchema(attendanceRosterAssignments).omit({ id: true, updatedAt: true });
 export const insertAttendanceSwapRequestSchema = createInsertSchema(attendanceSwapRequests).omit({

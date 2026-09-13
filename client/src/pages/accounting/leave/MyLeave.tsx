@@ -25,9 +25,15 @@ interface LeaveBalanceView extends Record<string, unknown> {
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  pending_admin_approval: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   cancelled: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+};
+// Over-5-day requests need a second sign-off (Super Admin/Admin) after the
+// manager's own approval — see LONG_LEAVE_THRESHOLD_DAYS in shared/schema.ts.
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending", pending_admin_approval: "Awaiting Admin Approval", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled",
 };
 
 function fmtDate(d: string) {
@@ -155,13 +161,13 @@ export default function MyLeave() {
                         <td className="px-4 py-3 text-sm">{fmtDate(r.startDate)}{r.startDate !== r.endDate ? ` – ${fmtDate(r.endDate)}` : ""}</td>
                         <td className="px-4 py-3 text-right text-sm">{r.numberOfDays}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${STATUS_COLORS[r.status]}`}>{r.status}</span>
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[r.status]}`}>{STATUS_LABELS[r.status] || r.status}</span>
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400 max-w-xs truncate">
                           {r.status === "rejected" && r.rejectionReason ? `Rejected: ${r.rejectionReason}` : (r.reason || "-")}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {r.status === "pending" && (
+                          {(r.status === "pending" || r.status === "pending_admin_approval") && (
                             <Button
                               size="icon" variant="ghost" className="text-red-600"
                               title="Cancel request" data-testid={`button-cancel-request-${r.id}`}

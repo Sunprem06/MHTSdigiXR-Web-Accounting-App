@@ -8,7 +8,8 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { requireAuth, requirePermission, requireRole } from "./auth";
 import { rateLimiter } from "./middleware/security.js";
-import type { JobApplication } from "@shared/schema";
+import type { JobApplication, LeaveRequest } from "@shared/schema";
+import { LONG_LEAVE_THRESHOLD_DAYS } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
 import { getFinancialYearPeriods, computeMonthlyAccrualCredit, computeCarryForwardOpeningBalance, computeAvailableBalance, round1 } from "./lib/leave-accrual-engine";
@@ -1922,9 +1923,11 @@ export async function registerRoutes(
 
   // "My team's" pending approvals — scoped to requests routed to this user via
   // employees.reportsTo, no leave.approve permission needed to see your own
-  // direct reports' requests. A leave.approve holder (HR/admin override) sees
-  // every pending request instead, since they can act on any of them — this
-  // also covers requests with no manager set (approverId null).
+  // direct reports' requests. A leave.approve holder (HR/admin override, in
+  // practice Super Admin/Admin) additionally sees every "pending" request
+  // (covers ones with no manager set) AND every "pending_admin_approval"
+  // request — a plain manager's own view never includes the latter, since a
+  // >5-day request has already passed their stage.
   // Enriches each request with the applicant's name/leave-type name so the
   // client doesn't need employees.view (which not every manager-capable role
   // has) just to render this page.
@@ -1932,7 +1935,7 @@ export async function registerRoutes(
     const perms: string[] = req.user!.permissions || [];
     const isOverride = perms.includes("leave.approve");
     const requests = isOverride
-      ? await storage.getLeaveRequests({ status: "pending" })
+      ? [...await storage.getLeaveRequests({ status: "pending" }), ...await storage.getLeaveRequests({ status: "pending_admin_approval" })]
       : await storage.getLeaveRequests({ approverId: req.user!.id, status: "pending" });
     const [employees, types] = await Promise.all([storage.getEmployees(), storage.getLeaveTypes()]);
     const employeeById = new Map(employees.map(e => [e.id, e]));
@@ -2006,15 +2009,12 @@ export async function registerRoutes(
     res.status(201).json(request);
   });
 
-  app.post("/api/accounting/leave-requests/:id/approve", requireAuth, async (req, res) => {
-    const id = parseInt(req.params.id);
-    const request = await storage.getLeaveRequest(id);
-    if (!request) return res.status(404).json({ message: "Leave request not found" });
-    if (!canActOnLeaveRequest(req, request)) return res.status(403).json({ message: "You are not authorized to approve this request" });
-    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be approved" });
-
-    const updated = await storage.updateLeaveRequest(id, { status: "approved", decidedBy: req.user!.id, decidedAt: new Date() });
-
+  // Applies the FINAL approval outcome — decrements the paid-leave balance
+  // (if applicable) and stamps decidedBy/decidedAt. Shared by both the
+  // one-step (<=5 days) and second-stage (>5 days, admin sign-off) paths so
+  // the balance-decrement logic only exists once.
+  async function finalizeLeaveApproval(request: LeaveRequest, decidedBy: number) {
+    const updated = await storage.updateLeaveRequest(request.id, { status: "approved", decidedBy, decidedAt: new Date() });
     const leaveType = await storage.getLeaveType(request.leaveTypeId);
     if (leaveType?.isPaid) {
       const activeFy = await storage.getActiveFinancialYear();
@@ -2023,21 +2023,69 @@ export async function registerRoutes(
         await storage.updateLeaveBalance(balance.id, { usedYtd: String(round1(parseFloat(balance.usedYtd) + parseFloat(request.numberOfDays))) });
       }
     }
+    return updated;
+  }
 
-    await storage.createAuditLog({
-      employeeId: req.user!.id, action: "approve", entity: "leave_request",
-      entityId: id, details: `Approved leave request for employee #${request.employeeId}`,
-      ipAddress: req.ip || null,
-    });
-    res.json(updated);
+  app.post("/api/accounting/leave-requests/:id/approve", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const request = await storage.getLeaveRequest(id);
+    if (!request) return res.status(404).json({ message: "Leave request not found" });
+
+    if (request.status === "pending") {
+      if (!canActOnLeaveRequest(req, request)) return res.status(403).json({ message: "You are not authorized to approve this request" });
+      const isLong = parseFloat(request.numberOfDays) > LONG_LEAVE_THRESHOLD_DAYS;
+      if (isLong) {
+        const updated = await storage.updateLeaveRequest(id, {
+          status: "pending_admin_approval", managerApprovedBy: req.user!.id, managerApprovedAt: new Date(),
+        });
+        await storage.createAuditLog({
+          employeeId: req.user!.id, action: "manager_approve", entity: "leave_request",
+          entityId: id, details: `Manager-approved a ${request.numberOfDays}-day request for employee #${request.employeeId} — over ${LONG_LEAVE_THRESHOLD_DAYS} days, awaiting Admin/Super Admin sign-off`,
+          ipAddress: req.ip || null,
+        });
+        return res.json(updated);
+      }
+      const updated = await finalizeLeaveApproval(request, req.user!.id);
+      await storage.createAuditLog({
+        employeeId: req.user!.id, action: "approve", entity: "leave_request",
+        entityId: id, details: `Approved leave request for employee #${request.employeeId}`,
+        ipAddress: req.ip || null,
+      });
+      return res.json(updated);
+    }
+
+    if (request.status === "pending_admin_approval") {
+      const perms: string[] = req.user!.permissions || [];
+      if (!perms.includes("leave.approve")) {
+        return res.status(403).json({ message: `This request is over ${LONG_LEAVE_THRESHOLD_DAYS} days and needs Super Admin/Admin approval` });
+      }
+      const updated = await finalizeLeaveApproval(request, req.user!.id);
+      await storage.createAuditLog({
+        employeeId: req.user!.id, action: "approve", entity: "leave_request",
+        entityId: id, details: `Final Admin/Super Admin approval for employee #${request.employeeId}'s ${request.numberOfDays}-day request`,
+        ipAddress: req.ip || null,
+      });
+      return res.json(updated);
+    }
+
+    return res.status(400).json({ message: "Only pending requests can be approved" });
   });
 
   app.post("/api/accounting/leave-requests/:id/reject", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     const request = await storage.getLeaveRequest(id);
     if (!request) return res.status(404).json({ message: "Leave request not found" });
-    if (!canActOnLeaveRequest(req, request)) return res.status(403).json({ message: "You are not authorized to reject this request" });
-    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be rejected" });
+    if (request.status !== "pending" && request.status !== "pending_admin_approval") {
+      return res.status(400).json({ message: "Only pending requests can be rejected" });
+    }
+    if (request.status === "pending_admin_approval") {
+      const perms: string[] = req.user!.permissions || [];
+      if (!perms.includes("leave.approve")) {
+        return res.status(403).json({ message: `This request is over ${LONG_LEAVE_THRESHOLD_DAYS} days and needs Super Admin/Admin to reject it` });
+      }
+    } else if (!canActOnLeaveRequest(req, request)) {
+      return res.status(403).json({ message: "You are not authorized to reject this request" });
+    }
     const rejectionReason = (req.body.rejectionReason || "").trim();
     if (!rejectionReason) return res.status(400).json({ message: "A reason is required to reject a leave request" });
 
@@ -2057,7 +2105,9 @@ export async function registerRoutes(
     const request = await storage.getLeaveRequest(id);
     if (!request) return res.status(404).json({ message: "Leave request not found" });
     if (request.employeeId !== req.user!.id) return res.status(403).json({ message: "You can only cancel your own leave requests" });
-    if (request.status !== "pending") return res.status(400).json({ message: "Only pending requests can be cancelled" });
+    if (request.status !== "pending" && request.status !== "pending_admin_approval") {
+      return res.status(400).json({ message: "Only pending requests can be cancelled" });
+    }
     const updated = await storage.updateLeaveRequest(id, { status: "cancelled" });
     await storage.createAuditLog({
       employeeId: req.user!.id, action: "cancel", entity: "leave_request",
