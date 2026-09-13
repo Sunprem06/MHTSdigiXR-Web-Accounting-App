@@ -24,6 +24,7 @@ const emptyForm = {
   acquisitionDate: "", originalCost: "", usefulLifeYears: "5",
   depreciationMethod: "wdv", residualValue: "0", residualValueJustification: "",
   location: "", vendorName: "", invoiceRef: "", serialNumber: "", notes: "",
+  assignedToEmployeeId: "",
 };
 
 const emptyDisposalForm = {
@@ -56,6 +57,10 @@ export default function FixedAssets() {
 
   const { data: ledgerAccounts } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/accounting/ledgers"],
+  });
+
+  const { data: assignableEmployees } = useQuery<{ id: number; fullName: string; employeeCode: string | null }[]>({
+    queryKey: ["/api/accounting/fixed-assets/assignable-employees"],
   });
 
   const residualCap = form.originalCost ? parseFloat(form.originalCost) * 0.05 : 0;
@@ -129,6 +134,7 @@ export default function FixedAssets() {
     invoiceRef: form.invoiceRef || null,
     serialNumber: form.serialNumber || null,
     notes: form.notes || null,
+    assignedToEmployeeId: form.assignedToEmployeeId ? parseInt(form.assignedToEmployeeId) : null,
   });
 
   const openAdd = async () => {
@@ -155,6 +161,7 @@ export default function FixedAssets() {
       location: a.location || "", vendorName: a.vendorName || "",
       invoiceRef: a.invoiceRef || "", serialNumber: a.serialNumber || "",
       notes: a.notes || "",
+      assignedToEmployeeId: a.assignedToEmployeeId ? String(a.assignedToEmployeeId) : "",
     });
     setEditOpen(true);
   };
@@ -222,6 +229,19 @@ export default function FixedAssets() {
         </div>
       )}
       <div><Label>Location</Label><Input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Chennai Office - 2nd Floor" data-testid="input-fa-location" /></div>
+      <div>
+        <Label>Assigned To (optional)</Label>
+        <Select value={form.assignedToEmployeeId || "none"} onValueChange={v => setForm({ ...form, assignedToEmployeeId: v === "none" ? "" : v })}>
+          <SelectTrigger data-testid="select-fa-assigned-to"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Unassigned</SelectItem>
+            {assignableEmployees?.map(e => (
+              <SelectItem key={e.id} value={String(e.id)}>{e.fullName}{e.employeeCode ? ` (${e.employeeCode})` : ""}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Lets the Resignation/Exit checklist auto-list this asset for return.</p>
+      </div>
       <div><Label>Vendor Name</Label><Input value={form.vendorName} onChange={e => setForm({ ...form, vendorName: e.target.value })} data-testid="input-fa-vendor" /></div>
       <div><Label>Invoice Ref</Label><Input value={form.invoiceRef} onChange={e => setForm({ ...form, invoiceRef: e.target.value })} data-testid="input-fa-invoice-ref" /></div>
       <div><Label>Serial Number</Label><Input value={form.serialNumber} onChange={e => setForm({ ...form, serialNumber: e.target.value })} data-testid="input-fa-serial" /></div>

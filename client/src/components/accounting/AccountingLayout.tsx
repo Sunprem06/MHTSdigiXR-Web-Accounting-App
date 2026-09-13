@@ -9,7 +9,8 @@ import {
   Shield, Menu, X, UserCheck, Boxes, FileSpreadsheet, Wallet, IndianRupee, KeyRound,
   Briefcase, Globe, Mail, PenLine, HelpCircle, MessageSquare, Activity, FolderOpen,
   Layers, DollarSign, Lock, Eye, EyeOff, Loader2, AlertTriangle, Fingerprint,
-  Banknote, GraduationCap, Landmark, CalendarDays, CalendarCheck, CalendarCog, Repeat, LayoutGrid
+  Banknote, GraduationCap, Landmark, CalendarDays, CalendarCheck, CalendarCog, Repeat, LayoutGrid,
+  UserMinus, UserX
 } from "lucide-react";
 import { ROLE_LABELS } from "@shared/schema";
 import type { Permission } from "@shared/schema";
@@ -90,6 +91,8 @@ const navItems: NavItem[] = [
       { label: "My Attendance", path: "/accounting/attendance/my-attendance", icon: Repeat, requiredPermission: "attendance.view_own" },
       { label: "Attendance Roster", path: "/accounting/attendance/roster", icon: LayoutGrid, requiredPermission: "attendance.manage" },
       { label: "Attendance Reports", path: "/accounting/attendance/reports", icon: BarChart3, requiredPermission: "attendance.view" },
+      { label: "My Exit", path: "/accounting/exit/my-exit", icon: UserMinus, requiredPermission: "exit.view_own" },
+      { label: "Exit Management", path: "/accounting/exit", icon: UserX, requiredPermission: "exit.view" },
     ],
   },
   { label: "My Payslips", path: "/accounting/payroll/my-payslips", icon: Receipt, requiredPermission: "payroll_tutors.view_own" },

@@ -38,6 +38,9 @@ import {
   attendanceRosterAssignments, attendanceSwapRequests,
   type InsertAttendanceRosterAssignment, type InsertAttendanceSwapRequest,
   type AttendanceRosterAssignment, type AttendanceSwapRequest,
+  employeeExits, exitChecklistItems, exitAssetReturns, employeeExitSettlements,
+  type InsertEmployeeExit, type InsertExitChecklistItem, type InsertExitAssetReturn, type InsertEmployeeExitSettlement,
+  type EmployeeExit, type ExitChecklistItem, type ExitAssetReturn, type EmployeeExitSettlement,
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -240,6 +243,29 @@ export interface IStorage {
   getOverlappingAttendanceSwaps(employeeId: number, date: string): Promise<AttendanceSwapRequest[]>;
   createAttendanceSwapRequest(data: InsertAttendanceSwapRequest): Promise<AttendanceSwapRequest>;
   updateAttendanceSwapRequest(id: number, data: Partial<AttendanceSwapRequest>): Promise<AttendanceSwapRequest | undefined>;
+
+  getFixedAssetsAssignedToEmployee(employeeId: number): Promise<FixedAsset[]>;
+
+  getEmployeeExits(filters?: { employeeId?: number; status?: string }): Promise<EmployeeExit[]>;
+  getEmployeeExit(id: number): Promise<EmployeeExit | undefined>;
+  getActiveEmployeeExitForEmployee(employeeId: number): Promise<EmployeeExit | undefined>;
+  createEmployeeExit(data: InsertEmployeeExit & { initiatedBy: number }): Promise<EmployeeExit>;
+  updateEmployeeExit(id: number, data: Partial<EmployeeExit>): Promise<EmployeeExit | undefined>;
+
+  getExitChecklistItems(exitId: number): Promise<ExitChecklistItem[]>;
+  getExitChecklistItem(id: number): Promise<ExitChecklistItem | undefined>;
+  createExitChecklistItem(data: InsertExitChecklistItem): Promise<ExitChecklistItem>;
+  updateExitChecklistItem(id: number, data: Partial<ExitChecklistItem>): Promise<ExitChecklistItem | undefined>;
+
+  getExitAssetReturns(exitId: number): Promise<ExitAssetReturn[]>;
+  getExitAssetReturn(id: number): Promise<ExitAssetReturn | undefined>;
+  createExitAssetReturn(data: InsertExitAssetReturn): Promise<ExitAssetReturn>;
+  updateExitAssetReturn(id: number, data: Partial<ExitAssetReturn>): Promise<ExitAssetReturn | undefined>;
+
+  getEmployeeExitSettlement(exitId: number): Promise<EmployeeExitSettlement | undefined>;
+  getEmployeeExitSettlementById(id: number): Promise<EmployeeExitSettlement | undefined>;
+  createEmployeeExitSettlement(data: InsertEmployeeExitSettlement & { preparedBy: number }): Promise<EmployeeExitSettlement>;
+  updateEmployeeExitSettlement(id: number, data: Partial<EmployeeExitSettlement>): Promise<EmployeeExitSettlement | undefined>;
 
   deleteProduct(id: number): Promise<boolean>;
   deleteParty(id: number): Promise<boolean>;
@@ -570,6 +596,12 @@ export class DatabaseStorage implements IStorage {
   async deleteFixedAsset(id: number): Promise<boolean> {
     const result = await db.delete(fixedAssets).where(eq(fixedAssets.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getFixedAssetsAssignedToEmployee(employeeId: number): Promise<FixedAsset[]> {
+    return await db.select().from(fixedAssets).where(and(
+      eq(fixedAssets.assignedToEmployeeId, employeeId), eq(fixedAssets.status, "active"),
+    )).orderBy(fixedAssets.name);
   }
 
   async getNextAssetCode(): Promise<string> {
@@ -1362,6 +1394,97 @@ export class DatabaseStorage implements IStorage {
   async getAttendanceSwapRequest(id: number): Promise<AttendanceSwapRequest | undefined> {
     const [request] = await db.select().from(attendanceSwapRequests).where(eq(attendanceSwapRequests.id, id));
     return request;
+  }
+
+  async getEmployeeExits(filters?: { employeeId?: number; status?: string }): Promise<EmployeeExit[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(eq(employeeExits.employeeId, filters.employeeId));
+    if (filters?.status) conditions.push(eq(employeeExits.status, filters.status));
+    if (conditions.length) {
+      return await db.select().from(employeeExits).where(and(...conditions)).orderBy(desc(employeeExits.createdAt));
+    }
+    return await db.select().from(employeeExits).orderBy(desc(employeeExits.createdAt));
+  }
+
+  async getEmployeeExit(id: number): Promise<EmployeeExit | undefined> {
+    const [exit] = await db.select().from(employeeExits).where(eq(employeeExits.id, id));
+    return exit;
+  }
+
+  async getActiveEmployeeExitForEmployee(employeeId: number): Promise<EmployeeExit | undefined> {
+    const [exit] = await db.select().from(employeeExits).where(and(
+      eq(employeeExits.employeeId, employeeId),
+      or(eq(employeeExits.status, "submitted"), eq(employeeExits.status, "approved")),
+    )).limit(1);
+    return exit;
+  }
+
+  async createEmployeeExit(data: InsertEmployeeExit & { initiatedBy: number }): Promise<EmployeeExit> {
+    const [newExit] = await db.insert(employeeExits).values(data).returning();
+    return newExit;
+  }
+
+  async updateEmployeeExit(id: number, data: Partial<EmployeeExit>): Promise<EmployeeExit | undefined> {
+    const [updated] = await db.update(employeeExits).set(data).where(eq(employeeExits.id, id)).returning();
+    return updated;
+  }
+
+  async getExitChecklistItems(exitId: number): Promise<ExitChecklistItem[]> {
+    return await db.select().from(exitChecklistItems).where(eq(exitChecklistItems.exitId, exitId)).orderBy(exitChecklistItems.id);
+  }
+
+  async getExitChecklistItem(id: number): Promise<ExitChecklistItem | undefined> {
+    const [item] = await db.select().from(exitChecklistItems).where(eq(exitChecklistItems.id, id));
+    return item;
+  }
+
+  async createExitChecklistItem(data: InsertExitChecklistItem): Promise<ExitChecklistItem> {
+    const [newItem] = await db.insert(exitChecklistItems).values(data).returning();
+    return newItem;
+  }
+
+  async updateExitChecklistItem(id: number, data: Partial<ExitChecklistItem>): Promise<ExitChecklistItem | undefined> {
+    const [updated] = await db.update(exitChecklistItems).set(data).where(eq(exitChecklistItems.id, id)).returning();
+    return updated;
+  }
+
+  async getExitAssetReturns(exitId: number): Promise<ExitAssetReturn[]> {
+    return await db.select().from(exitAssetReturns).where(eq(exitAssetReturns.exitId, exitId)).orderBy(exitAssetReturns.id);
+  }
+
+  async getExitAssetReturn(id: number): Promise<ExitAssetReturn | undefined> {
+    const [item] = await db.select().from(exitAssetReturns).where(eq(exitAssetReturns.id, id));
+    return item;
+  }
+
+  async createExitAssetReturn(data: InsertExitAssetReturn): Promise<ExitAssetReturn> {
+    const [newItem] = await db.insert(exitAssetReturns).values(data).returning();
+    return newItem;
+  }
+
+  async updateExitAssetReturn(id: number, data: Partial<ExitAssetReturn>): Promise<ExitAssetReturn | undefined> {
+    const [updated] = await db.update(exitAssetReturns).set(data).where(eq(exitAssetReturns.id, id)).returning();
+    return updated;
+  }
+
+  async getEmployeeExitSettlement(exitId: number): Promise<EmployeeExitSettlement | undefined> {
+    const [settlement] = await db.select().from(employeeExitSettlements).where(eq(employeeExitSettlements.exitId, exitId));
+    return settlement;
+  }
+
+  async getEmployeeExitSettlementById(id: number): Promise<EmployeeExitSettlement | undefined> {
+    const [settlement] = await db.select().from(employeeExitSettlements).where(eq(employeeExitSettlements.id, id));
+    return settlement;
+  }
+
+  async createEmployeeExitSettlement(data: InsertEmployeeExitSettlement & { preparedBy: number }): Promise<EmployeeExitSettlement> {
+    const [newSettlement] = await db.insert(employeeExitSettlements).values(data).returning();
+    return newSettlement;
+  }
+
+  async updateEmployeeExitSettlement(id: number, data: Partial<EmployeeExitSettlement>): Promise<EmployeeExitSettlement | undefined> {
+    const [updated] = await db.update(employeeExitSettlements).set({ ...data, updatedAt: new Date() }).where(eq(employeeExitSettlements.id, id)).returning();
+    return updated;
   }
 
   async getOverlappingAttendanceSwaps(employeeId: number, date: string): Promise<AttendanceSwapRequest[]> {

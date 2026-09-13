@@ -9,12 +9,13 @@ import nodemailer from "nodemailer";
 import { requireAuth, requirePermission, requireRole } from "./auth";
 import { rateLimiter } from "./middleware/security.js";
 import type { JobApplication, PayrollStatutoryConfig, PayrollEmployee, LeaveRequest } from "@shared/schema";
-import { FIXED_ASSET_CATEGORY_DEFAULTS, DEFAULT_PAYROLL_STATUTORY_CONFIG, LONG_LEAVE_THRESHOLD_DAYS } from "@shared/schema";
+import { FIXED_ASSET_CATEGORY_DEFAULTS, DEFAULT_PAYROLL_STATUTORY_CONFIG, LONG_LEAVE_THRESHOLD_DAYS, DEFAULT_NOTICE_PERIOD_DAYS, DEFAULT_EXIT_CHECKLIST_ITEMS, GRATUITY_ELIGIBILITY_YEARS } from "@shared/schema";
 import { buildDepreciationSchedule, summarize, type PeriodBoundary } from "./lib/depreciation-engine";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
 import { getFinancialYearPeriods, computeMonthlyAccrualCredit, computeCarryForwardOpeningBalance, computeAvailableBalance, round1 } from "./lib/leave-accrual-engine";
 import { getWeekday, resolveEffectiveDayType, validateSwapRequest } from "./lib/attendance-roster-engine";
+import { computeProposedLastWorkingDay, computeGratuity, computeLeaveEncashment, computePendingSalary, computeNetSettlement } from "./lib/exit-settlement-engine";
 
 // ── Tutor payslip calculation — Sec 194J (KoodaldigiXS Learning independent contractors) ──
 // Matches Clause 4.1-4.4 of the signed Individual Tutor Agreement (verified against real
@@ -925,6 +926,15 @@ export async function registerRoutes(
   app.get("/api/accounting/fixed-assets/next-code", requireAuth, requirePermission("fixed_assets.create"), async (req, res) => {
     const code = await storage.getNextAssetCode();
     res.json({ assetCode: code });
+  });
+
+  // Dedicated lightweight employee list for the "Assign To" dropdown, gated on
+  // fixed_assets.view rather than employees.view/manage — same reasoning as
+  // /attendance/colleagues in Step 4: most roles that can manage this register
+  // (senior_accountant, accountant) don't hold employees.view.
+  app.get("/api/accounting/fixed-assets/assignable-employees", requireAuth, requirePermission("fixed_assets.view"), async (_req, res) => {
+    const employees = await storage.getEmployees();
+    res.json(employees.filter(e => e.isActive).map(e => ({ id: e.id, fullName: e.fullName, employeeCode: e.employeeCode })));
   });
 
   app.get("/api/accounting/fixed-assets/:id", requireAuth, requirePermission("fixed_assets.view"), async (req, res) => {
@@ -3361,6 +3371,397 @@ export async function registerRoutes(
     res.json({ swaps: enriched, swapCountsByEmployee: Object.fromEntries(countsByEmployee) });
   });
 
+  // ── Resignation / Exit (Step 5 — salaried MHTSdigiXR employees only, see
+  // shared/schema.ts for the full scope rationale). Lifecycle: submitted ->
+  // approved (HR confirms the actual last working day) -> settled (terminal,
+  // set when the F&F settlement is marked paid) or cancelled (terminal, from
+  // submitted/approved). Access revocation and the F&F settlement are
+  // separate sub-resources so their own approve/paid states can be tracked
+  // and audited independently of the case's own status.
+  async function enrichExitCase(exit: NonNullable<Awaited<ReturnType<typeof storage.getEmployeeExit>>>) {
+    const [checklist, assetReturns, settlement, employee] = await Promise.all([
+      storage.getExitChecklistItems(exit.id),
+      storage.getExitAssetReturns(exit.id),
+      storage.getEmployeeExitSettlement(exit.id),
+      storage.getEmployeeById(exit.employeeId),
+    ]);
+    const assets = assetReturns.length ? await Promise.all(assetReturns.map(a => storage.getFixedAsset(a.fixedAssetId))) : [];
+    return {
+      ...exit,
+      employeeName: employee?.fullName || `Employee #${exit.employeeId}`,
+      checklist,
+      assetReturns: assetReturns.map((a, i) => ({ ...a, assetName: assets[i]?.name || `Asset #${a.fixedAssetId}`, assetCode: assets[i]?.assetCode })),
+      settlement: settlement || null,
+    };
+  }
+
+  function canAccessExitCase(req: any, exit: { employeeId: number }): boolean {
+    const perms: string[] = req.user!.permissions || [];
+    return perms.includes("exit.view") || perms.includes("exit.manage") || exit.employeeId === req.user!.id;
+  }
+
+  app.get("/api/accounting/exits/mine", requireAuth, requirePermission("exit.view_own"), async (req, res) => {
+    const cases = await storage.getEmployeeExits({ employeeId: req.user!.id });
+    if (cases.length === 0) return res.json(null);
+    // Most relevant: an active (submitted/approved) case if one exists, else the most recent.
+    const active = cases.find(c => c.status === "submitted" || c.status === "approved");
+    res.json(await enrichExitCase(active || cases[0]));
+  });
+
+  app.get("/api/accounting/exits", requireAuth, requirePermission("exit.view"), async (req, res) => {
+    const employeeId = req.query.employeeId ? parseInt(req.query.employeeId as string) : undefined;
+    const status = req.query.status as string | undefined;
+    const cases = await storage.getEmployeeExits({ employeeId, status });
+    const employees = await storage.getEmployees();
+    const employeeById = new Map(employees.map(e => [e.id, e]));
+    res.json(cases.map(c => ({ ...c, employeeName: employeeById.get(c.employeeId)?.fullName || `Employee #${c.employeeId}` })));
+  });
+
+  app.get("/api/accounting/exits/:id", requireAuth, async (req, res) => {
+    const exit = await storage.getEmployeeExit(parseInt(req.params.id));
+    if (!exit) return res.status(404).json({ message: "Exit case not found" });
+    if (!canAccessExitCase(req, exit)) return res.status(403).json({ message: "You are not authorized to view this exit case" });
+    res.json(await enrichExitCase(exit));
+  });
+
+  // Any employee can submit their own resignation (exit.initiate). Only an
+  // exit.manage holder (HR) may initiate a case on someone else's behalf or
+  // set exitType to "termination" — a plain employee can only resign for themselves.
+  app.post("/api/accounting/exits", requireAuth, requirePermission("exit.initiate"), async (req, res) => {
+    const perms: string[] = req.user!.permissions || [];
+    const canActOnBehalf = perms.includes("exit.manage");
+    const employeeId = canActOnBehalf && req.body.employeeId ? parseInt(req.body.employeeId) : req.user!.id;
+    const exitType = canActOnBehalf && req.body.exitType === "termination" ? "termination" : "resignation";
+    const { resignationDate, reason } = req.body;
+    if (!resignationDate) return res.status(400).json({ message: "resignationDate is required" });
+
+    const existing = await storage.getActiveEmployeeExitForEmployee(employeeId);
+    if (existing) return res.status(400).json({ message: "This employee already has an active exit case" });
+
+    const noticePeriodDays = req.body.noticePeriodDays !== undefined
+      ? parseInt(req.body.noticePeriodDays) : DEFAULT_NOTICE_PERIOD_DAYS;
+    const proposedLastWorkingDay = computeProposedLastWorkingDay(resignationDate, noticePeriodDays);
+
+    const exit = await storage.createEmployeeExit({
+      employeeId, exitType, resignationDate, noticePeriodDays, proposedLastWorkingDay,
+      reason: reason || null, initiatedBy: req.user!.id,
+    });
+
+    // Seed the generic checklist (DEFAULT_EXIT_CHECKLIST_ITEMS — see schema.ts)
+    // plus one row per fixed asset currently assigned to this employee.
+    await Promise.all(DEFAULT_EXIT_CHECKLIST_ITEMS.map(itemLabel =>
+      storage.createExitChecklistItem({ exitId: exit.id, itemLabel })
+    ));
+    const assignedAssets = await storage.getFixedAssetsAssignedToEmployee(employeeId);
+    await Promise.all(assignedAssets.map(asset =>
+      storage.createExitAssetReturn({ exitId: exit.id, fixedAssetId: asset.id })
+    ));
+
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "employee_exit",
+      entityId: exit.id, details: `${exitType === "termination" ? "Initiated termination" : "Submitted resignation"} for employee #${employeeId} — proposed LWD ${proposedLastWorkingDay}`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(await enrichExitCase(exit));
+  });
+
+  app.post("/api/accounting/exits/:id/approve", requireAuth, requirePermission("exit.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const exit = await storage.getEmployeeExit(id);
+    if (!exit) return res.status(404).json({ message: "Exit case not found" });
+    if (exit.status !== "submitted") return res.status(400).json({ message: "Only a submitted case can be approved" });
+    const actualLastWorkingDay = req.body.actualLastWorkingDay || exit.proposedLastWorkingDay;
+    const updated = await storage.updateEmployeeExit(id, {
+      status: "approved", approvedBy: req.user!.id, approvedAt: new Date(), actualLastWorkingDay,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "approve", entity: "employee_exit",
+      entityId: id, details: `Approved exit case for employee #${exit.employeeId} — last working day ${actualLastWorkingDay}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/exits/:id/cancel", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const exit = await storage.getEmployeeExit(id);
+    if (!exit) return res.status(404).json({ message: "Exit case not found" });
+    const perms: string[] = req.user!.permissions || [];
+    const isOwn = exit.employeeId === req.user!.id;
+    if (!perms.includes("exit.manage") && !isOwn) return res.status(403).json({ message: "You are not authorized to cancel this exit case" });
+    if (exit.status !== "submitted" && exit.status !== "approved") {
+      return res.status(400).json({ message: "Only a submitted or approved case can be cancelled" });
+    }
+    const updated = await storage.updateEmployeeExit(id, {
+      status: "cancelled", cancelledBy: req.user!.id, cancelledAt: new Date(),
+      cancellationReason: req.body.cancellationReason || null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "cancel", entity: "employee_exit",
+      entityId: id, details: `Cancelled exit case for employee #${exit.employeeId}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/exits/:id/checklist", requireAuth, requirePermission("exit.manage"), async (req, res) => {
+    const exitId = parseInt(req.params.id);
+    const exit = await storage.getEmployeeExit(exitId);
+    if (!exit) return res.status(404).json({ message: "Exit case not found" });
+    const itemLabel = (req.body.itemLabel || "").trim();
+    if (!itemLabel) return res.status(400).json({ message: "itemLabel is required" });
+    const item = await storage.createExitChecklistItem({ exitId, itemLabel });
+    res.status(201).json(item);
+  });
+
+  app.patch("/api/accounting/exits/:id/checklist/:itemId", requireAuth, requirePermission("exit.manage"), async (req, res) => {
+    const item = await storage.getExitChecklistItem(parseInt(req.params.itemId));
+    if (!item || item.exitId !== parseInt(req.params.id)) return res.status(404).json({ message: "Checklist item not found" });
+    const isCompleted = !!req.body.isCompleted;
+    const updated = await storage.updateExitChecklistItem(item.id, {
+      isCompleted, notes: req.body.notes ?? item.notes,
+      completedBy: isCompleted ? req.user!.id : null, completedAt: isCompleted ? new Date() : null,
+    });
+    res.json(updated);
+  });
+
+  // Marking an asset returned also frees it up in the register (clears
+  // assignedToEmployeeId) so it can be reassigned to someone else right away.
+  app.patch("/api/accounting/exits/:id/asset-returns/:itemId", requireAuth, requirePermission("exit.manage"), async (req, res) => {
+    const item = await storage.getExitAssetReturn(parseInt(req.params.itemId));
+    if (!item || item.exitId !== parseInt(req.params.id)) return res.status(404).json({ message: "Asset return item not found" });
+    const isReturned = !!req.body.isReturned;
+    const updated = await storage.updateExitAssetReturn(item.id, {
+      isReturned, conditionNotes: req.body.conditionNotes ?? item.conditionNotes,
+      verifiedBy: isReturned ? req.user!.id : null, returnedAt: isReturned ? new Date() : null,
+    });
+    if (isReturned) {
+      await storage.updateFixedAsset(item.fixedAssetId, { assignedToEmployeeId: null });
+    }
+    res.json(updated);
+  });
+
+  // Access revocation — deactivates login + ends the linked payroll record as
+  // ONE action (see project notes on why this used to be three manual steps).
+  // Gated on exit.approve (Admin/Super Admin) since it's hard to reverse, and
+  // on the checklist + all asset returns being complete first.
+  app.post("/api/accounting/exits/:id/revoke-access", requireAuth, requirePermission("exit.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const exit = await storage.getEmployeeExit(id);
+    if (!exit) return res.status(404).json({ message: "Exit case not found" });
+    if (exit.status !== "approved") return res.status(400).json({ message: "Only an approved exit case can have access revoked" });
+    if (exit.accessRevoked) return res.status(400).json({ message: "Access has already been revoked for this case" });
+
+    const [checklist, assetReturns] = await Promise.all([
+      storage.getExitChecklistItems(id), storage.getExitAssetReturns(id),
+    ]);
+    if (checklist.some(c => !c.isCompleted)) {
+      return res.status(400).json({ message: "Complete every exit checklist item before revoking access" });
+    }
+    if (assetReturns.some(a => !a.isReturned)) {
+      return res.status(400).json({ message: "Confirm every assigned asset has been returned before revoking access" });
+    }
+
+    await storage.updateEmployee(exit.employeeId, { isActive: false });
+    const payrollProfile = await storage.getPayrollEmployeeByLoginEmployeeId(exit.employeeId);
+    if (payrollProfile) {
+      await storage.updatePayrollEmployee(payrollProfile.id, { status: "inactive" });
+    }
+    const updated = await storage.updateEmployeeExit(id, {
+      accessRevoked: true, accessRevokedBy: req.user!.id, accessRevokedAt: new Date(),
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "revoke-access", entity: "employee_exit",
+      entityId: id, details: `Revoked login access for employee #${exit.employeeId}${payrollProfile ? ` and ended payroll record #${payrollProfile.id}` : ""}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  // Auto-computes a DRAFT Full & Final settlement from this employee's current
+  // compensation structure and leave balances (see server/lib/exit-settlement-engine.ts
+  // for the formulas and their CA-review caveat). Creates the settlement row if
+  // none exists yet, otherwise recomputes an EXISTING DRAFT row in place — never
+  // touches an already-approved/paid settlement.
+  app.post("/api/accounting/exits/:id/settlement/compute", requireAuth, requirePermission("exit.manage"), async (req, res) => {
+    const exitId = parseInt(req.params.id);
+    const exit = await storage.getEmployeeExit(exitId);
+    if (!exit) return res.status(404).json({ message: "Exit case not found" });
+    const existing = await storage.getEmployeeExitSettlement(exitId);
+    if (existing && existing.status !== "draft") {
+      return res.status(400).json({ message: "This settlement has already been approved and can no longer be recomputed" });
+    }
+    const lastWorkingDay = exit.actualLastWorkingDay || exit.proposedLastWorkingDay;
+
+    const payrollProfile = await storage.getPayrollEmployeeByLoginEmployeeId(exit.employeeId);
+    let pendingSalaryAmount = 0, pendingSalaryDays = 0, perDayRate = 0;
+    let gratuity = { eligible: false, yearsOfService: 0, amount: 0 };
+    if (payrollProfile) {
+      const structure = await storage.getCurrentPayrollCompensationStructure(payrollProfile.id, lastWorkingDay);
+      if (structure) {
+        const monthlyGross = parseFloat(structure.ctcAnnual) / 12;
+        const basicMonthly = parseFloat(structure.basicAnnual) / 12;
+        perDayRate = basicMonthly / 26;
+        const daysWorkedInFinalMonth = new Date(lastWorkingDay + "T00:00:00Z").getUTCDate();
+        pendingSalaryDays = Math.min(daysWorkedInFinalMonth, 26);
+        pendingSalaryAmount = computePendingSalary({ monthlyGross, standardWorkingDays: 26, daysWorkedInFinalMonth });
+        if (payrollProfile.dateOfJoining) {
+          gratuity = computeGratuity({
+            basicPlusDaMonthly: basicMonthly, dateOfJoining: payrollProfile.dateOfJoining,
+            lastWorkingDay, eligibilityYears: GRATUITY_ELIGIBILITY_YEARS,
+          });
+        }
+      }
+    }
+
+    // Leave encashment only needs employees.id — independent of a payroll
+    // profile existing, since leaveBalances is keyed off the login identity.
+    const activeFy = await storage.getActiveFinancialYear();
+    let leaveEncashment = { days: 0, amount: 0 };
+    if (activeFy) {
+      const [balances, leaveTypesList] = await Promise.all([
+        storage.getLeaveBalances({ employeeId: exit.employeeId, financialYearId: activeFy.id }),
+        storage.getLeaveTypes(),
+      ]);
+      const typeById = new Map(leaveTypesList.map(t => [t.id, t]));
+      leaveEncashment = computeLeaveEncashment({
+        balances: balances.map(b => ({
+          isEncashable: !!typeById.get(b.leaveTypeId)?.isEncashable,
+          availableDays: computeAvailableBalance({
+            openingBalance: parseFloat(b.openingBalance), accruedYtd: parseFloat(b.accruedYtd),
+            adjustmentYtd: parseFloat(b.adjustmentYtd), usedYtd: parseFloat(b.usedYtd),
+          }),
+        })),
+        perDayRate,
+      });
+    }
+
+    const fields = {
+      exitId, payrollEmployeeId: payrollProfile?.id || null,
+      pendingSalaryDays: String(pendingSalaryDays), pendingSalaryAmount: String(pendingSalaryAmount),
+      leaveEncashmentDays: String(leaveEncashment.days), leaveEncashmentAmount: String(leaveEncashment.amount),
+      gratuityEligible: gratuity.eligible, gratuityYearsOfService: String(gratuity.yearsOfService), gratuityAmount: String(gratuity.amount),
+      otherEarnings: existing?.otherEarnings || "0", otherEarningsNote: existing?.otherEarningsNote || null,
+      otherDeductions: existing?.otherDeductions || "0", otherDeductionsNote: existing?.otherDeductionsNote || null,
+    };
+    const netSettlementAmount = computeNetSettlement({
+      pendingSalaryAmount, leaveEncashmentAmount: leaveEncashment.amount, gratuityAmount: gratuity.amount,
+      otherEarnings: parseFloat(fields.otherEarnings), otherDeductions: parseFloat(fields.otherDeductions),
+    });
+
+    const settlement = existing
+      ? await storage.updateEmployeeExitSettlement(existing.id, { ...fields, netSettlementAmount: String(netSettlementAmount) })
+      : await storage.createEmployeeExitSettlement({ ...fields, netSettlementAmount: String(netSettlementAmount), preparedBy: req.user!.id });
+    res.json(settlement);
+  });
+
+  // Manual override of a DRAFT settlement's earnings/deductions/amounts — see
+  // shared/schema.ts on why F&F stays editable pre-approval unlike payslips.
+  app.patch("/api/accounting/exits/:id/settlement", requireAuth, requirePermission("exit.manage"), async (req, res) => {
+    const settlement = await storage.getEmployeeExitSettlement(parseInt(req.params.id));
+    if (!settlement) return res.status(404).json({ message: "No settlement exists yet for this exit case — compute one first" });
+    if (settlement.status !== "draft") return res.status(400).json({ message: "Only a draft settlement can be edited" });
+
+    const editable = [
+      "pendingSalaryAmount", "leaveEncashmentAmount", "gratuityAmount",
+      "otherEarnings", "otherEarningsNote", "otherDeductions", "otherDeductionsNote",
+    ] as const;
+    const patch: Record<string, any> = {};
+    for (const field of editable) if (req.body[field] !== undefined) patch[field] = req.body[field];
+
+    const merged = { ...settlement, ...patch };
+    const netSettlementAmount = computeNetSettlement({
+      pendingSalaryAmount: parseFloat(merged.pendingSalaryAmount), leaveEncashmentAmount: parseFloat(merged.leaveEncashmentAmount),
+      gratuityAmount: parseFloat(merged.gratuityAmount), otherEarnings: parseFloat(merged.otherEarnings), otherDeductions: parseFloat(merged.otherDeductions),
+    });
+    const updated = await storage.updateEmployeeExitSettlement(settlement.id, { ...patch, netSettlementAmount: String(netSettlementAmount) });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/exits/:id/settlement/approve", requireAuth, requirePermission("exit.approve"), async (req, res) => {
+    const settlement = await storage.getEmployeeExitSettlement(parseInt(req.params.id));
+    if (!settlement) return res.status(404).json({ message: "No settlement exists yet for this exit case" });
+    if (settlement.status !== "draft") return res.status(400).json({ message: "Only a draft settlement can be approved" });
+    const updated = await storage.updateEmployeeExitSettlement(settlement.id, {
+      status: "approved", approvedBy: req.user!.id, approvedAt: new Date(),
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "approve", entity: "employee_exit_settlement",
+      entityId: settlement.id, details: `Approved F&F settlement — net amount ${settlement.netSettlementAmount}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  // Posts the actual cash payment to the ledger and closes out the exit case.
+  // Requires access to already be revoked (see revoke-access above) — a real
+  // exit is expected to be fully offboarded by the time F&F is paid out.
+  app.post("/api/accounting/exits/:id/settlement/mark-paid", requireAuth, requirePermission("exit.approve"), async (req, res) => {
+    const settlement = await storage.getEmployeeExitSettlement(parseInt(req.params.id));
+    if (!settlement) return res.status(404).json({ message: "No settlement exists yet for this exit case" });
+    if (settlement.status !== "approved") return res.status(400).json({ message: "Only an approved settlement can be marked paid" });
+    const exit = await storage.getEmployeeExit(settlement.exitId);
+    if (!exit) return res.status(404).json({ message: "Exit case not found" });
+    if (!exit.accessRevoked) return res.status(400).json({ message: "Revoke this employee's access before marking the settlement paid" });
+
+    const payDate = new Date().toISOString().split("T")[0];
+    const fyError = await checkFinancialYearForDate(payDate);
+    if (fyError) return res.status(400).json({ message: fyError });
+
+    const ledgerAccounts = await storage.getLedgerAccounts();
+    const salaryLedger = ledgerAccounts.find(a => a.name === "Salary & Wages");
+    const bankLedger = ledgerAccounts.find(a => a.name === "Bank Account");
+    const encashmentLedger = ledgerAccounts.find(a => a.name === "Leave Encashment");
+    const gratuityLedger = ledgerAccounts.find(a => a.name === "Gratuity Expense");
+    const adjustmentsLedger = ledgerAccounts.find(a => a.name === "Other Settlement Adjustments");
+    if (!salaryLedger || !bankLedger) {
+      return res.status(500).json({ message: "Required ledger accounts are missing — contact an administrator" });
+    }
+
+    const pendingSalary = parseFloat(settlement.pendingSalaryAmount);
+    const encashment = parseFloat(settlement.leaveEncashmentAmount);
+    const gratuity = parseFloat(settlement.gratuityAmount);
+    const otherEarnings = parseFloat(settlement.otherEarnings);
+    const otherDeductions = parseFloat(settlement.otherDeductions);
+    const net = parseFloat(settlement.netSettlementAmount);
+
+    const entries: { ledgerAccountId: number; voucherId: number; debit: string; credit: string }[] = [];
+    if (pendingSalary > 0) entries.push({ ledgerAccountId: salaryLedger.id, voucherId: 0, debit: String(pendingSalary), credit: "0" });
+    if (encashment > 0) {
+      if (!encashmentLedger) return res.status(500).json({ message: "Leave Encashment ledger account is missing — contact an administrator" });
+      entries.push({ ledgerAccountId: encashmentLedger.id, voucherId: 0, debit: String(encashment), credit: "0" });
+    }
+    if (gratuity > 0) {
+      if (!gratuityLedger) return res.status(500).json({ message: "Gratuity Expense ledger account is missing — contact an administrator" });
+      entries.push({ ledgerAccountId: gratuityLedger.id, voucherId: 0, debit: String(gratuity), credit: "0" });
+    }
+    if (otherEarnings > 0 || otherDeductions > 0) {
+      if (!adjustmentsLedger) return res.status(500).json({ message: "Other Settlement Adjustments ledger account is missing — contact an administrator" });
+      if (otherEarnings > 0) entries.push({ ledgerAccountId: adjustmentsLedger.id, voucherId: 0, debit: String(otherEarnings), credit: "0" });
+      if (otherDeductions > 0) entries.push({ ledgerAccountId: adjustmentsLedger.id, voucherId: 0, debit: "0", credit: String(otherDeductions) });
+    }
+    entries.push({ ledgerAccountId: bankLedger.id, voucherId: 0, debit: "0", credit: String(net) });
+
+    const employee = await storage.getEmployeeById(exit.employeeId);
+    const voucherNumber = await storage.getNextVoucherNumber("payment");
+    const voucher = await storage.createVoucher({
+      voucherNumber, date: payDate, type: "payment",
+      narration: `Full & Final settlement — ${employee?.fullName || `Employee #${exit.employeeId}`}`,
+      totalAmount: String(net), status: "approved", partyId: null,
+      gstRate: null, taxableAmount: null, cgstAmount: null, sgstAmount: null, igstAmount: null, isInterState: false,
+      createdBy: req.user!.id, approvedBy: req.user!.id,
+    }, entries);
+
+    const updatedSettlement = await storage.updateEmployeeExitSettlement(settlement.id, { status: "paid", voucherId: voucher.id });
+    await storage.updateEmployeeExit(exit.id, { status: "settled" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "mark-paid", entity: "employee_exit_settlement",
+      entityId: settlement.id, details: `Marked F&F settlement paid for employee #${exit.employeeId} — posted voucher ${voucherNumber}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ ...updatedSettlement, voucher });
+  });
+
   // Company Settings
   app.get("/api/accounting/company-settings", requireAuth, async (req, res) => {
     const settings = await storage.getCompanySettings();
@@ -4563,6 +4964,35 @@ async function seedDatabase() {
         await storage.createLedgerAccount({
           name: "ESI Payable", groupId: dutiesGroup.id, openingBalance: "0", balanceType: "credit",
           description: "Employee ESI contribution withheld from salaried staff, due for remittance",
+        });
+      }
+    }
+  }
+
+  // Ensure Full & Final settlement ledger accounts exist — same unconditional
+  // backfill pattern as the PF/ESI Payable block above, needed for the
+  // settlement mark-paid voucher posting (see the /exits/:id/settlement/mark-paid route).
+  {
+    const existingGroups = await storage.getAccountGroups();
+    const expenseGroup = existingGroups.find(g => g.name === "Indirect Expenses") || existingGroups.find(g => g.name === "Direct Expenses");
+    if (expenseGroup) {
+      const existingAccounts = await storage.getLedgerAccounts();
+      if (!existingAccounts.some(a => a.name === "Leave Encashment")) {
+        await storage.createLedgerAccount({
+          name: "Leave Encashment", groupId: expenseGroup.id, openingBalance: "0", balanceType: "debit",
+          description: "Full & Final settlement payout for unused encashable leave balance",
+        });
+      }
+      if (!existingAccounts.some(a => a.name === "Gratuity Expense")) {
+        await storage.createLedgerAccount({
+          name: "Gratuity Expense", groupId: expenseGroup.id, openingBalance: "0", balanceType: "debit",
+          description: "Full & Final settlement gratuity payout (Payment of Gratuity Act, 1972 — draft formula, CA review pending)",
+        });
+      }
+      if (!existingAccounts.some(a => a.name === "Other Settlement Adjustments")) {
+        await storage.createLedgerAccount({
+          name: "Other Settlement Adjustments", groupId: expenseGroup.id, openingBalance: "0", balanceType: "debit",
+          description: "Manual Full & Final settlement earnings/deductions not covered by another ledger",
         });
       }
     }

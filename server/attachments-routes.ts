@@ -55,6 +55,16 @@ const ENTITY_CONFIG: Record<AttachmentEntityType, EntityConfig> = {
     managePermission: "fixed_assets.edit",
     entityExists: async (id) => !!(await storage.getFixedAsset(id)),
   },
+  // Gated on exit.view/exit.manage only, never exit.view_own — this generic
+  // system has no per-row ownership check (same documented gap as leave
+  // request attachments in Step 4), so a self-service permission here would
+  // let any employee view/upload another employee's exit documents by ID.
+  employee_exit: {
+    viewPermission: "exit.view",
+    uploadPermission: "exit.manage",
+    managePermission: "exit.manage",
+    entityExists: async (id) => !!(await storage.getEmployeeExit(id)),
+  },
 };
 
 function isValidEntityType(value: string): value is AttachmentEntityType {
