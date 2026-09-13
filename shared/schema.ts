@@ -223,6 +223,11 @@ export const fixedAssets = pgTable("fixed_assets", {
   // Companies Act 2013 Schedule II Part C, note 4.
   residualValueJustification: text("residual_value_justification"),
   location: text("location"),
+  // Nullable, additive extension for Step 5 (Resignation/Exit) — lets the exit
+  // checklist auto-list assets currently assigned to an exiting employee.
+  // Doesn't affect existing Step 3 behavior since it's optional and unused
+  // elsewhere in the register.
+  assignedToEmployeeId: integer("assigned_to_employee_id").references(() => employees.id),
   vendorName: text("vendor_name"),
   invoiceRef: text("invoice_ref"),
   serialNumber: text("serial_number"),
@@ -782,6 +787,11 @@ export const leaveTypes = pgTable("leave_types", {
   isPaid: boolean("is_paid").notNull().default(true),
   requiresApproval: boolean("requires_approval").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
+  // Nullable, additive extension for Step 5 (Resignation/Exit) — only leave
+  // types marked encashable count toward Full & Final leave-encashment
+  // (draft baseline: none seeded true by default, HR review should confirm
+  // which types, typically Earned Leave, are encashable before flipping this).
+  isEncashable: boolean("is_encashable").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -895,7 +905,138 @@ export const attendanceSwapRequests = pgTable("attendance_swap_requests", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const ATTACHMENT_ENTITY_TYPES = ["voucher", "expense_claim", "quotation", "party", "fixed_asset"] as const;
+// ── Resignation / Exit (Step 5 — salaried MHTSdigiXR employees only, same
+// scope split as Leave Management/Attendance Roster above; a Tutor
+// Agreement's own status field already covers ending a tutor engagement, so
+// this workflow is not wired to tutors). Ties together the reportsTo
+// hierarchy (Step 4), the Fixed Assets Register (Step 3, via
+// fixedAssets.assignedToEmployeeId above), and Leave Balances (for
+// encashment).
+//
+// Notice period and gratuity-eligibility numbers below are a DRAFT baseline
+// (standard notice-period practice; Payment of Gratuity Act's 5-year
+// continuous-service rule) — same standing rule as every other statutory
+// number in this app (Sec 192/PF/ESI, leave entitlements): HR/CA review must
+// confirm these before a real exit relies on them. The "fixed-term employee
+// after 1 year" carve-out from the new Labour Codes is NOT applied here since
+// this app has no employment-type field to key it off — flagged for review
+// rather than guessed. The math lives in server/lib/exit-settlement-engine.ts
+// as editable constants, never hardcoded inline — same convention as the
+// depreciation and leave-accrual engines.
+export const EXIT_TYPES = ["resignation", "termination"] as const;
+export type ExitType = typeof EXIT_TYPES[number];
+
+export const EXIT_STATUSES = ["submitted", "approved", "settled", "cancelled"] as const;
+export type ExitStatus = typeof EXIT_STATUSES[number];
+
+export const DEFAULT_NOTICE_PERIOD_DAYS = 30;
+export const GRATUITY_ELIGIBILITY_YEARS = 5;
+
+export const employeeExits = pgTable("employee_exits", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  exitType: text("exit_type").notNull().default("resignation"),
+  resignationDate: date("resignation_date").notNull(),
+  noticePeriodDays: integer("notice_period_days").notNull().default(30),
+  // resignationDate + noticePeriodDays, computed on submit but stored (and
+  // independently editable) so a later default change doesn't retroactively
+  // alter an in-flight case.
+  proposedLastWorkingDay: date("proposed_last_working_day").notNull(),
+  // Set at approval — may differ from the proposed date (notice waived/extended).
+  actualLastWorkingDay: date("actual_last_working_day"),
+  reason: text("reason"),
+  status: text("status").notNull().default("submitted"),
+  initiatedBy: integer("initiated_by").references(() => employees.id).notNull(),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  approvedAt: timestamp("approved_at"),
+  cancelledBy: integer("cancelled_by").references(() => employees.id),
+  cancelledAt: timestamp("cancelled_at"),
+  cancellationReason: text("cancellation_reason"),
+  // Deactivate login + end the linked payroll record as ONE action (see
+  // routes.ts), gated on the exit checklist being complete.
+  accessRevoked: boolean("access_revoked").notNull().default(false),
+  accessRevokedBy: integer("access_revoked_by").references(() => employees.id),
+  accessRevokedAt: timestamp("access_revoked_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Generic, admin-editable per-case checklist rows. A plain constant
+// (DEFAULT_EXIT_CHECKLIST_ITEMS) seeds each new case — not a separate
+// DB-configurable template table — since these are workflow reminders, not
+// statutory content, and HR can add/remove ad-hoc rows per case anyway.
+export const DEFAULT_EXIT_CHECKLIST_ITEMS = [
+  "ID Card / Access Card Return",
+  "Laptop & IT Equipment Return",
+  "Exit Interview Conducted",
+  "Knowledge Transfer / Handover Document",
+  "No Dues Certificate",
+] as const;
+
+export const exitChecklistItems = pgTable("exit_checklist_items", {
+  id: serial("id").primaryKey(),
+  exitId: integer("exit_id").references(() => employeeExits.id).notNull(),
+  itemLabel: text("item_label").notNull(),
+  isCompleted: boolean("is_completed").notNull().default(false),
+  completedBy: integer("completed_by").references(() => employees.id),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// One row per fixed asset assigned to the exiting employee at the time the
+// case was created (snapshotted from fixedAssets.assignedToEmployeeId) —
+// deliberately not live-queried on every checklist view, so a mid-exit
+// reassignment elsewhere doesn't silently drop it from this checklist.
+export const exitAssetReturns = pgTable("exit_asset_returns", {
+  id: serial("id").primaryKey(),
+  exitId: integer("exit_id").references(() => employeeExits.id).notNull(),
+  fixedAssetId: integer("fixed_asset_id").references(() => fixedAssets.id).notNull(),
+  isReturned: boolean("is_returned").notNull().default(false),
+  returnedAt: timestamp("returned_at"),
+  conditionNotes: text("condition_notes"),
+  verifiedBy: integer("verified_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const EXIT_SETTLEMENT_STATUSES = ["draft", "approved", "paid"] as const;
+export type ExitSettlementStatus = typeof EXIT_SETTLEMENT_STATUSES[number];
+
+// Full & Final settlement — one row per exit case (1:1). Amounts are
+// auto-computed by server/lib/exit-settlement-engine.ts from this employee's
+// current compensation structure and leave balances, but every amount stays
+// editable while status is "draft" so HR can correct the draft-baseline math
+// before finalizing — a deliberate deviation from payslips (which never allow
+// override) because gratuity/encashment policy is genuinely less settled at
+// this business's scale than the payroll formulas already CA-flagged.
+export const employeeExitSettlements = pgTable("employee_exit_settlements", {
+  id: serial("id").primaryKey(),
+  exitId: integer("exit_id").references(() => employeeExits.id).notNull().unique(),
+  // Null if this employee has no linked payroll profile — F&F money math only
+  // runs when one exists; otherwise HR enters every amount manually.
+  payrollEmployeeId: integer("payroll_employee_id").references(() => payrollEmployees.id),
+  pendingSalaryDays: decimal("pending_salary_days", { precision: 5, scale: 1 }).notNull().default("0"),
+  pendingSalaryAmount: decimal("pending_salary_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  leaveEncashmentDays: decimal("leave_encashment_days", { precision: 5, scale: 1 }).notNull().default("0"),
+  leaveEncashmentAmount: decimal("leave_encashment_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  gratuityEligible: boolean("gratuity_eligible").notNull().default(false),
+  gratuityYearsOfService: decimal("gratuity_years_of_service", { precision: 4, scale: 1 }).notNull().default("0"),
+  gratuityAmount: decimal("gratuity_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  otherEarnings: decimal("other_earnings", { precision: 12, scale: 2 }).notNull().default("0"),
+  otherEarningsNote: text("other_earnings_note"),
+  otherDeductions: decimal("other_deductions", { precision: 12, scale: 2 }).notNull().default("0"),
+  otherDeductionsNote: text("other_deductions_note"),
+  netSettlementAmount: decimal("net_settlement_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("draft"),
+  preparedBy: integer("prepared_by").references(() => employees.id),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  approvedAt: timestamp("approved_at"),
+  voucherId: integer("voucher_id").references(() => vouchers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const ATTACHMENT_ENTITY_TYPES = ["voucher", "expense_claim", "quotation", "party", "fixed_asset", "employee_exit"] as const;
 export type AttachmentEntityType = typeof ATTACHMENT_ENTITY_TYPES[number];
 
 export const attachments = pgTable("attachments", {
@@ -1078,6 +1219,23 @@ export const insertAttendanceRosterAssignmentSchema = createInsertSchema(attenda
 export const insertAttendanceSwapRequestSchema = createInsertSchema(attendanceSwapRequests).omit({
   id: true, createdAt: true, requestedAt: true, status: true, decidedBy: true, decidedAt: true,
 });
+// status/approvedBy/approvedAt/cancelledBy/cancelledAt/accessRevoked* are
+// always server-set, never trusted from the client — same convention as
+// leaveRequests above.
+export const insertEmployeeExitSchema = createInsertSchema(employeeExits).omit({
+  id: true, createdAt: true, status: true, initiatedBy: true,
+  approvedBy: true, approvedAt: true, cancelledBy: true, cancelledAt: true,
+  accessRevoked: true, accessRevokedBy: true, accessRevokedAt: true,
+});
+export const insertExitChecklistItemSchema = createInsertSchema(exitChecklistItems).omit({
+  id: true, createdAt: true, isCompleted: true, completedBy: true, completedAt: true,
+});
+export const insertExitAssetReturnSchema = createInsertSchema(exitAssetReturns).omit({
+  id: true, createdAt: true, isReturned: true, returnedAt: true, verifiedBy: true,
+});
+export const insertEmployeeExitSettlementSchema = createInsertSchema(employeeExitSettlements).omit({
+  id: true, createdAt: true, updatedAt: true, status: true, preparedBy: true, approvedBy: true, approvedAt: true, voucherId: true,
+});
 export const insertJobPostingSchema = createInsertSchema(jobPostings).omit({ id: true, createdAt: true });
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({ id: true, createdAt: true });
 export const insertFaqItemSchema = createInsertSchema(faqItems).omit({ id: true, createdAt: true });
@@ -1161,6 +1319,14 @@ export type AttendanceRosterAssignment = typeof attendanceRosterAssignments.$inf
 export type InsertAttendanceRosterAssignment = z.infer<typeof insertAttendanceRosterAssignmentSchema>;
 export type AttendanceSwapRequest = typeof attendanceSwapRequests.$inferSelect;
 export type InsertAttendanceSwapRequest = z.infer<typeof insertAttendanceSwapRequestSchema>;
+export type EmployeeExit = typeof employeeExits.$inferSelect;
+export type InsertEmployeeExit = z.infer<typeof insertEmployeeExitSchema>;
+export type ExitChecklistItem = typeof exitChecklistItems.$inferSelect;
+export type InsertExitChecklistItem = z.infer<typeof insertExitChecklistItemSchema>;
+export type ExitAssetReturn = typeof exitAssetReturns.$inferSelect;
+export type InsertExitAssetReturn = z.infer<typeof insertExitAssetReturnSchema>;
+export type EmployeeExitSettlement = typeof employeeExitSettlements.$inferSelect;
+export type InsertEmployeeExitSettlement = z.infer<typeof insertEmployeeExitSettlementSchema>;
 export type JobPosting = typeof jobPostings.$inferSelect;
 export type InsertJobPosting = z.infer<typeof insertJobPostingSchema>;
 export type JobApplication = typeof jobApplications.$inferSelect;
@@ -1228,6 +1394,12 @@ export const ALL_PERMISSIONS = [
   // override on a swap request (mirrors leave.approve) — a plain colleague
   // accepts/rejects a swap they were named on without needing any permission.
   "attendance.view", "attendance.view_own", "attendance.request_swap", "attendance.manage",
+  // exit.approve is the HR/admin-level sign-off that finalizes a Full & Final
+  // settlement and revokes access — mirrors leave.approve/attendance.manage;
+  // exit.manage covers preparing the checklist/settlement (the "process" step
+  // without final money/access authority), and exit.initiate lets any
+  // employee submit their own resignation.
+  "exit.view", "exit.view_own", "exit.initiate", "exit.manage", "exit.approve",
 ] as const;
 
 export type Permission = typeof ALL_PERMISSIONS[number];
@@ -1256,6 +1428,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   fixed_assets: { label: "Fixed Assets Register", permissions: ["fixed_assets.view", "fixed_assets.create", "fixed_assets.edit", "fixed_assets.dispose"] },
   leave: { label: "Leave Management", permissions: ["leave.view", "leave.view_own", "leave.apply", "leave.approve", "leave.manage"] },
   attendance: { label: "Attendance Roster", permissions: ["attendance.view", "attendance.view_own", "attendance.request_swap", "attendance.manage"] },
+  exit: { label: "Resignation / Exit", permissions: ["exit.view", "exit.view_own", "exit.initiate", "exit.manage", "exit.approve"] },
 };
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
@@ -1264,7 +1437,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   // the user that ONLY super_admin should be able to create/revoke ERP licenses or see
   // activation codes, not every admin.
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.") && !p.startsWith("erp_licenses.")),
-  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own", "fixed_assets.view", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own", "fixed_assets.view", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap", "exit.view", "exit.view_own", "exit.initiate"],
   senior_accountant: [
     "dashboard.view",
     "ledgers.view", "ledgers.create", "ledgers.edit",
@@ -1290,6 +1463,10 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     // They can still approve their OWN direct reports via employees.reportsTo.
     "leave.view", "leave.manage", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap",
     "attendance.view", "attendance.manage",
+    // Same "prepare vs approve" split as payroll/leave/attendance above: can
+    // process the checklist and prepare a settlement, but final sign-off
+    // (money + access revocation) requires admin/super_admin.
+    "exit.view", "exit.view_own", "exit.initiate", "exit.manage",
   ],
   accountant: [
     "dashboard.view",
@@ -1306,10 +1483,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     // after entry would distort an already-computed depreciation history.
     "fixed_assets.view", "fixed_assets.create",
     "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap",
+    "exit.view_own", "exit.initiate",
   ],
-  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
-  viewer: ["dashboard.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
-  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
+  data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap", "exit.view_own", "exit.initiate"],
+  viewer: ["dashboard.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap", "exit.view_own", "exit.initiate"],
+  sales_person: ["dashboard.view", "quotations.view", "quotations.create", "parties.view", "parties.create", "products.view", "invoices.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap", "exit.view_own", "exit.initiate"],
   sales_manager: [
     "dashboard.view",
     "quotations.view", "quotations.create", "quotations.edit", "quotations.approve",
@@ -1320,6 +1498,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "reports.view",
     "payroll_employees.view_own",
     "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap",
+    "exit.view_own", "exit.initiate",
   ],
   // Tutor self-service: view-only access to their own payslips. Scoped
   // server-side to the tutor record linked via tutors.loginEmployeeId —

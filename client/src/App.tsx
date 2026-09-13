@@ -96,6 +96,9 @@ import LeaveTypes from "@/pages/accounting/leave/LeaveTypes";
 import MyAttendance from "@/pages/accounting/attendance/MyAttendance";
 import AttendanceRoster from "@/pages/accounting/attendance/AttendanceRoster";
 import AttendanceReports from "@/pages/accounting/attendance/AttendanceReports";
+import MyExit from "@/pages/accounting/exit/MyExit";
+import ExitManagement from "@/pages/accounting/exit/ExitManagement";
+import ExitCaseDetail from "@/pages/accounting/exit/ExitCaseDetail";
 
 function WebsiteRouter() {
   return (
@@ -298,6 +301,15 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/attendance/reports">
         {() => <ProtectedRoute requiredPermission="attendance.view"><AttendanceReports /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/exit/my-exit">
+        {() => <ProtectedRoute requiredPermission="exit.view_own"><MyExit /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/exit/:id">
+        {() => <ProtectedRoute requiredPermission="exit.view_own"><ExitCaseDetail /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/exit">
+        {() => <ProtectedRoute requiredPermission="exit.view"><ExitManagement /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/contact-inbox">
         {() => <ProtectedRoute requiredPermission="contacts.view"><ContactInbox /></ProtectedRoute>}
