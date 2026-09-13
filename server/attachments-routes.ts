@@ -49,6 +49,12 @@ const ENTITY_CONFIG: Record<AttachmentEntityType, EntityConfig> = {
     managePermission: "parties.delete",
     entityExists: async (id) => !!(await storage.getParty(id)),
   },
+  fixed_asset: {
+    viewPermission: "fixed_assets.view",
+    uploadPermission: "fixed_assets.create",
+    managePermission: "fixed_assets.edit",
+    entityExists: async (id) => !!(await storage.getFixedAsset(id)),
+  },
 };
 
 function isValidEntityType(value: string): value is AttachmentEntityType {

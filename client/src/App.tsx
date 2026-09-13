@@ -42,6 +42,7 @@ import ResetPassword from "@/pages/accounting/ResetPassword";
 import ForceChangePassword from "@/pages/accounting/ForceChangePassword";
 import AccountingDashboard from "@/pages/accounting/Dashboard";
 import Ledgers from "@/pages/accounting/Ledgers";
+import FixedAssets from "@/pages/accounting/FixedAssets";
 import VoucherList from "@/pages/accounting/VoucherList";
 import VoucherEntry from "@/pages/accounting/VoucherEntry";
 import VoucherView from "@/pages/accounting/VoucherView";
@@ -150,6 +151,9 @@ function AccountingRouter() {
       </Route>
       <Route path="/accounting/ledgers">
         {() => <ProtectedRoute requiredPermission="ledgers.view"><Ledgers /></ProtectedRoute>}
+      </Route>
+      <Route path="/accounting/fixed-assets">
+        {() => <ProtectedRoute requiredPermission="fixed_assets.view"><FixedAssets /></ProtectedRoute>}
       </Route>
       <Route path="/accounting/parties">
         {() => <ProtectedRoute requiredPermission="parties.view"><Parties /></ProtectedRoute>}

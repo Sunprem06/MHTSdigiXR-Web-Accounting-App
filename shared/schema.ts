@@ -173,6 +173,75 @@ export const financialYears = pgTable("financial_years", {
   isActive: boolean("is_active").notNull().default(false),
 });
 
+export const FIXED_ASSET_CATEGORIES = [
+  "furniture_fittings", "computer_equipment", "office_equipment",
+  "plant_machinery", "motor_vehicle", "building", "other",
+] as const;
+export type FixedAssetCategory = typeof FIXED_ASSET_CATEGORIES[number];
+
+// Useful-life defaults are a best-effort reading of Companies Act 2013 Schedule II
+// Part C — NOT reviewed by a CA. Editable per asset; these are starting suggestions,
+// not enforced minimums or maximums.
+export const FIXED_ASSET_CATEGORY_DEFAULTS: Record<FixedAssetCategory, {
+  label: string;
+  defaultUsefulLifeYears: number;
+  defaultLedgerAccountName: string;
+}> = {
+  furniture_fittings: { label: "Furniture & Fittings", defaultUsefulLifeYears: 10, defaultLedgerAccountName: "Furniture & Fixtures" },
+  computer_equipment: { label: "Computers & Data Processing", defaultUsefulLifeYears: 3, defaultLedgerAccountName: "Computer & Equipment" },
+  office_equipment: { label: "Office Equipment", defaultUsefulLifeYears: 5, defaultLedgerAccountName: "Office Equipment" },
+  plant_machinery: { label: "Plant & Machinery (General Rate)", defaultUsefulLifeYears: 15, defaultLedgerAccountName: "Plant & Machinery" },
+  motor_vehicle: { label: "Motor Vehicles", defaultUsefulLifeYears: 8, defaultLedgerAccountName: "Motor Vehicles" },
+  building: { label: "Building", defaultUsefulLifeYears: 30, defaultLedgerAccountName: "Buildings" },
+  other: { label: "Other", defaultUsefulLifeYears: 5, defaultLedgerAccountName: "Other Fixed Assets" },
+};
+
+export const DEPRECIATION_METHODS = ["slm", "wdv"] as const;
+export type DepreciationMethod = typeof DEPRECIATION_METHODS[number];
+
+export const FIXED_ASSET_STATUSES = ["active", "disposed", "scrapped"] as const;
+export type FixedAssetStatus = typeof FIXED_ASSET_STATUSES[number];
+
+export const FIXED_ASSET_DISPOSAL_METHODS = ["sold", "scrapped", "written_off"] as const;
+export type FixedAssetDisposalMethod = typeof FIXED_ASSET_DISPOSAL_METHODS[number];
+
+// Per-item asset tracking, distinct from the aggregate GL ledger balance under the
+// same "Fixed Assets" account group. Depreciation math lives in server/lib/depreciation-engine.ts
+// (best-effort Companies Act 2013 Schedule II implementation — NOT CA-reviewed).
+export const fixedAssets = pgTable("fixed_assets", {
+  id: serial("id").primaryKey(),
+  assetCode: text("asset_code").notNull().unique(),
+  name: text("name").notNull(),
+  category: text("category").notNull().default("other"),
+  ledgerAccountId: integer("ledger_account_id").references(() => ledgerAccounts.id).notNull(),
+  acquisitionDate: date("acquisition_date").notNull(),
+  originalCost: decimal("original_cost", { precision: 15, scale: 2 }).notNull(),
+  usefulLifeYears: decimal("useful_life_years", { precision: 4, scale: 1 }).notNull(),
+  depreciationMethod: text("depreciation_method").notNull().default("wdv"),
+  residualValue: decimal("residual_value", { precision: 15, scale: 2 }).notNull().default("0"),
+  // Required (server-enforced) when residualValue exceeds 5% of originalCost —
+  // Companies Act 2013 Schedule II Part C, note 4.
+  residualValueJustification: text("residual_value_justification"),
+  location: text("location"),
+  vendorName: text("vendor_name"),
+  invoiceRef: text("invoice_ref"),
+  serialNumber: text("serial_number"),
+  status: text("status").notNull().default("active"),
+  notes: text("notes"),
+  // Read-cache columns kept in sync by the depreciation engine (Piece 2) — avoids
+  // recomputing a full schedule per row just to render the register list.
+  accumulatedDepreciation: decimal("accumulated_depreciation", { precision: 15, scale: 2 }).notNull().default("0"),
+  currentBookValue: decimal("current_book_value", { precision: 15, scale: 2 }),
+  disposalDate: date("disposal_date"),
+  disposalMethod: text("disposal_method"),
+  disposalProceeds: decimal("disposal_proceeds", { precision: 15, scale: 2 }),
+  disposalReason: text("disposal_reason"),
+  disposalApprovedBy: integer("disposal_approved_by").references(() => employees.id),
+  disposalApprovedAt: timestamp("disposal_approved_at"),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const companySettings = pgTable("company_settings", {
   id: serial("id").primaryKey(),
   companyName: text("company_name").notNull(),
@@ -318,6 +387,27 @@ export const voucherEntries = pgTable("voucher_entries", {
   ledgerAccountId: integer("ledger_account_id").references(() => ledgerAccounts.id).notNull(),
   debit: decimal("debit", { precision: 15, scale: 2 }).default("0").notNull(),
   credit: decimal("credit", { precision: 15, scale: 2 }).default("0").notNull(),
+});
+
+// One row per asset per financial year — frozen at generation time (same convention
+// as tutorPayslips/payrollPayslips), NOT a live re-derivation from financialYears.
+// Once a financial year is closed, its entries are locked; recalculation only
+// appends new periods going forward.
+export const fixedAssetDepreciationEntries = pgTable("fixed_asset_depreciation_entries", {
+  id: serial("id").primaryKey(),
+  fixedAssetId: integer("fixed_asset_id").references(() => fixedAssets.id, { onDelete: "cascade" }).notNull(),
+  periodStartDate: date("period_start_date").notNull(),
+  periodEndDate: date("period_end_date").notNull(),
+  financialYearLabel: text("financial_year_label").notNull(),
+  openingWdv: decimal("opening_wdv", { precision: 15, scale: 2 }).notNull(),
+  depreciationAmount: decimal("depreciation_amount", { precision: 15, scale: 2 }).notNull(),
+  closingWdv: decimal("closing_wdv", { precision: 15, scale: 2 }).notNull(),
+  method: text("method").notNull(),
+  isProrated: boolean("is_prorated").notNull().default(false),
+  // Populated only once GL posting (Piece 4, not yet built) exists.
+  voucherId: integer("voucher_id").references(() => vouchers.id),
+  calculatedBy: integer("calculated_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const quotations = pgTable("quotations", {
@@ -805,7 +895,7 @@ export const attendanceSwapRequests = pgTable("attendance_swap_requests", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const ATTACHMENT_ENTITY_TYPES = ["voucher", "expense_claim", "quotation", "party"] as const;
+export const ATTACHMENT_ENTITY_TYPES = ["voucher", "expense_claim", "quotation", "party", "fixed_asset"] as const;
 export type AttachmentEntityType = typeof ATTACHMENT_ENTITY_TYPES[number];
 
 export const attachments = pgTable("attachments", {
@@ -947,6 +1037,8 @@ export const insertLegalPageSchema = createInsertSchema(legalPages).omit({ id: t
 export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, updatedAt: true });
 export const insertVoucherSchema = createInsertSchema(vouchers).omit({ id: true, createdAt: true });
 export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit({ id: true });
+export const insertFixedAssetSchema = createInsertSchema(fixedAssets).omit({ id: true, createdAt: true, accumulatedDepreciation: true, currentBookValue: true });
+export const insertFixedAssetDepreciationEntrySchema = createInsertSchema(fixedAssetDepreciationEntries).omit({ id: true, createdAt: true });
 export const insertAuditNoteSchema = createInsertSchema(auditNotes).omit({ id: true, createdAt: true });
 export const insertAttachmentSchema = createInsertSchema(attachments).omit({ id: true, createdAt: true });
 export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true });
@@ -1029,6 +1121,10 @@ export type Voucher = typeof vouchers.$inferSelect;
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
 export type VoucherEntry = typeof voucherEntries.$inferSelect;
 export type InsertVoucherEntry = z.infer<typeof insertVoucherEntrySchema>;
+export type FixedAsset = typeof fixedAssets.$inferSelect;
+export type InsertFixedAsset = z.infer<typeof insertFixedAssetSchema>;
+export type FixedAssetDepreciationEntry = typeof fixedAssetDepreciationEntries.$inferSelect;
+export type InsertFixedAssetDepreciationEntry = z.infer<typeof insertFixedAssetDepreciationEntrySchema>;
 export type AuditNote = typeof auditNotes.$inferSelect;
 export type InsertAuditNote = z.infer<typeof insertAuditNoteSchema>;
 export type Attachment = typeof attachments.$inferSelect;
@@ -1123,6 +1219,7 @@ export const ALL_PERMISSIONS = [
   // Deliberately separate from settings.manage (which is super_admin-only) so
   // Admin can also activate/manage financial years without the broader settings access.
   "financial_years.manage",
+  "fixed_assets.view", "fixed_assets.create", "fixed_assets.edit", "fixed_assets.dispose",
   // leave.approve is the HR/admin-level override that can act on ANY request
   // regardless of hierarchy; a plain manager approves their own reports' leave
   // via employees.reportsTo instead, without needing this permission at all.
@@ -1156,6 +1253,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; permissions: Per
   payroll_tutors: { label: "Payroll - Tutors", permissions: ["payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process", "payroll_tutors.approve", "payroll_tutors.view_own"] },
   payroll_employees: { label: "Payroll - Employees", permissions: ["payroll_employees.view", "payroll_employees.manage", "payroll_employees.process", "payroll_employees.approve", "payroll_employees.view_own"] },
   financial_years: { label: "Financial Years", permissions: ["financial_years.manage"] },
+  fixed_assets: { label: "Fixed Assets Register", permissions: ["fixed_assets.view", "fixed_assets.create", "fixed_assets.edit", "fixed_assets.dispose"] },
   leave: { label: "Leave Management", permissions: ["leave.view", "leave.view_own", "leave.apply", "leave.approve", "leave.manage"] },
   attendance: { label: "Attendance Roster", permissions: ["attendance.view", "attendance.view_own", "attendance.request_swap", "attendance.manage"] },
 };
@@ -1166,7 +1264,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   // the user that ONLY super_admin should be able to create/revoke ERP licenses or see
   // activation codes, not every admin.
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith("settings.") && !p.startsWith("erp_licenses.")),
-  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
+  auditor: ["dashboard.view", "ledgers.view", "parties.view", "products.view", "quotations.view", "invoices.view", "vouchers.view", "expenses.view", "contacts.view", "reports.view", "audit.view", "audit.notes", "payroll_employees.view_own", "fixed_assets.view", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],
   senior_accountant: [
     "dashboard.view",
     "ledgers.view", "ledgers.create", "ledgers.edit",
@@ -1183,6 +1281,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "payroll_tutors.view", "payroll_tutors.manage", "payroll_tutors.process",
     "payroll_employees.view", "payroll_employees.manage", "payroll_employees.process",
     "payroll_employees.view_own",
+    // Can prepare/maintain the register but not dispose assets — disposal changes
+    // book value and potential P&L, same "prepare vs approve" split as above.
+    "fixed_assets.view", "fixed_assets.create", "fixed_assets.edit",
     // Same split as payroll_tutors above: Senior Accountant can configure leave
     // types and see all requests/balances, but final HR-level leave.approve
     // (i.e. approving someone else's team's request) requires admin/super_admin.
@@ -1201,6 +1302,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "expenses.view", "expenses.create",
     "reports.view",
     "payroll_employees.view_own",
+    // Deliberately view/create only, not edit — editing cost/useful-life/method
+    // after entry would distort an already-computed depreciation history.
+    "fixed_assets.view", "fixed_assets.create",
     "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap",
   ],
   data_entry: ["dashboard.view", "vouchers.view", "vouchers.create", "quotations.view", "quotations.create", "expenses.view", "expenses.create", "parties.view", "products.view", "payroll_employees.view_own", "leave.view_own", "leave.apply", "attendance.view_own", "attendance.request_swap"],

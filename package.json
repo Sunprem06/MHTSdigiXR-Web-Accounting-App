@@ -8,11 +8,11 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "test": "vitest run",
     "db:push": "drizzle-kit push",
     "test:local-portal": "tsx testing/start-local-test-portal.mjs",
     "reset-admin-password": "tsx scripts/reset-admin-password.ts",
-    "backfill-employee-codes": "tsx scripts/backfill-employee-codes.ts",
-    "test": "vitest run"
+    "backfill-employee-codes": "tsx scripts/backfill-employee-codes.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
