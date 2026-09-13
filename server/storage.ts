@@ -29,6 +29,12 @@ import {
   type Tutor, type TutorAgreement, type TutorPayslip, type PayrollEmployee, type PayrollStatutoryConfigVersion,
   type PayrollCompensationStructure, type PayrollPayslip,
   emailTemplates, type InsertEmailTemplate, type EmailTemplate,
+  leaveTypes, leaveBalances, leaveRequests,
+  type InsertLeaveType, type InsertLeaveBalance, type InsertLeaveRequest,
+  type LeaveType, type LeaveBalance, type LeaveRequest,
+  attendanceRosterAssignments, attendanceSwapRequests,
+  type InsertAttendanceRosterAssignment, type InsertAttendanceSwapRequest,
+  type AttendanceRosterAssignment, type AttendanceSwapRequest,
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 
@@ -190,6 +196,36 @@ export interface IStorage {
   deletePayrollStatutoryConfigVersion(id: number): Promise<boolean>;
   activatePayrollStatutoryConfigVersion(id: number): Promise<PayrollStatutoryConfigVersion | undefined>;
   getNextClaimNumber(): Promise<string>;
+
+  getEmployeesReportingTo(managerId: number): Promise<Employee[]>;
+
+  getLeaveTypes(activeOnly?: boolean): Promise<LeaveType[]>;
+  getLeaveType(id: number): Promise<LeaveType | undefined>;
+  getLeaveTypeByCode(code: string): Promise<LeaveType | undefined>;
+  createLeaveType(data: InsertLeaveType): Promise<LeaveType>;
+  updateLeaveType(id: number, data: Partial<InsertLeaveType>): Promise<LeaveType | undefined>;
+
+  getLeaveBalances(filters?: { employeeId?: number; financialYearId?: number }): Promise<LeaveBalance[]>;
+  getLeaveBalanceById(id: number): Promise<LeaveBalance | undefined>;
+  getLeaveBalance(employeeId: number, leaveTypeId: number, financialYearId: number): Promise<LeaveBalance | undefined>;
+  createLeaveBalance(data: InsertLeaveBalance): Promise<LeaveBalance>;
+  updateLeaveBalance(id: number, data: Partial<InsertLeaveBalance>): Promise<LeaveBalance | undefined>;
+
+  getLeaveRequests(filters?: { employeeId?: number; approverId?: number; status?: string }): Promise<LeaveRequest[]>;
+  getLeaveRequest(id: number): Promise<LeaveRequest | undefined>;
+  getOverlappingLeaveRequests(employeeId: number, startDate: string, endDate: string, excludeId?: number): Promise<LeaveRequest[]>;
+  createLeaveRequest(data: InsertLeaveRequest & { approverId: number | null }): Promise<LeaveRequest>;
+  updateLeaveRequest(id: number, data: Partial<LeaveRequest>): Promise<LeaveRequest | undefined>;
+
+  getAttendanceRoster(employeeId: number): Promise<AttendanceRosterAssignment[]>;
+  getAttendanceRosterForEmployees(employeeIds: number[]): Promise<AttendanceRosterAssignment[]>;
+  upsertAttendanceRosterAssignment(employeeId: number, weekday: number, dayType: string, updatedBy: number): Promise<AttendanceRosterAssignment>;
+
+  getAttendanceSwapRequests(filters?: { employeeId?: number; status?: string }): Promise<AttendanceSwapRequest[]>;
+  getAttendanceSwapRequest(id: number): Promise<AttendanceSwapRequest | undefined>;
+  getOverlappingAttendanceSwaps(employeeId: number, date: string): Promise<AttendanceSwapRequest[]>;
+  createAttendanceSwapRequest(data: InsertAttendanceSwapRequest): Promise<AttendanceSwapRequest>;
+  updateAttendanceSwapRequest(id: number, data: Partial<AttendanceSwapRequest>): Promise<AttendanceSwapRequest | undefined>;
 
   deleteProduct(id: number): Promise<boolean>;
   deleteParty(id: number): Promise<boolean>;
@@ -1110,6 +1146,164 @@ export class DatabaseStorage implements IStorage {
       const [updated] = await tx.update(payrollStatutoryConfigVersions).set({ isActive: true }).where(eq(payrollStatutoryConfigVersions.id, id)).returning();
       return updated;
     });
+  }
+
+  async getEmployeesReportingTo(managerId: number): Promise<Employee[]> {
+    return await db.select().from(employees).where(eq(employees.reportsTo, managerId)).orderBy(employees.fullName);
+  }
+
+  async getLeaveTypes(activeOnly?: boolean): Promise<LeaveType[]> {
+    if (activeOnly) {
+      return await db.select().from(leaveTypes).where(eq(leaveTypes.isActive, true)).orderBy(leaveTypes.name);
+    }
+    return await db.select().from(leaveTypes).orderBy(leaveTypes.name);
+  }
+
+  async getLeaveType(id: number): Promise<LeaveType | undefined> {
+    const [type] = await db.select().from(leaveTypes).where(eq(leaveTypes.id, id));
+    return type;
+  }
+
+  async getLeaveTypeByCode(code: string): Promise<LeaveType | undefined> {
+    const [type] = await db.select().from(leaveTypes).where(eq(leaveTypes.code, code));
+    return type;
+  }
+
+  async createLeaveType(data: InsertLeaveType): Promise<LeaveType> {
+    const [newType] = await db.insert(leaveTypes).values(data).returning();
+    return newType;
+  }
+
+  async updateLeaveType(id: number, data: Partial<InsertLeaveType>): Promise<LeaveType | undefined> {
+    const [updated] = await db.update(leaveTypes).set(data).where(eq(leaveTypes.id, id)).returning();
+    return updated;
+  }
+
+  async getLeaveBalances(filters?: { employeeId?: number; financialYearId?: number }): Promise<LeaveBalance[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(eq(leaveBalances.employeeId, filters.employeeId));
+    if (filters?.financialYearId) conditions.push(eq(leaveBalances.financialYearId, filters.financialYearId));
+    if (conditions.length) {
+      return await db.select().from(leaveBalances).where(and(...conditions));
+    }
+    return await db.select().from(leaveBalances);
+  }
+
+  async getLeaveBalanceById(id: number): Promise<LeaveBalance | undefined> {
+    const [balance] = await db.select().from(leaveBalances).where(eq(leaveBalances.id, id));
+    return balance;
+  }
+
+  async getLeaveBalance(employeeId: number, leaveTypeId: number, financialYearId: number): Promise<LeaveBalance | undefined> {
+    const [balance] = await db.select().from(leaveBalances).where(and(
+      eq(leaveBalances.employeeId, employeeId),
+      eq(leaveBalances.leaveTypeId, leaveTypeId),
+      eq(leaveBalances.financialYearId, financialYearId),
+    )).limit(1);
+    return balance;
+  }
+
+  async createLeaveBalance(data: InsertLeaveBalance): Promise<LeaveBalance> {
+    const [newBalance] = await db.insert(leaveBalances).values(data).returning();
+    return newBalance;
+  }
+
+  async updateLeaveBalance(id: number, data: Partial<InsertLeaveBalance>): Promise<LeaveBalance | undefined> {
+    const [updated] = await db.update(leaveBalances).set({ ...data, updatedAt: new Date() }).where(eq(leaveBalances.id, id)).returning();
+    return updated;
+  }
+
+  async getLeaveRequests(filters?: { employeeId?: number; approverId?: number; status?: string }): Promise<LeaveRequest[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(eq(leaveRequests.employeeId, filters.employeeId));
+    if (filters?.approverId) conditions.push(eq(leaveRequests.approverId, filters.approverId));
+    if (filters?.status) conditions.push(eq(leaveRequests.status, filters.status));
+    if (conditions.length) {
+      return await db.select().from(leaveRequests).where(and(...conditions)).orderBy(desc(leaveRequests.appliedAt));
+    }
+    return await db.select().from(leaveRequests).orderBy(desc(leaveRequests.appliedAt));
+  }
+
+  async getLeaveRequest(id: number): Promise<LeaveRequest | undefined> {
+    const [request] = await db.select().from(leaveRequests).where(eq(leaveRequests.id, id));
+    return request;
+  }
+
+  async getOverlappingLeaveRequests(employeeId: number, startDate: string, endDate: string, excludeId?: number): Promise<LeaveRequest[]> {
+    const conditions = [
+      eq(leaveRequests.employeeId, employeeId),
+      or(eq(leaveRequests.status, "pending"), eq(leaveRequests.status, "approved")),
+      lte(leaveRequests.startDate, endDate),
+      gte(leaveRequests.endDate, startDate),
+    ];
+    if (excludeId) conditions.push(sql`${leaveRequests.id} != ${excludeId}`);
+    return await db.select().from(leaveRequests).where(and(...conditions));
+  }
+
+  async createLeaveRequest(data: InsertLeaveRequest & { approverId: number | null }): Promise<LeaveRequest> {
+    const [newRequest] = await db.insert(leaveRequests).values(data).returning();
+    return newRequest;
+  }
+
+  async updateLeaveRequest(id: number, data: Partial<LeaveRequest>): Promise<LeaveRequest | undefined> {
+    const [updated] = await db.update(leaveRequests).set(data).where(eq(leaveRequests.id, id)).returning();
+    return updated;
+  }
+
+  async getAttendanceRoster(employeeId: number): Promise<AttendanceRosterAssignment[]> {
+    return await db.select().from(attendanceRosterAssignments).where(eq(attendanceRosterAssignments.employeeId, employeeId)).orderBy(attendanceRosterAssignments.weekday);
+  }
+
+  async getAttendanceRosterForEmployees(employeeIds: number[]): Promise<AttendanceRosterAssignment[]> {
+    if (employeeIds.length === 0) return [];
+    return await db.select().from(attendanceRosterAssignments).where(inArray(attendanceRosterAssignments.employeeId, employeeIds));
+  }
+
+  async upsertAttendanceRosterAssignment(employeeId: number, weekday: number, dayType: string, updatedBy: number): Promise<AttendanceRosterAssignment> {
+    const [existing] = await db.select().from(attendanceRosterAssignments).where(and(
+      eq(attendanceRosterAssignments.employeeId, employeeId), eq(attendanceRosterAssignments.weekday, weekday),
+    )).limit(1);
+    if (existing) {
+      const [updated] = await db.update(attendanceRosterAssignments)
+        .set({ dayType, updatedBy, updatedAt: new Date() })
+        .where(eq(attendanceRosterAssignments.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(attendanceRosterAssignments).values({ employeeId, weekday, dayType, updatedBy }).returning();
+    return created;
+  }
+
+  async getAttendanceSwapRequests(filters?: { employeeId?: number; status?: string }): Promise<AttendanceSwapRequest[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(or(eq(attendanceSwapRequests.requesterId, filters.employeeId), eq(attendanceSwapRequests.partnerId, filters.employeeId)));
+    if (filters?.status) conditions.push(eq(attendanceSwapRequests.status, filters.status));
+    if (conditions.length) {
+      return await db.select().from(attendanceSwapRequests).where(and(...conditions)).orderBy(desc(attendanceSwapRequests.requestedAt));
+    }
+    return await db.select().from(attendanceSwapRequests).orderBy(desc(attendanceSwapRequests.requestedAt));
+  }
+
+  async getAttendanceSwapRequest(id: number): Promise<AttendanceSwapRequest | undefined> {
+    const [request] = await db.select().from(attendanceSwapRequests).where(eq(attendanceSwapRequests.id, id));
+    return request;
+  }
+
+  async getOverlappingAttendanceSwaps(employeeId: number, date: string): Promise<AttendanceSwapRequest[]> {
+    return await db.select().from(attendanceSwapRequests).where(and(
+      eq(attendanceSwapRequests.date, date),
+      or(eq(attendanceSwapRequests.requesterId, employeeId), eq(attendanceSwapRequests.partnerId, employeeId)),
+      or(eq(attendanceSwapRequests.status, "pending"), eq(attendanceSwapRequests.status, "accepted")),
+    ));
+  }
+
+  async createAttendanceSwapRequest(data: InsertAttendanceSwapRequest): Promise<AttendanceSwapRequest> {
+    const [newRequest] = await db.insert(attendanceSwapRequests).values(data).returning();
+    return newRequest;
+  }
+
+  async updateAttendanceSwapRequest(id: number, data: Partial<AttendanceSwapRequest>): Promise<AttendanceSwapRequest | undefined> {
+    const [updated] = await db.update(attendanceSwapRequests).set(data).where(eq(attendanceSwapRequests.id, id)).returning();
+    return updated;
   }
 
   async deleteProduct(id: number): Promise<boolean> {

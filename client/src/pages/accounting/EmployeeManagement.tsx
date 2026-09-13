@@ -27,6 +27,7 @@ interface Employee {
   role: string;
   phone: string | null;
   employeeCode: string | null;
+  reportsTo: number | null;
   permissions: string[] | null;
   isActive: boolean;
   createdAt: string;
@@ -46,6 +47,7 @@ export default function EmployeeManagement() {
   const [newRole, setNewRole] = useState("viewer");
   const [newPhone, setNewPhone] = useState("");
   const [newEmployeeCode, setNewEmployeeCode] = useState("");
+  const [newReportsTo, setNewReportsTo] = useState<string>("");
   const [newUseOverrides, setNewUseOverrides] = useState(false);
   const [newOverridePerms, setNewOverridePerms] = useState<string[]>([]);
 
@@ -54,6 +56,7 @@ export default function EmployeeManagement() {
   const [editRole, setEditRole] = useState("viewer");
   const [editPhone, setEditPhone] = useState("");
   const [editEmployeeCode, setEditEmployeeCode] = useState("");
+  const [editReportsTo, setEditReportsTo] = useState<string>("");
   const [editIsActive, setEditIsActive] = useState(true);
   const [editPassword, setEditPassword] = useState("");
   const [editUseOverrides, setEditUseOverrides] = useState(false);
@@ -69,7 +72,7 @@ export default function EmployeeManagement() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; email: string; password: string; fullName: string; role: string; phone?: string; employeeCode?: string; permissions?: string[] }) => {
+    mutationFn: async (data: { username: string; email: string; password: string; fullName: string; role: string; phone?: string; employeeCode?: string; reportsTo?: string; permissions?: string[] }) => {
       const res = await apiRequest("POST", "/api/accounting/employees", data);
       return res.json();
     },
@@ -112,6 +115,7 @@ export default function EmployeeManagement() {
     setNewFullName("");
     setNewRole("viewer");
     setNewPhone("");
+    setNewReportsTo("");
     setNewUseOverrides(false);
     setNewOverridePerms([]);
     setNewEmployeeCode("");
@@ -132,6 +136,7 @@ export default function EmployeeManagement() {
       role: newRole,
       ...(newPhone ? { phone: newPhone } : {}),
       ...(newEmployeeCode ? { employeeCode: newEmployeeCode } : {}),
+      ...(newReportsTo ? { reportsTo: newReportsTo } : {}),
       ...(newUseOverrides ? { permissions: newOverridePerms } : {}),
     });
   };
@@ -145,6 +150,7 @@ export default function EmployeeManagement() {
       isActive: editIsActive,
       phone: editPhone || "",
       employeeCode: editEmployeeCode || null,
+      reportsTo: editReportsTo || null,
     };
     if (editPassword) {
       data.password = editPassword;
@@ -160,6 +166,7 @@ export default function EmployeeManagement() {
     setEditRole(emp.role);
     setEditPhone(emp.phone || "");
     setEditEmployeeCode(emp.employeeCode || "");
+    setEditReportsTo(emp.reportsTo ? String(emp.reportsTo) : "");
     setEditIsActive(emp.isActive);
     setEditPassword("");
     const hasOverrides = Array.isArray(emp.permissions) && emp.permissions.length > 0;
@@ -234,6 +241,7 @@ export default function EmployeeManagement() {
                     <TableHead>Username</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Reports To</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -249,6 +257,9 @@ export default function EmployeeManagement() {
                         <Badge variant="secondary" data-testid={`badge-role-${emp.id}`}>
                           {dbRoles?.find(r => r.slug === emp.role)?.label || ROLE_LABELS[emp.role] || emp.role}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-500 dark:text-slate-400" data-testid={`text-reports-to-${emp.id}`}>
+                        {emp.reportsTo ? (employees?.find(e => e.id === emp.reportsTo)?.fullName || "-") : "-"}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -317,6 +328,22 @@ export default function EmployeeManagement() {
                     {availableRoles.map((r) => (
                       <SelectItem key={r.slug} value={r.slug} data-testid={`option-role-${r.slug}`}>
                         {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Reports To (optional)</Label>
+                <Select value={newReportsTo || "none"} onValueChange={(v) => setNewReportsTo(v === "none" ? "" : v)}>
+                  <SelectTrigger data-testid="select-new-reports-to">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No manager</SelectItem>
+                    {filteredEmployees?.filter(e => e.isActive).map((e) => (
+                      <SelectItem key={e.id} value={String(e.id)} data-testid={`option-reports-to-${e.id}`}>
+                        {e.fullName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -413,6 +440,22 @@ export default function EmployeeManagement() {
                     {availableRoles.map((r) => (
                       <SelectItem key={r.slug} value={r.slug} data-testid={`option-edit-role-${r.slug}`}>
                         {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Reports To (optional)</Label>
+                <Select value={editReportsTo || "none"} onValueChange={(v) => setEditReportsTo(v === "none" ? "" : v)}>
+                  <SelectTrigger data-testid="select-edit-reports-to">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No manager</SelectItem>
+                    {filteredEmployees?.filter(e => e.isActive && e.id !== editingEmployee?.id).map((e) => (
+                      <SelectItem key={e.id} value={String(e.id)} data-testid={`option-edit-reports-to-${e.id}`}>
+                        {e.fullName}
                       </SelectItem>
                     ))}
                   </SelectContent>
