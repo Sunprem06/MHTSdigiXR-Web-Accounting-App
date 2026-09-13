@@ -8,8 +8,8 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { requireAuth, requirePermission, requireRole } from "./auth";
 import { rateLimiter } from "./middleware/security.js";
-import type { JobApplication, LeaveRequest } from "@shared/schema";
-import { LONG_LEAVE_THRESHOLD_DAYS } from "@shared/schema";
+import type { JobApplication, PayrollStatutoryConfig, PayrollEmployee, LeaveRequest } from "@shared/schema";
+import { DEFAULT_PAYROLL_STATUTORY_CONFIG, LONG_LEAVE_THRESHOLD_DAYS } from "@shared/schema";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerAttachmentRoutes } from "./attachments-routes";
 import { getFinancialYearPeriods, computeMonthlyAccrualCredit, computeCarryForwardOpeningBalance, computeAvailableBalance, round1 } from "./lib/leave-accrual-engine";
@@ -75,6 +75,205 @@ function computeTutorPayslip(input: TutorPayslipInputs) {
   const netPay = Math.max(0, round2(netOfCommission - tdsAmount - otherDeduction));
 
   return { grossEarnings, platformCommissionAmount, tdsAmount, netPay, tdsRatePercent, validPan, panAtPayment: pan || null };
+}
+
+// ── Payroll compensation structure — CTC total is always the sum of the named
+// components, recomputed server-side (same "never trust client totals" convention
+// as computeTutorPayslip above). Matches the business's actual Offer Letter
+// Annexure A layout: Basic + HRA + Conveyance + Medical + Other Allowances.
+function computeCompensationCtc(input: { basicAnnual: number; hraAnnual: number; conveyanceAnnual: number; medicalAnnual: number; otherAllowancesAnnual: number }): number {
+  return round2(
+    Math.max(0, input.basicAnnual || 0) +
+    Math.max(0, input.hraAnnual || 0) +
+    Math.max(0, input.conveyanceAnnual || 0) +
+    Math.max(0, input.medicalAnnual || 0) +
+    Math.max(0, input.otherAllowancesAnnual || 0)
+  );
+}
+
+const PAY_MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+// payMonth is stored as a label ("April 2026", matching tutorPayslips.payMonth) —
+// this resolves it to that month's first day, to look up which compensation
+// structure was effective then.
+function parsePayMonthToDate(payMonth: string): string | null {
+  const match = payMonth.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (!match) return null;
+  const idx = PAY_MONTH_NAMES.findIndex(m => m.toLowerCase() === match[1].toLowerCase());
+  if (idx === -1) return null;
+  return `${match[2]}-${String(idx + 1).padStart(2, "0")}-01`;
+}
+
+// ── Payroll payslip earnings — shared by both formats ──
+// Each earning component is pro-rated for LOP days and rounded individually
+// (not the CTC total divided by 12) — matches how the business's own monthly
+// payslips and Full & Final Settlement statement break down pro-rata earnings.
+// Rounded to the nearest whole rupee (not paise) — every one of the business's
+// actual payslip/compensation documents shows whole-rupee amounts only.
+function computeProRatedEarnings(input: {
+  basicAnnual: number; hraAnnual: number; conveyanceAnnual: number; medicalAnnual: number; otherAllowancesAnnual: number;
+  standardWorkingDays: number; lopDays: number;
+}) {
+  const factor = input.standardWorkingDays > 0
+    ? Math.max(0, Math.min(1, (input.standardWorkingDays - input.lopDays) / input.standardWorkingDays))
+    : 1;
+  const earned = (annual: number) => Math.round(Math.round((annual || 0) / 12) * factor);
+
+  const basicEarned = earned(input.basicAnnual);
+  const hraEarned = earned(input.hraAnnual);
+  const conveyanceEarned = earned(input.conveyanceAnnual);
+  const medicalEarned = earned(input.medicalAnnual);
+  const otherAllowancesEarned = earned(input.otherAllowancesAnnual);
+  const grossEarnings = basicEarned + hraEarned + conveyanceEarned + medicalEarned + otherAllowancesEarned;
+
+  return { basicEarned, hraEarned, conveyanceEarned, medicalEarned, otherAllowancesEarned, grossEarnings };
+}
+
+// ── Payroll payslip — Format 1 (No PF/ESI) ──
+// Professional Tax is the ONLY deduction in this format, entered manually per
+// payslip — never derived from a slab table (see the standing rule at
+// payrollEmployees in shared/schema.ts). This is the only place these numbers
+// should be computed — always recomputed server-side, client totals are never trusted.
+function computePayrollPayslipNoPfEsi(input: {
+  basicAnnual: number; hraAnnual: number; conveyanceAnnual: number; medicalAnnual: number; otherAllowancesAnnual: number;
+  standardWorkingDays: number; lopDays: number; professionalTax: number;
+}) {
+  const earnings = computeProRatedEarnings(input);
+  const professionalTax = Math.round(Math.max(0, input.professionalTax || 0));
+  const totalDeductions = professionalTax;
+  const netPay = Math.max(0, earnings.grossEarnings - totalDeductions);
+
+  return { ...earnings, professionalTax, totalDeductions, netPay };
+}
+
+// ── Payroll payslip — Format 2 (With PF/ESI) ──
+// PF and ESI are each independently gated on the employee's own pfApplicable/
+// esiApplicable flags (an employee can be covered by one scheme and not the
+// other) — the "with_pf_esi" format just means "this payslip's math includes
+// PF/ESI where applicable," not "both always apply." Rates/ceilings come from
+// the active payrollStatutoryConfigVersions row — never hardcoded — see
+// PayrollStatutoryConfig in shared/schema.ts. Both are computed on the
+// ALREADY LOP-pro-rated basicEarned/grossEarnings (matching how real PF/ESI
+// contributions are based on wages actually earned that month, not the full
+// contracted salary) — the wage ceilings themselves are NOT pro-rated for a
+// partial month, since no reference material confirms that specific edge case;
+// flagging this assumption so it's easy to correct if it's ever wrong.
+// Employer-side amounts are computed and returned for storage only — they are
+// NOT part of totalDeductions/netPay and are not yet posted to the ledger.
+function computePayrollPayslipWithPfEsi(input: {
+  basicAnnual: number; hraAnnual: number; conveyanceAnnual: number; medicalAnnual: number; otherAllowancesAnnual: number;
+  standardWorkingDays: number; lopDays: number; professionalTax: number;
+  pfApplicable: boolean; esiApplicable: boolean; config: PayrollStatutoryConfig;
+}) {
+  const earnings = computeProRatedEarnings(input);
+  const professionalTax = Math.round(Math.max(0, input.professionalTax || 0));
+
+  const pfApplied = !!input.pfApplicable;
+  const pfWageBase = input.config.pfWageCeilingApplied ? Math.min(earnings.basicEarned, input.config.pfWageCeiling) : earnings.basicEarned;
+  const pfEmployeeAmount = pfApplied ? Math.round(pfWageBase * (input.config.pfRatePercent / 100)) : 0;
+  const pfEmployerAmount = pfApplied ? Math.round(pfWageBase * (input.config.pfEmployerRatePercent / 100)) : 0;
+
+  const esiEligible = earnings.grossEarnings <= input.config.esiWageCeiling;
+  const esiApplied = !!input.esiApplicable && esiEligible;
+  const esiEmployeeAmount = esiApplied ? Math.round(earnings.grossEarnings * (input.config.esiEmployeeRatePercent / 100)) : 0;
+  const esiEmployerAmount = esiApplied ? Math.round(earnings.grossEarnings * (input.config.esiEmployerRatePercent / 100)) : 0;
+
+  const totalDeductions = professionalTax + pfEmployeeAmount + esiEmployeeAmount;
+  const netPay = Math.max(0, earnings.grossEarnings - totalDeductions);
+
+  return {
+    ...earnings, professionalTax,
+    pfApplied, pfEmployeeAmount, pfEmployerAmount,
+    esiApplied, esiEmployeeAmount, esiEmployerAmount,
+    totalDeductions, netPay,
+  };
+}
+
+// ── Sec 192 TDS (New Tax Regime only) ──
+// Applies to every payslip regardless of payslipFormat — PF/ESI applicability
+// is a separate axis. Verified against a real payslip's worked example: Gross
+// ₹7,42,295 − ₹75,000 standard deduction = Taxable ₹6,67,300; tax = 5% ×
+// (6,67,300 − 4,00,000) = ₹13,365 exactly, fully cancelled by the Sec 87A
+// rebate (taxable ≤ ₹12,00,000) → Net Tax ₹0. Confirmed via web search
+// (Sep 2026) that Budget 2026 made no change to these New Regime numbers for
+// FY 2026-27. Old Regime (investment declarations, HRA/80C exemptions) is
+// deliberately not built — no reference material for it, and it needs its
+// own declaration workflow. Surcharge (only above ₹50L income) is out of
+// scope — not applicable at this business's pay scale.
+function computeIncomeTaxOnAnnualIncome(taxableIncome: number, config: PayrollStatutoryConfig): { taxBeforeRebate: number; rebate: number; taxAfterRebate: number; cess: number; totalTax: number } {
+  let tax = 0;
+  let lowerBound = 0;
+  for (const slab of config.incomeTaxSlabs) {
+    const upperBound = slab.upTo ?? Infinity;
+    if (taxableIncome > lowerBound) {
+      tax += (Math.min(taxableIncome, upperBound) - lowerBound) * (slab.ratePercent / 100);
+    }
+    lowerBound = upperBound;
+    if (taxableIncome <= upperBound) break;
+  }
+  tax = Math.round(tax);
+
+  // Sec 87A: full rebate (net tax zero) at/below the threshold; a marginal-relief
+  // band just above it caps tax at the amount of income exceeding the threshold,
+  // so crossing the threshold by a small amount never costs more tax than the excess.
+  let rebate = 0;
+  let taxAfterRebate = tax;
+  if (taxableIncome <= config.incomeTaxRebateThreshold) {
+    rebate = Math.min(tax, config.incomeTaxRebateCap);
+    taxAfterRebate = Math.max(0, tax - rebate);
+  } else {
+    const excessOverThreshold = taxableIncome - config.incomeTaxRebateThreshold;
+    if (tax > excessOverThreshold) {
+      rebate = tax - excessOverThreshold;
+      taxAfterRebate = excessOverThreshold;
+    }
+  }
+  const cess = Math.round(taxAfterRebate * (config.incomeTaxCessPercent / 100));
+  return { taxBeforeRebate: tax, rebate, taxAfterRebate, cess, totalTax: taxAfterRebate + cess };
+}
+
+// Projects this employee's annual salary for the financial year containing payMonth
+// (actual gross from their OTHER payslips already in that FY + this month's actual
+// gross + remaining months projected at the current full monthly rate, i.e. without
+// this month's own LOP proration — future months are assumed full attendance), then
+// spreads the remaining annual tax liability evenly across the remaining months.
+// Past payslips' frozen numbers are read-only inputs here — never rewritten.
+async function computeIncomeTaxForPayslip(input: {
+  payrollEmployeeId: number; payMonth: string;
+  currentMonthGrossEarnings: number; fullMonthlyGrossRate: number;
+  config: PayrollStatutoryConfig; excludePayslipId?: number;
+}): Promise<{ error: string; data?: undefined } | { error?: undefined; data: { annualProjectedGross: number; annualTaxableIncome: number; annualTaxPayable: number; tdsDeductedTillDate: number; tdsThisMonth: number } }> {
+  const asOfDate = parsePayMonthToDate(input.payMonth);
+  if (!asOfDate) return { error: "Invalid Pay Month" };
+
+  const financialYears = await storage.getFinancialYears();
+  const fy = financialYears.find(f => asOfDate >= f.startDate && asOfDate <= f.endDate);
+  if (!fy) return { error: `No financial year is configured covering ${input.payMonth} — set one up in Settings → Financial Years first` };
+
+  const allPayslips = await storage.getPayrollPayslips({ payrollEmployeeId: input.payrollEmployeeId });
+  const priorInFy = allPayslips.filter(p => {
+    if (p.id === input.excludePayslipId || p.status === "rejected") return false;
+    const d = parsePayMonthToDate(p.payMonth);
+    return !!d && d >= fy.startDate && d <= fy.endDate && d < asOfDate;
+  });
+  const grossSoFar = priorInFy.reduce((sum, p) => sum + parseFloat(p.grossEarnings), 0);
+  const tdsSoFar = priorInFy.reduce((sum, p) => sum + parseFloat(p.tdsThisMonth || "0"), 0);
+
+  const [asOfYear, asOfMonth] = asOfDate.split("-").map(Number);
+  const [endYear, endMonth] = fy.endDate.split("-").map(Number);
+  const remainingMonths = (endYear * 12 + endMonth) - (asOfYear * 12 + asOfMonth) + 1;
+  if (remainingMonths <= 0) return { error: "Pay Month falls outside its financial year" };
+  const futureMonthsCount = remainingMonths - 1;
+
+  const annualProjectedGross = Math.round(grossSoFar + input.currentMonthGrossEarnings + futureMonthsCount * input.fullMonthlyGrossRate);
+  const annualTaxableIncome = Math.max(0, annualProjectedGross - input.config.incomeTaxStandardDeduction);
+  const { totalTax: annualTaxPayable } = computeIncomeTaxOnAnnualIncome(annualTaxableIncome, input.config);
+
+  const remainingTaxLiability = Math.max(0, annualTaxPayable - tdsSoFar);
+  const tdsThisMonth = Math.round(remainingTaxLiability / remainingMonths);
+  const tdsDeductedTillDate = tdsSoFar + tdsThisMonth;
+
+  return { data: { annualProjectedGross, annualTaxableIncome, annualTaxPayable, tdsDeductedTillDate, tdsThisMonth } };
 }
 
 // A voucher's date must fall within SOME configured Financial Year — not
@@ -1507,6 +1706,20 @@ export async function registerRoutes(
     res.json(list);
   });
 
+  // Registered BEFORE /:id below — otherwise Express would match "headcount-summary"
+  // as an :id value first and this route would never be reached.
+  // Informational/gating only for the statutory threshold banner (see
+  // PayrollEmployees.tsx / PayrollStatutoryConfig.tsx) — never auto-flips any
+  // employee's pfApplicable/esiApplicable flag; those stay a deliberate per-employee choice.
+  app.get("/api/accounting/payroll-employees/headcount-summary", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const employees = await storage.getPayrollEmployees({ status: "active" });
+    res.json({
+      totalActive: employees.length,
+      pfApplicableCount: employees.filter(e => e.pfApplicable).length,
+      esiApplicableCount: employees.filter(e => e.esiApplicable).length,
+    });
+  });
+
   app.get("/api/accounting/payroll-employees/:id", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
     const employee = await storage.getPayrollEmployee(parseInt(req.params.id));
     if (!employee) return res.status(404).json({ message: "Payroll employee not found" });
@@ -1554,6 +1767,514 @@ export async function registerRoutes(
       ipAddress: req.ip || null,
     });
     res.json({ message: "Deleted successfully" });
+  });
+
+  // Payroll: Statutory Config — effective-dated, versioned rates/ceilings for the
+  // With-PF/ESI payslip format. Every rate/ceiling/threshold is configurable here,
+  // never hardcoded in calculation code (see PayrollStatutoryConfig in shared/schema.ts).
+  app.get("/api/accounting/payroll-statutory-config", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const list = await storage.getPayrollStatutoryConfigVersions();
+    res.json(list);
+  });
+
+  app.get("/api/accounting/payroll-statutory-config/active", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const active = await storage.getActivePayrollStatutoryConfigVersion();
+    if (!active) return res.status(404).json({ message: "No statutory configuration is active" });
+    res.json(active);
+  });
+
+  app.get("/api/accounting/payroll-statutory-config/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const version = await storage.getPayrollStatutoryConfigVersion(parseInt(req.params.id));
+    if (!version) return res.status(404).json({ message: "Statutory config version not found" });
+    res.json(version);
+  });
+
+  app.post("/api/accounting/payroll-statutory-config", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    if (!req.body.effectiveFrom) return res.status(400).json({ message: "Effective From date is required" });
+    if (!req.body.label) return res.status(400).json({ message: "Label is required" });
+    const config = { ...DEFAULT_PAYROLL_STATUTORY_CONFIG, ...(req.body.config || {}) };
+    const version = await storage.createPayrollStatutoryConfigVersion({
+      effectiveFrom: req.body.effectiveFrom,
+      label: req.body.label,
+      config,
+      isActive: false,
+      notes: req.body.notes || null,
+      createdBy: req.user!.id,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "payroll_statutory_config_version",
+      entityId: version.id, details: `Created statutory config version "${version.label}" effective ${version.effectiveFrom}`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(version);
+  });
+
+  app.patch("/api/accounting/payroll-statutory-config/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollStatutoryConfigVersion(id);
+    if (!existing) return res.status(404).json({ message: "Statutory config version not found" });
+    const config = req.body.config ? { ...(existing.config as object), ...req.body.config } : undefined;
+    const updated = await storage.updatePayrollStatutoryConfigVersion(id, {
+      effectiveFrom: req.body.effectiveFrom ?? existing.effectiveFrom,
+      label: req.body.label ?? existing.label,
+      notes: req.body.notes !== undefined ? req.body.notes || null : existing.notes,
+      ...(config ? { config } : {}),
+    });
+    if (!updated) return res.status(404).json({ message: "Statutory config version not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "payroll_statutory_config_version",
+      entityId: updated.id, details: `Updated statutory config version "${updated.label}"`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/payroll-statutory-config/:id/activate", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollStatutoryConfigVersion(id);
+    if (!existing) return res.status(404).json({ message: "Statutory config version not found" });
+    const updated = await storage.activatePayrollStatutoryConfigVersion(id);
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "activate", entity: "payroll_statutory_config_version",
+      entityId: id, details: `Activated statutory config version "${existing.label}"`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/payroll-statutory-config/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollStatutoryConfigVersion(id);
+    if (!existing) return res.status(404).json({ message: "Statutory config version not found" });
+    if (existing.isActive) return res.status(400).json({ message: "Cannot delete the active configuration — activate a different version first" });
+    const deleted = await storage.deletePayrollStatutoryConfigVersion(id);
+    if (!deleted) return res.status(404).json({ message: "Statutory config version not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "payroll_statutory_config_version",
+      entityId: id, details: `Deleted statutory config version "${existing.label}"`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
+  // Payroll: Compensation Structures — effective-dated, reused by payslip generation (Step 2b/2c)
+  app.get("/api/accounting/payroll-compensation-structures", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const filters: any = {};
+    if (req.query.payrollEmployeeId) filters.payrollEmployeeId = parseInt(req.query.payrollEmployeeId as string);
+    const list = await storage.getPayrollCompensationStructures(filters);
+    res.json(list);
+  });
+
+  app.get("/api/accounting/payroll-compensation-structures/:id", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const structure = await storage.getPayrollCompensationStructure(parseInt(req.params.id));
+    if (!structure) return res.status(404).json({ message: "Compensation structure not found" });
+    res.json(structure);
+  });
+
+  app.post("/api/accounting/payroll-compensation-structures", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const payrollEmployeeId = parseInt(req.body.payrollEmployeeId);
+    const employee = await storage.getPayrollEmployee(payrollEmployeeId);
+    if (!employee) return res.status(400).json({ message: "Payroll employee not found" });
+    if (!req.body.effectiveFrom) return res.status(400).json({ message: "Effective From date is required" });
+
+    const existingForDate = (await storage.getPayrollCompensationStructures({ payrollEmployeeId }))
+      .find(s => s.effectiveFrom === req.body.effectiveFrom);
+    if (existingForDate) {
+      return res.status(400).json({ message: `A compensation structure already exists effective ${req.body.effectiveFrom} for this employee` });
+    }
+
+    const basicAnnual = parseFloat(req.body.basicAnnual) || 0;
+    const hraAnnual = parseFloat(req.body.hraAnnual) || 0;
+    const conveyanceAnnual = parseFloat(req.body.conveyanceAnnual) || 0;
+    const medicalAnnual = parseFloat(req.body.medicalAnnual) || 0;
+    const otherAllowancesAnnual = parseFloat(req.body.otherAllowancesAnnual) || 0;
+    const ctcAnnual = computeCompensationCtc({ basicAnnual, hraAnnual, conveyanceAnnual, medicalAnnual, otherAllowancesAnnual });
+
+    const structure = await storage.createPayrollCompensationStructure({
+      payrollEmployeeId, effectiveFrom: req.body.effectiveFrom,
+      reason: req.body.reason || null, refNo: req.body.refNo || null,
+      basicAnnual: String(basicAnnual), hraAnnual: String(hraAnnual), conveyanceAnnual: String(conveyanceAnnual),
+      medicalAnnual: String(medicalAnnual), otherAllowancesAnnual: String(otherAllowancesAnnual),
+      ctcAnnual: String(ctcAnnual),
+      createdBy: req.user!.id,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "payroll_compensation_structure",
+      entityId: structure.id, details: `Set compensation for ${employee.employeeCode} effective ${structure.effectiveFrom}: CTC Rs.${structure.ctcAnnual}/yr`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(structure);
+  });
+
+  app.patch("/api/accounting/payroll-compensation-structures/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollCompensationStructure(id);
+    if (!existing) return res.status(404).json({ message: "Compensation structure not found" });
+
+    const basicAnnual = req.body.basicAnnual !== undefined ? parseFloat(req.body.basicAnnual) || 0 : parseFloat(existing.basicAnnual);
+    const hraAnnual = req.body.hraAnnual !== undefined ? parseFloat(req.body.hraAnnual) || 0 : parseFloat(existing.hraAnnual);
+    const conveyanceAnnual = req.body.conveyanceAnnual !== undefined ? parseFloat(req.body.conveyanceAnnual) || 0 : parseFloat(existing.conveyanceAnnual);
+    const medicalAnnual = req.body.medicalAnnual !== undefined ? parseFloat(req.body.medicalAnnual) || 0 : parseFloat(existing.medicalAnnual);
+    const otherAllowancesAnnual = req.body.otherAllowancesAnnual !== undefined ? parseFloat(req.body.otherAllowancesAnnual) || 0 : parseFloat(existing.otherAllowancesAnnual);
+    const ctcAnnual = computeCompensationCtc({ basicAnnual, hraAnnual, conveyanceAnnual, medicalAnnual, otherAllowancesAnnual });
+
+    const updated = await storage.updatePayrollCompensationStructure(id, {
+      effectiveFrom: req.body.effectiveFrom ?? existing.effectiveFrom,
+      reason: req.body.reason !== undefined ? req.body.reason || null : existing.reason,
+      refNo: req.body.refNo !== undefined ? req.body.refNo || null : existing.refNo,
+      basicAnnual: String(basicAnnual), hraAnnual: String(hraAnnual), conveyanceAnnual: String(conveyanceAnnual),
+      medicalAnnual: String(medicalAnnual), otherAllowancesAnnual: String(otherAllowancesAnnual),
+      ctcAnnual: String(ctcAnnual),
+    });
+    if (!updated) return res.status(404).json({ message: "Compensation structure not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "payroll_compensation_structure",
+      entityId: updated.id, details: `Updated compensation structure effective ${updated.effectiveFrom}: CTC Rs.${updated.ctcAnnual}/yr`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/payroll-compensation-structures/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollCompensationStructure(id);
+    if (!existing) return res.status(404).json({ message: "Compensation structure not found" });
+    const deleted = await storage.deletePayrollCompensationStructure(id);
+    if (!deleted) return res.status(404).json({ message: "Compensation structure not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "payroll_compensation_structure",
+      entityId: id, details: `Deleted compensation structure effective ${existing.effectiveFrom}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
+  // Payroll: Payslips — both formats. Sec 192 TDS applies to both alike (see
+  // computeIncomeTaxForPayslip above) — an active statutory config is now required
+  // for ANY payslip, not just With-PF/ESI, since it also carries the tax slab settings.
+  type PayrollPayslipComputedFields = {
+    compensationStructureId: number;
+    statutoryConfigVersionId: number | null;
+    payMonth: string;
+    payslipFormat: "no_pf_esi" | "with_pf_esi";
+    standardWorkingDays: number;
+    lopDays: string;
+    basicEarned: string; hraEarned: string; conveyanceEarned: string; medicalEarned: string; otherAllowancesEarned: string;
+    grossEarnings: string;
+    professionalTax: string;
+    pfApplied: boolean; pfEmployeeAmount: string; pfEmployerAmount: string;
+    esiApplied: boolean; esiEmployeeAmount: string; esiEmployerAmount: string;
+    annualProjectedGross: string; annualTaxableIncome: string; annualTaxPayable: string;
+    tdsDeductedTillDate: string; tdsThisMonth: string;
+    totalDeductions: string;
+    netPay: string;
+  };
+  async function buildPayrollPayslipData(employee: PayrollEmployee, body: any, excludePayslipId?: number): Promise<{ error: string; data?: undefined } | { error?: undefined; data: PayrollPayslipComputedFields }> {
+    if (!body.payMonth) return { error: "Pay Month is required" };
+    const asOfDate = parsePayMonthToDate(body.payMonth);
+    if (!asOfDate) return { error: "Invalid Pay Month" };
+    const structure = await storage.getCurrentPayrollCompensationStructure(employee.id, asOfDate);
+    if (!structure) return { error: `No compensation structure is effective for ${body.payMonth} — set one up first` };
+
+    const configVersion = await storage.getActivePayrollStatutoryConfigVersion();
+    if (!configVersion) return { error: "No statutory configuration is active — set one up in Payroll → Statutory Config first" };
+    const config = { ...DEFAULT_PAYROLL_STATUTORY_CONFIG, ...(configVersion.config as Partial<PayrollStatutoryConfig>) };
+
+    const standardWorkingDays = parseInt(body.standardWorkingDays) || 26;
+    const lopDays = parseFloat(body.lopDays) || 0;
+    const professionalTax = parseFloat(body.professionalTax) || 0;
+    // Defaults from the employee's own flags, overridable per payslip (e.g. to force a
+    // one-off no_pf_esi payslip, or to test with_pf_esi ahead of flipping the flag).
+    const payslipFormat: "no_pf_esi" | "with_pf_esi" =
+      body.payslipFormat === "with_pf_esi" || body.payslipFormat === "no_pf_esi"
+        ? body.payslipFormat
+        : (employee.pfApplicable || employee.esiApplicable ? "with_pf_esi" : "no_pf_esi");
+
+    const structureAnnuals = {
+      basicAnnual: parseFloat(structure.basicAnnual), hraAnnual: parseFloat(structure.hraAnnual),
+      conveyanceAnnual: parseFloat(structure.conveyanceAnnual), medicalAnnual: parseFloat(structure.medicalAnnual),
+      otherAllowancesAnnual: parseFloat(structure.otherAllowancesAnnual),
+    };
+    const earningsInput = { ...structureAnnuals, standardWorkingDays, lopDays };
+
+    const computed = payslipFormat === "no_pf_esi"
+      ? { ...computePayrollPayslipNoPfEsi({ ...earningsInput, professionalTax }), pfApplied: false, pfEmployeeAmount: 0, pfEmployerAmount: 0, esiApplied: false, esiEmployeeAmount: 0, esiEmployerAmount: 0 }
+      : computePayrollPayslipWithPfEsi({ ...earningsInput, professionalTax, pfApplicable: employee.pfApplicable, esiApplicable: employee.esiApplicable, config });
+
+    // Full (non-LOP-prorated) monthly rate, for projecting the FY's remaining months.
+    const fullMonthlyGrossRate = computeProRatedEarnings({ ...structureAnnuals, standardWorkingDays, lopDays: 0 }).grossEarnings;
+    const taxResult = await computeIncomeTaxForPayslip({
+      payrollEmployeeId: employee.id, payMonth: body.payMonth,
+      currentMonthGrossEarnings: computed.grossEarnings, fullMonthlyGrossRate, config, excludePayslipId,
+    });
+    if (taxResult.error) return { error: taxResult.error };
+    const tax = taxResult.data!;
+
+    const totalDeductions = computed.totalDeductions + tax.tdsThisMonth;
+    const netPay = Math.max(0, computed.grossEarnings - totalDeductions);
+
+    return {
+      data: {
+        compensationStructureId: structure.id, statutoryConfigVersionId: configVersion.id,
+        payMonth: body.payMonth, payslipFormat,
+        standardWorkingDays, lopDays: String(lopDays),
+        basicEarned: String(computed.basicEarned), hraEarned: String(computed.hraEarned),
+        conveyanceEarned: String(computed.conveyanceEarned), medicalEarned: String(computed.medicalEarned),
+        otherAllowancesEarned: String(computed.otherAllowancesEarned),
+        grossEarnings: String(computed.grossEarnings),
+        professionalTax: String(computed.professionalTax),
+        pfApplied: computed.pfApplied, pfEmployeeAmount: String(computed.pfEmployeeAmount), pfEmployerAmount: String(computed.pfEmployerAmount),
+        esiApplied: computed.esiApplied, esiEmployeeAmount: String(computed.esiEmployeeAmount), esiEmployerAmount: String(computed.esiEmployerAmount),
+        annualProjectedGross: String(tax.annualProjectedGross), annualTaxableIncome: String(tax.annualTaxableIncome), annualTaxPayable: String(tax.annualTaxPayable),
+        tdsDeductedTillDate: String(tax.tdsDeductedTillDate), tdsThisMonth: String(tax.tdsThisMonth),
+        totalDeductions: String(totalDeductions),
+        netPay: String(netPay),
+      },
+    };
+  }
+
+  app.get("/api/accounting/payroll-payslips", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const filters: any = {};
+    if (req.query.payrollEmployeeId) filters.payrollEmployeeId = parseInt(req.query.payrollEmployeeId as string);
+    if (req.query.status) filters.status = req.query.status;
+    const list = await storage.getPayrollPayslips(filters);
+    res.json(list);
+  });
+
+  app.get("/api/accounting/payroll-payslips/:id", requireAuth, requirePermission("payroll_employees.view"), async (req, res) => {
+    const payslip = await storage.getPayrollPayslip(parseInt(req.params.id));
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    res.json(payslip);
+  });
+
+  app.post("/api/accounting/payroll-payslips", requireAuth, requirePermission("payroll_employees.process"), async (req, res) => {
+    const employee = await storage.getPayrollEmployee(parseInt(req.body.payrollEmployeeId));
+    if (!employee) return res.status(400).json({ message: "Payroll employee not found" });
+
+    const existingForMonth = (await storage.getPayrollPayslips({ payrollEmployeeId: employee.id }))
+      .find(p => p.payMonth === req.body.payMonth);
+    if (existingForMonth) {
+      return res.status(400).json({ message: `A payslip already exists for ${req.body.payMonth} for this employee` });
+    }
+
+    const built = await buildPayrollPayslipData(employee, req.body);
+    if (built.error) return res.status(400).json({ message: built.error });
+
+    const payslip = await storage.createPayrollPayslip({
+      ...built.data!,
+      payrollEmployeeId: employee.id,
+      status: "draft",
+      preparedBy: req.user!.id,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "create", entity: "payroll_payslip",
+      entityId: payslip.id, details: `Created draft payslip for ${employee.employeeCode} — ${payslip.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.status(201).json(payslip);
+  });
+
+  app.patch("/api/accounting/payroll-payslips/:id", requireAuth, requirePermission("payroll_employees.process"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollPayslip(id);
+    if (!existing) return res.status(404).json({ message: "Payslip not found" });
+    if (existing.status !== "draft" && existing.status !== "rejected") {
+      return res.status(400).json({ message: "Only draft or rejected payslips can be edited" });
+    }
+    const employee = await storage.getPayrollEmployee(existing.payrollEmployeeId);
+    if (!employee) return res.status(400).json({ message: "Payroll employee not found" });
+
+    const mergedBody = { ...existing, ...req.body };
+    if (mergedBody.payMonth !== existing.payMonth) {
+      const existingForMonth = (await storage.getPayrollPayslips({ payrollEmployeeId: employee.id }))
+        .find(p => p.payMonth === mergedBody.payMonth && p.id !== id);
+      if (existingForMonth) {
+        return res.status(400).json({ message: `A payslip already exists for ${mergedBody.payMonth} for this employee` });
+      }
+    }
+
+    const built = await buildPayrollPayslipData(employee, mergedBody, id);
+    if (built.error) return res.status(400).json({ message: built.error });
+
+    const updated = await storage.updatePayrollPayslip(id, {
+      ...built.data!,
+      status: "draft",
+      rejectionReason: null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "update", entity: "payroll_payslip",
+      entityId: id, details: `Updated payslip for ${employee.employeeCode} — ${updated!.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.delete("/api/accounting/payroll-payslips/:id", requireAuth, requirePermission("payroll_employees.manage"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getPayrollPayslip(id);
+    if (!existing) return res.status(404).json({ message: "Payslip not found" });
+    if (existing.status === "paid") {
+      return res.status(400).json({ message: "Cannot delete a paid payslip — it has a posted ledger voucher. Reverse the voucher first if this was posted in error." });
+    }
+    const deleted = await storage.deletePayrollPayslip(id);
+    if (!deleted) return res.status(404).json({ message: "Payslip not found" });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "delete", entity: "payroll_payslip",
+      entityId: id, details: `Deleted payslip for payroll employee #${existing.payrollEmployeeId} — ${existing.payMonth}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ message: "Deleted successfully" });
+  });
+
+  app.post("/api/accounting/payroll-payslips/:id/submit", requireAuth, requirePermission("payroll_employees.process"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getPayrollPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "draft") return res.status(400).json({ message: "Only draft payslips can be submitted" });
+    const updated = await storage.updatePayrollPayslip(id, { status: "submitted", submittedAt: new Date() });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "submit", entity: "payroll_payslip",
+      entityId: id, details: `Submitted payslip ${id} for approval`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/payroll-payslips/:id/approve", requireAuth, requirePermission("payroll_employees.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getPayrollPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "submitted") return res.status(400).json({ message: "Only submitted payslips can be approved" });
+    const updated = await storage.updatePayrollPayslip(id, {
+      status: "approved", approvedBy: req.user!.id, approvedAt: new Date(),
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "approve", entity: "payroll_payslip",
+      entityId: id, details: `Approved payslip ${id}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/payroll-payslips/:id/reject", requireAuth, requirePermission("payroll_employees.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getPayrollPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "submitted") return res.status(400).json({ message: "Only submitted payslips can be rejected" });
+    const reason = req.body?.reason || "";
+    const updated = await storage.updatePayrollPayslip(id, {
+      status: "rejected", approvedBy: req.user!.id, approvedAt: new Date(),
+      rejectionReason: reason || null,
+    });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "reject", entity: "payroll_payslip",
+      entityId: id, details: `Rejected payslip ${id}${reason ? ": " + reason : ""}`,
+      ipAddress: req.ip || null,
+    });
+    res.json(updated);
+  });
+
+  app.post("/api/accounting/payroll-payslips/:id/mark-paid", requireAuth, requirePermission("payroll_employees.approve"), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const payslip = await storage.getPayrollPayslip(id);
+    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+    if (payslip.status !== "approved") return res.status(400).json({ message: "Only approved payslips can be marked paid" });
+    const employee = await storage.getPayrollEmployee(payslip.payrollEmployeeId);
+    if (!employee) return res.status(400).json({ message: "Payroll employee not found" });
+    const payDate = new Date().toISOString().split("T")[0];
+    const fyError = await checkFinancialYearForDate(payDate);
+    if (fyError) return res.status(400).json({ message: fyError });
+
+    const ledgerAccounts = await storage.getLedgerAccounts();
+    const salaryLedger = ledgerAccounts.find(a => a.name === "Salary & Wages");
+    const ptLedger = ledgerAccounts.find(a => a.name === "Professional Tax");
+    const bankLedger = ledgerAccounts.find(a => a.name === "Bank Account");
+    const pfLedger = ledgerAccounts.find(a => a.name === "PF Payable");
+    const esiLedger = ledgerAccounts.find(a => a.name === "ESI Payable");
+    const tdsLedger = ledgerAccounts.find(a => a.name === "TDS Payable");
+    if (!salaryLedger || !ptLedger || !bankLedger) {
+      return res.status(500).json({ message: "Required ledger accounts are missing — contact an administrator" });
+    }
+
+    const gross = parseFloat(payslip.grossEarnings);
+    const pt = parseFloat(payslip.professionalTax);
+    const pfEmployee = parseFloat(payslip.pfEmployeeAmount || "0");
+    const esiEmployee = parseFloat(payslip.esiEmployeeAmount || "0");
+    const tds = parseFloat(payslip.tdsThisMonth || "0");
+    const net = parseFloat(payslip.netPay);
+
+    // voucherId is a placeholder — storage.createVoucher() overwrites it with the
+    // newly-created voucher's real id for every entry before inserting.
+    // Only the EMPLOYEE-side PF/ESI withheld is posted here (a real liability the
+    // company owes) — employer contributions are stored on the payslip but not yet
+    // posted to the ledger (see the payrollPayslips comment in shared/schema.ts).
+    const entries = [
+      { ledgerAccountId: salaryLedger.id, voucherId: 0, debit: String(gross), credit: "0" },
+      { ledgerAccountId: bankLedger.id, voucherId: 0, debit: "0", credit: String(net) },
+    ];
+    if (pt > 0) {
+      entries.push({ ledgerAccountId: ptLedger.id, voucherId: 0, debit: "0", credit: String(pt) });
+    }
+    if (pfEmployee > 0) {
+      if (!pfLedger) return res.status(500).json({ message: "PF Payable ledger account is missing — contact an administrator" });
+      entries.push({ ledgerAccountId: pfLedger.id, voucherId: 0, debit: "0", credit: String(pfEmployee) });
+    }
+    if (esiEmployee > 0) {
+      if (!esiLedger) return res.status(500).json({ message: "ESI Payable ledger account is missing — contact an administrator" });
+      entries.push({ ledgerAccountId: esiLedger.id, voucherId: 0, debit: "0", credit: String(esiEmployee) });
+    }
+    if (tds > 0) {
+      if (!tdsLedger) return res.status(500).json({ message: "TDS Payable ledger account is missing — contact an administrator" });
+      entries.push({ ledgerAccountId: tdsLedger.id, voucherId: 0, debit: "0", credit: String(tds) });
+    }
+
+    const voucherNumber = await storage.getNextVoucherNumber("payment");
+    const voucher = await storage.createVoucher({
+      voucherNumber,
+      date: payDate,
+      type: "payment",
+      narration: `Payroll payslip — ${employee.employeeCode} (${employee.fullName}) — ${payslip.payMonth}`,
+      totalAmount: String(gross),
+      status: "approved",
+      partyId: null,
+      gstRate: null,
+      taxableAmount: null,
+      cgstAmount: null,
+      sgstAmount: null,
+      igstAmount: null,
+      isInterState: false,
+      createdBy: req.user!.id,
+      approvedBy: req.user!.id,
+    }, entries);
+
+    const updated = await storage.updatePayrollPayslip(id, { status: "paid", voucherId: voucher.id });
+    await storage.createAuditLog({
+      employeeId: req.user!.id, action: "mark-paid", entity: "payroll_payslip",
+      entityId: id, details: `Marked payslip ${id} paid — posted voucher ${voucherNumber}`,
+      ipAddress: req.ip || null,
+    });
+    res.json({ ...updated, voucher });
+  });
+
+  // Payroll Employee self-service payslips — mirrors /my-payslips for tutors,
+  // scoped to the payroll profile linked via payrollEmployees.loginEmployeeId.
+  app.get("/api/accounting/my-payroll-payslips", requireAuth, requirePermission("payroll_employees.view_own"), async (req, res) => {
+    const profile = await storage.getPayrollEmployeeByLoginEmployeeId(req.user!.id);
+    if (!profile) return res.status(404).json({ message: "No payroll profile linked to this account" });
+    const list = await storage.getPayrollPayslips({ payrollEmployeeId: profile.id });
+    // Only finalized states — draft/submitted/rejected are internal admin workflow
+    // states with no self-service UI to render them (same convention as tutors).
+    res.json(list.filter(p => p.status === "approved" || p.status === "paid"));
+  });
+
+  app.get("/api/accounting/my-payroll-payslips/:id", requireAuth, requirePermission("payroll_employees.view_own"), async (req, res) => {
+    const profile = await storage.getPayrollEmployeeByLoginEmployeeId(req.user!.id);
+    if (!profile) return res.status(404).json({ message: "No payroll profile linked to this account" });
+    const payslip = await storage.getPayrollPayslip(parseInt(req.params.id));
+    if (!payslip || payslip.payrollEmployeeId !== profile.id || (payslip.status !== "approved" && payslip.status !== "paid")) {
+      return res.status(404).json({ message: "Payslip not found" });
+    }
+    res.json(payslip);
   });
 
   // Vouchers
@@ -3487,6 +4208,30 @@ async function seedDatabase() {
           openingBalance: "0",
           balanceType: "credit",
           description: "Platform commission retained from tutor fees per Clause 4.2 of the Individual Tutor Agreement (usually 0%)",
+        });
+      }
+    }
+  }
+
+  // Ensure PF/ESI Payable ledger accounts exist — same unconditional backfill
+  // pattern as the Tutor Payroll ledgers above, needed for the With-PF/ESI
+  // payroll payslip format's mark-paid voucher posting (employee-side
+  // withholding only; employer contributions are tracked on the payslip but
+  // not yet posted to the ledger — see payrollPayslips in shared/schema.ts).
+  {
+    const dutiesGroup = (await storage.getAccountGroups()).find(g => g.name === "Duties & Taxes");
+    if (dutiesGroup) {
+      const existingAccounts = await storage.getLedgerAccounts();
+      if (!existingAccounts.some(a => a.name === "PF Payable")) {
+        await storage.createLedgerAccount({
+          name: "PF Payable", groupId: dutiesGroup.id, openingBalance: "0", balanceType: "credit",
+          description: "Employee PF contribution withheld from salaried staff, due for remittance",
+        });
+      }
+      if (!existingAccounts.some(a => a.name === "ESI Payable")) {
+        await storage.createLedgerAccount({
+          name: "ESI Payable", groupId: dutiesGroup.id, openingBalance: "0", balanceType: "credit",
+          description: "Employee ESI contribution withheld from salaried staff, due for remittance",
         });
       }
     }
