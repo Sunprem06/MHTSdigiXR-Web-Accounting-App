@@ -2108,6 +2108,15 @@ export async function registerRoutes(
     return results;
   }
 
+  // Lightweight colleague picker for the swap-request form — deliberately its
+  // own route rather than reusing /employees/directory, since that one is
+  // gated on employees.view and most roles that hold attendance.request_swap
+  // (accountant, data_entry, sales roles, etc.) don't have that permission.
+  app.get("/api/accounting/attendance/colleagues", requireAuth, requirePermission("attendance.request_swap"), async (req, res) => {
+    const employees = await storage.getEmployees();
+    res.json(employees.filter(e => e.isActive && e.role !== "tutor" && e.id !== req.user!.id).map(e => ({ id: e.id, fullName: e.fullName })));
+  });
+
   app.get("/api/accounting/attendance/week/mine", requireAuth, requirePermission("attendance.view_own"), async (req, res) => {
     const startDate = (req.query.startDate as string) || new Date().toISOString().slice(0, 10);
     const week = await resolveWeekEffectiveTypes(req.user!.id, startDate);
